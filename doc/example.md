@@ -1,5 +1,7 @@
 # Example
 
+**WARNING: These features are planned, not yet implemented.**
+
 This example document shows how Nanobot works
 using example data from
 [Structural size measurements and isotopic signatures of foraging among adult male and female Adélie penguins (Pygoscelis adeliae) nesting along the Palmer Archipelago near Palmer Station, 2007-2009](https://doi.org/10.6073/pasta/abc50eed9138b75f54eaada0841b9b86)
