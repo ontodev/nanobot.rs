@@ -3,10 +3,10 @@ use std::fs;
 use std::path::Path;
 
 fn init() -> Result<&'static str, &'static str> {
-    if Path::new("nanobot/nanobot.toml").exists() {
+    if Path::new("nanobot.toml").exists() {
         Err("nanobot.toml file already exists.")
     } else {
-        fs::copy("src/resources/default_config.toml", "nanobot/nanobot.toml").unwrap();
+        fs::copy("src/resources/default_config.toml", "nanobot.toml").unwrap();
         Ok("Hello world")
     }
 }
