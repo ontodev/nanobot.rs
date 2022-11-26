@@ -26,7 +26,11 @@ fn main() {
 
     //print exit message
     match exit_result {
-        Err(x) => println!("{}", x),
+        Err(x) => {
+            println!("{}", x);
+            std::process::exit(1)
+        }
+
         Ok(x) => println!("{}", x),
     }
 }
