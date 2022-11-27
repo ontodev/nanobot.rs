@@ -1,0 +1,31 @@
+on: [push]
+
+name: Test binaries
+
+jobs: 
+  build_and_test:
+    name: Test nanobot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --all-features
+      - uses: actions/upload-artifact@v3
+        with:
+          name: nanobot
+          path: target/release/nanobot
+          if-no-files-found: error 
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16
+      - uses: GuillaumeFalourd/assert-command-line-output@v1
+        with:
+          command_line: ./target/release/nanobot init
+          assert_file_path: tests/test_1.txt
+          expected_result: PASSED 
+
