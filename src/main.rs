@@ -13,7 +13,47 @@ fn init() -> Result<String, String> {
     }
 }
 
-//Merge two toml::Values (giving priority to the second argument)
+/// Merge two toml::Values.
+/// The second argument is given priority in case of conflicts.
+/// So, given two toml::Values d and c,
+/// where d is considered a default configuartion,
+/// and a is a custom configuration deviating from d.
+/// Then, merge(d,c) keeps the custom values specified in c
+/// and includes default values from d not specified in c.
+///
+/// #Examples
+///
+/// ```
+/// use toml::Value;
+///
+/// let s1 = r#"
+/// [package]
+/// name = "macrobot"
+/// version = "0.1.0"
+/// edition = "2021"
+/// "#;
+///
+/// let s2 = r#"
+/// [package]
+/// name = "nanobot"
+/// version = "0.1.0"
+/// "#;
+///
+/// let s3 = r#"
+/// [package]
+/// name = "nanobot"
+/// version = "0.1.0"
+/// edition = "2021"
+/// "#;
+///
+/// let v1 = s1.parse::<Value>().unwrap();
+/// let v2 = s2.parse::<Value>().unwrap();
+/// let expected = s3.parse::<Value>().unwrap();
+///
+/// let merged = merge(v1,v2);
+///
+/// assert_eq!(expected, merged);
+/// ```
 fn merge(v1: &Value, v2: &Value) -> Value {
     match v1 {
         Value::Table(x) => match v2 {
