@@ -26,6 +26,6 @@ jobs:
       - uses: GuillaumeFalourd/assert-command-line-output@v1
         with:
           command_line: ./target/release/nanobot init
-          assert_file_path: tests/test_1.txt
+          assert_file_path: tests/init.txt
           expected_result: PASSED 
 
