@@ -1,6 +1,6 @@
-on: [push]
+on: [push, pull_request]
 
-name: Test binaries
+name: Continuous integration
 
 jobs: 
   build_and_test:
@@ -10,7 +10,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
+          profile: minimal
           toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check 
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -27,5 +33,4 @@ jobs:
         with:
           command_line: ./target/release/nanobot init
           assert_file_path: tests/init.txt
-          expected_result: PASSED 
-
+          expected_result: PASSED
