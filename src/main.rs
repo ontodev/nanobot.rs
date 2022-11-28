@@ -1,13 +1,13 @@
-use clap::{command, Command};
+use clap::{arg, command, value_parser, Command};
 use std::error;
 use std::fs;
+use std::fs::File;
 use std::path::Path;
 
-fn init() -> Result<&'static str, &'static str> {
-
-    match fs::create_dir_all("src/schema"){
+fn init(database: &str) -> Result<&'static str, &'static str> {
+    match fs::create_dir_all("src/schema") {
         Err(_x) => return Err("Couldn't create folder src/schema"),
-        Ok(_x) => {} 
+        Ok(_x) => {}
     };
 
     match create_table_tsv() {
@@ -24,6 +24,12 @@ fn init() -> Result<&'static str, &'static str> {
         Err(_x) => return Err("Couldn't write datatype.tsv"),
         Ok(_x) => {}
     };
+
+    //create database
+    match File::create(database) {
+        Err(_x) => return Err("Couldn't create database"),
+        Ok(_x) => {}
+    }
 
     if Path::new("nanobot.toml").exists() {
         Err("nanobot.toml file already exists.")
@@ -288,11 +294,22 @@ fn main() {
         .propagate_version(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
-        .subcommand(Command::new("init").about("Initialises things"))
+        .subcommand(
+            Command::new("init").about("Initialises things").arg(
+                arg!(
+                    -d --database <FILE> "Specifies a custom database name"
+                )
+                .required(false)
+                .value_parser(value_parser!(String)),
+            ),
+        )
         .get_matches();
 
     let exit_result = match matches.subcommand() {
-        Some(("init", _sub_matches)) => init(),
+        Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
+            Some(x) => init(x),
+            _ => init(".nanobot.db"),
+        },
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
