@@ -40,252 +40,53 @@ fn init(database: &str) -> Result<&'static str, &'static str> {
 }
 
 fn create_table_tsv() -> Result<(), Box<dyn error::Error>> {
-    let mut wtr = csv::WriterBuilder::new()
-        .delimiter(b'\t')
-        .from_path("src/schema/table.csv")?;
+    let data = r#"table	path	description	type
+table	src/schema/table.tsv	All of the tables in this project.	table
+column	src/schema/column.tsv	Columns for all of the tables.	column
+datatype	src/schema/datatype.tsv	Datatypes for all of the columns	datatype
+"#;
+    fs::write("src/schema/table.csv", data).expect("Unable to write file");
 
-    wtr.write_record(&["table", "path", "description", "type"])?;
-    wtr.write_record(&[
-        "table",
-        "src/schema/table.tsv",
-        "All of the tables in this project.",
-        "table",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "src/schema/column.tsv",
-        "Columns for all of the tables.",
-        "column",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "src/schema/datatype.tsv",
-        "Datatypes for all of the columns",
-        "datatype",
-    ])?;
-
-    wtr.flush()?;
     Ok(())
 }
 
 fn create_column_tsv() -> Result<(), Box<dyn error::Error>> {
-    let mut wtr = csv::WriterBuilder::new()
-        .delimiter(b'\t')
-        .from_path("src/schema/column.csv")?;
+    let data = r#"table	column	nulltype	datatype	structure	description
+table	table		label	unique	name of this table
+table	path		line		path to the TSV file for this table, relative to the table.tsv file
+table	type	empty	table_type		type of this table, used for tables with special meanings
+table	description	empty	text		a description of this table
+column	table		label	from(table.table)	the table that this column belongs to
+column	column		label		the name of this column
+column	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
+column	datatype		word	from(datatype.datatype)	the datatype for this column
+column	structure	empty	label		schema information for this column
+column	description	empty	text		a description of this column
+datatype	datatype		word	primary	the name of this datatype
+datatype	parent	empty	word	tree(datatype)	the parent datatype
+datatype	condition	empty	line		the method for testing the datatype
+datatype	description	empty	text		a description of this datatype
+datatype	SQL type	empty	sql_type		the SQL type for representing this data
+datatype	HTML type	empty	html_type	 	the HTML type for viewing and editing this data
+"#;
+    fs::write("src/schema/column.csv", data).expect("Unable to write file");
 
-    wtr.write_record(&[
-        "table",
-        "column",
-        "nulltype",
-        "datatype",
-        "structure",
-        "description",
-    ])?;
-    wtr.write_record(&[
-        "table",
-        "table",
-        "",
-        "label",
-        "unique",
-        "name of this table",
-    ])?;
-    wtr.write_record(&[
-        "table",
-        "path",
-        "",
-        "line",
-        "",
-        "path to the TSV file for this table, relative to the table.tsv file",
-    ])?;
-    wtr.write_record(&[
-        "table",
-        "type",
-        "empty",
-        "table_type",
-        "",
-        "type of this table, used for tables with special meanings",
-    ])?;
-    wtr.write_record(&[
-        "table",
-        "description",
-        "empty",
-        "text",
-        "",
-        "a description of this table",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "table",
-        "",
-        "label",
-        "from(table.table)",
-        "the table that this column belongs to",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "column",
-        "",
-        "label",
-        "",
-        "the name of this column",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "nulltype",
-        "empty",
-        "word",
-        "from(datatype.datatype)",
-        "the datatype for NULL values in this column",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "datatype",
-        "",
-        "word",
-        "from(datatype.datatype)",
-        "the datatype for this column",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "structure",
-        "empty",
-        "label",
-        "",
-        "schema information for this column",
-    ])?;
-    wtr.write_record(&[
-        "column",
-        "description",
-        "empty",
-        "text",
-        "",
-        "a description of this column",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "datatype",
-        "",
-        "word",
-        "primary",
-        "the name of this datatype",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "parent",
-        "empty",
-        "word",
-        "tree(datatype)",
-        "the parent datatype",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "condition",
-        "empty",
-        "line",
-        "",
-        "the method for testing the datatype",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "description",
-        "empty",
-        "text",
-        "",
-        "a description of this datatype",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "SQL type",
-        "empty",
-        "sql_type",
-        "",
-        "the SQL type for representing this data",
-    ])?;
-    wtr.write_record(&[
-        "datatype",
-        "HTML type",
-        "empty",
-        "html_type",
-        " ",
-        "the HTML type for viewing and editing this data",
-    ])?; //NB: use of white space
-
-    wtr.flush()?;
     Ok(())
 }
 
 fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
-    let mut wtr = csv::WriterBuilder::new()
-        .delimiter(b'\t')
-        .from_path("src/schema/datatype.csv")?;
+    let data = r#"datatype	parent	condition	description	SQL type	HTML type
+text			any text	TEXT	textarea
+empty	text	equals('')	the empty string	NULL	
+line	text	exclude(/\\\\\\\n/)	one line of text		text
+label	line	match(/[^\s]+.+[^\s]/)	text that does not begin or end with whitespace		
+word	label	exclude(/\W/)	a single word: letters, numbers, underscore		
+table_type	word	in('table', 'column', 'datatype')	a VALVE table type		search
+sql_type	word	in('NULL', 'TEXT', 'INT')	a SQL type		search
+html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')	an HTML form type		search
+"#;
+    fs::write("src/schema/datatype.csv", data).expect("Unable to write file");
 
-    wtr.write_record(&[
-        "datatype",
-        "parent",
-        "condition",
-        "description",
-        "SQL type",
-        "HTML type",
-    ])?;
-    wtr.write_record(&["text", "", "", "any text", "TEXT", "textarea"])?;
-    wtr.write_record(&[
-        "empty",
-        "text",
-        "equals('')",
-        "the empty string",
-        "NULL",
-        "",
-    ])?;
-    wtr.write_record(&[
-        "line",
-        "text",
-        "exclude(/\\\\\\\\\\\\\\n/)",
-        "one line of text",
-        "",
-        "text",
-    ])?;
-    wtr.write_record(&[
-        "label",
-        "line",
-        "match(/[^\\s]+.+[^\\s]/)",
-        "text that does not begin or end with whitespace",
-        "",
-        "",
-    ])?;
-    wtr.write_record(&[
-        "word",
-        "label",
-        "exclude(/\\W/)",
-        "a single word: letters, numbers, underscore",
-        "",
-        "",
-    ])?;
-    wtr.write_record(&[
-        "table_type",
-        "word",
-        "in('table', 'column', 'datatype')",
-        "a VALVE table type",
-        "",
-        "search",
-    ])?;
-    wtr.write_record(&[
-        "sql_type",
-        "word",
-        "in('NULL', 'TEXT', 'INT')",
-        "a SQL type",
-        "",
-        "search",
-    ])?;
-    wtr.write_record(&[
-        "html_type",
-        "word",
-        "in('text', 'textarea', 'search', 'radio', 'number', 'select')",
-        "an HTML form type",
-        "",
-        "search",
-    ])?;
-
-    wtr.flush()?;
     Ok(())
 }
 
