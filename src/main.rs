@@ -34,7 +34,14 @@ fn init(database: &str) -> Result<&'static str, &'static str> {
     if Path::new("nanobot.toml").exists() {
         Err("nanobot.toml file already exists.")
     } else {
-        fs::copy("src/resources/default_config.toml", "nanobot.toml").unwrap();
+        let toml = r#"[tool]
+name = "nanobot"
+version = "0.1.0"
+edition = "2021"
+"#;
+
+        fs::write("nanobot.toml", toml).expect("Unable to write file");
+
         Ok("Hello world")
     }
 }
