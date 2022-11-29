@@ -20,9 +20,9 @@ Nanobot initializes a new project in these steps:
 You can check that this is the case using the `tree` utility:
 
 ```shell-session tesh-session="init"
-$ tree
-├── nanobot.toml
+$ tree -a
 ├── .nanobot.db
+├── nanobot.toml
 └── src
     └── schema
         ├── column.tsv
