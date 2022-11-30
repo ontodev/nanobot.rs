@@ -9,7 +9,7 @@ fn init() -> Result<String, String> {
         Err(String::from("nanobot.toml file already exists."))
     } else {
         fs::copy("src/resources/default_config.toml", "nanobot.toml").unwrap();
-        Ok(String::from("Hello world"))
+        Ok(String::from("Initialized a Nanobot project"))
     }
 }
 
