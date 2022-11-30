@@ -1,10 +1,11 @@
 use clap::{arg, command, value_parser, Command};
+use ontodev_valve::configure_and_or_load;
 use std::error;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
 
-fn init(database: &str) -> Result<&'static str, &'static str> {
+async fn init(database: &str) -> Result<&'static str, &'static str> {
     match fs::create_dir_all("src/schema") {
         Err(_x) => return Err("Couldn't create folder src/schema"),
         Ok(_x) => {}
@@ -30,6 +31,9 @@ fn init(database: &str) -> Result<&'static str, &'static str> {
         Err(_x) => return Err("Couldn't create database"),
         Ok(_x) => {}
     }
+
+    //load tables into database
+    let _config = configure_and_or_load("src/schema/table.tsv", database, true).await;
 
     if Path::new("nanobot.toml").exists() {
         Err("nanobot.toml file already exists.")
@@ -97,7 +101,8 @@ html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')	an 
     Ok(())
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let matches = command!() // requires `cargo` feature
         .propagate_version(true)
         .subcommand_required(true)
@@ -122,7 +127,7 @@ fn main() {
     };
 
     //print exit message
-    match exit_result {
+    match exit_result.await {
         Err(x) => {
             println!("{}", x);
             std::process::exit(1)
