@@ -74,7 +74,7 @@ datatype	parent	empty	word	tree(datatype)	the parent datatype
 datatype	condition	empty	line		the method for testing the datatype
 datatype	description	empty	text		a description of this datatype
 datatype	SQL type	empty	sql_type		the SQL type for representing this data
-datatype	HTML type	empty	html_type	 	the HTML type for viewing and editing this data
+datatype	HTML type	empty	html_type		the HTML type for viewing and editing this data
 "#;
     fs::write("src/schema/column.csv", data).expect("Unable to write file");
 
