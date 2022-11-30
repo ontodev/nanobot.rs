@@ -52,7 +52,7 @@ table	src/schema/table.tsv	All of the tables in this project.	table
 column	src/schema/column.tsv	Columns for all of the tables.	column
 datatype	src/schema/datatype.tsv	Datatypes for all of the columns	datatype
 "#;
-    fs::write("src/schema/table.csv", data).expect("Unable to write file");
+    fs::write("src/schema/table.tsv", data).expect("Unable to write file");
 
     Ok(())
 }
@@ -76,7 +76,7 @@ datatype	description	empty	text		a description of this datatype
 datatype	SQL type	empty	sql_type		the SQL type for representing this data
 datatype	HTML type	empty	html_type		the HTML type for viewing and editing this data
 "#;
-    fs::write("src/schema/column.csv", data).expect("Unable to write file");
+    fs::write("src/schema/column.tsv", data).expect("Unable to write file");
 
     Ok(())
 }
@@ -92,7 +92,7 @@ table_type	word	in('table', 'column', 'datatype')	a VALVE table type		search
 sql_type	word	in('NULL', 'TEXT', 'INT')	a SQL type		search
 html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')	an HTML form type		search
 "#;
-    fs::write("src/schema/datatype.csv", data).expect("Unable to write file");
+    fs::write("src/schema/datatype.tsv", data).expect("Unable to write file");
 
     Ok(())
 }
