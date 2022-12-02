@@ -54,7 +54,7 @@ fn format_table_stdout(rows: &Vec<SqliteRow>) -> String {
     result
 }
 
-async fn get_table_from_database(database: &str, table: &str) -> Result<String, String> {
+async fn get_table_from_database(database: &str, table: &str, format: &str) -> Result<String, String> {
     let connection_string = format!("sqlite://{}?mode=rwc", database);
 
     let pool = SqlitePoolOptions::new()
@@ -71,7 +71,12 @@ async fn get_table_from_database(database: &str, table: &str) -> Result<String, 
     let query_string = format!("SELECT * FROM '{}'", &table_checked);
     let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(&pool).await.unwrap();
 
-    let result = format_table_stdout(&rows);
+
+    let result = match format {
+        "stdout" => format_table_stdout(&rows),
+        _ => panic!("Format '{}' not supported", format) 
+    }; 
+
     Ok(result)
 }
 
@@ -215,7 +220,12 @@ async fn main() {
                 arg!(<TABLE> "A database table")
                     .required(true)
                     .value_parser(value_parser!(String)),
-            ),
+            )
+            .arg(
+                arg!(-f --format <FORMAT> "Specifies an output format, e.g., json")
+                    .required(false)
+                    .value_parser(value_parser!(String)),
+                ),
         )
         .get_matches();
 
@@ -223,11 +233,19 @@ async fn main() {
         Some(("init", _sub_matches)) => init(),
         Some(("config", _sub_matches)) => config("nanobot.toml"),
         Some(("get", sub_matches)) => {
-            match sub_matches.get_one::<String>("TABLE") {
-                Some(x) => get_table_from_database(".nanobot.db", x),
-                _ => panic!("No table given"),
-            }
-            .await
+
+            let table = match sub_matches.get_one::<String>("TABLE") {
+                Some(x) => x,
+                _  => panic!("No table given")
+            };
+
+            let format = match sub_matches.get_one::<String>("format") {
+                Some(x) => x,
+                _  => "stdout" //default behavior: print to STDOUT
+            }; 
+
+            get_table_from_database(".nanobot.db", table, format).await
+
         }
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
