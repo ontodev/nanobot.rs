@@ -1,6 +1,11 @@
-use clap::{command, Command};
+use clap::{arg, command, value_parser, Command};
+use sqlx::sqlite::SqlitePoolOptions;
+use sqlx::sqlite::SqliteRow;
+use sqlx::Row;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
+use tabwriter::TabWriter;
 use toml::map::Map;
 use toml::Value;
 
@@ -11,6 +16,58 @@ fn init() -> Result<String, String> {
         fs::copy("src/resources/default_config.toml", "nanobot.toml").unwrap();
         Ok(String::from("Initialized a Nanobot project"))
     }
+}
+
+fn format_table_stdout(rows: &Vec<SqliteRow>) -> String {
+    //transform rows into a single string
+    let rows_string = rows
+        .iter()
+        .map(|r| {
+            format!(
+                "{}\t{}\t{}\t{}",
+                r.get::<String, _>("table"),
+                r.get::<String, _>("path"),
+                r.get::<String, _>("description"),
+                r.get::<String, _>("type")
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    //add header information
+    let mut rows_with_header: String = "table\tpath\tdescription\ttype\n".to_owned();
+    rows_with_header.push_str(&rows_string);
+
+    //format using elastic tabstops
+    let mut tw = TabWriter::new(vec![]);
+    write!(&mut tw, "{}", rows_with_header).unwrap();
+    tw.flush().unwrap();
+
+    //return result
+    let result = String::from_utf8(tw.into_inner().unwrap()).unwrap();
+    result
+}
+
+async fn get_table_from_database(database: &str, table: &str) -> Result<String, String> {
+    let connection_string = format!("sqlite://{}?mode=rwc", database);
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
+
+    let table_checked = match table {
+        "table" => "table",
+        _ => panic!("Unsupported table"),
+    };
+
+    let query_string = format!("SELECT * FROM '{}'", &table_checked); //TODO: change this to 'table'
+    let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(&pool).await.unwrap();
+
+    let str_result = format_table_stdout(&rows);
+
+    Ok(str_result)
 }
 
 /// Merge two toml::Values.
@@ -140,18 +197,33 @@ fn config(file_path: &str) -> Result<String, String> {
     Ok(toml)
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let matches = command!() // requires `cargo` feature
         .propagate_version(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(Command::new("init").about("Initialises things"))
         .subcommand(Command::new("config").about("Configures things"))
+        .subcommand(
+            Command::new("get").about("Gets things from a table").arg(
+                arg!(<TABLE> "A database table")
+                    .required(true)
+                    .value_parser(value_parser!(String)),
+            ),
+        )
         .get_matches();
 
     let exit_result = match matches.subcommand() {
         Some(("init", _sub_matches)) => init(),
         Some(("config", _sub_matches)) => config("nanobot.toml"),
+        Some(("get", sub_matches)) => {
+            match sub_matches.get_one::<String>("TABLE") {
+                Some(x) => get_table_from_database(".nanobot.db", x),
+                _ => panic!("No table given"),
+            }
+            .await
+        }
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
