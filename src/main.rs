@@ -13,7 +13,13 @@ fn init() -> Result<String, String> {
     if Path::new("nanobot.toml").exists() {
         Err(String::from("nanobot.toml file already exists."))
     } else {
-        fs::copy("src/resources/default_config.toml", "nanobot.toml").unwrap();
+        let toml = r#"[tool]
+name = "nanobot"
+version = "0.1.0"
+edition = "2021"
+"#;
+        fs::write("nanobot.toml", toml).expect("Unable to write file");
+
         Ok(String::from("Initialized a Nanobot project"))
     }
 }
@@ -62,12 +68,11 @@ async fn get_table_from_database(database: &str, table: &str) -> Result<String, 
         _ => panic!("Unsupported table"),
     };
 
-    let query_string = format!("SELECT * FROM '{}'", &table_checked); //TODO: change this to 'table'
+    let query_string = format!("SELECT * FROM '{}'", &table_checked);
     let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(&pool).await.unwrap();
 
-    let str_result = format_table_stdout(&rows);
-
-    Ok(str_result)
+    let result = format_table_stdout(&rows);
+    Ok(result)
 }
 
 /// Merge two toml::Values.
