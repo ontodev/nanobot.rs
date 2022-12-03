@@ -8,8 +8,9 @@
   </tr>
   {% for r in row -%}
   <tr>
-    {% for column, cell in r|items -%}
-    <td>{{ cell.value }}</td>
+    {# {% for column, cell in r|items -%} #}
+    {% for column, value in r|items %}
+    <td>{{ value }}</td>
     {% endfor %}
   </tr>
   {% endfor %}

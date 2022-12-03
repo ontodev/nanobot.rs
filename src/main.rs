@@ -143,7 +143,8 @@ fn config(file_path: &str) -> Result<String, String> {
     Ok(toml)
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)

@@ -26,10 +26,10 @@ pub async fn main() -> Result<String, String> {
 }
 
 async fn root() -> String {
-    get::table(String::from("table"))
+    get::table(String::from("table")).await
 }
 
 async fn table(Path(table): Path<String>, RawQuery(query): RawQuery) -> String {
     tracing::info!("query {:?}", query);
-    get::table(table)
+    get::table(table).await
 }
