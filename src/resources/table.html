@@ -1,0 +1,17 @@
+{% extends "page.html" %}
+{% block content %}
+<table class="table">
+  <tr>
+    {% for name, value in column|items -%}
+    <th>{{ name }}</th>
+    {% endfor %}
+  </tr>
+  {% for r in row -%}
+  <tr>
+    {% for column, cell in r|items -%}
+    <td>{{ cell.value }}</td>
+    {% endfor %}
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

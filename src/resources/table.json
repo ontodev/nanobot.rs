@@ -1,0 +1,87 @@
+{
+  "format": "valve.json",
+  "table": {
+    "table": "table",
+    "path": "src/schema/table.tsv",
+    "description": "All of the tables in this project.",
+    "type": "table",
+    "query": "table?limit=1",
+    "limit": 1,
+    "offset": 0
+  },
+  "column": {
+    "table": {
+      "datatype": "label",
+      "structure": "unique",
+      "description": "name of this table"
+    },
+    "path": {
+      "datatype": "line",
+      "description": "path to the TSV file for this table, relative to the table.tsv file"
+    },
+    "description": {
+      "nulltype": "empty",
+      "datatype": "text",
+      "description": "a description of this table"
+    },
+    "type": {
+      "nulltype": "empty",
+      "datatype": "table_type",
+      "description": "type of this table, used for tables with special meanings"
+    }
+  },
+  "datatype": {
+    "text": {
+      "description": "any text",
+      "HTML type": "textarea"
+    },
+    "empty": {
+      "parent": "text",
+      "condition": "equals('')",
+      "description": "the empty string",
+      "HTML type": "none"
+    },
+    "line": {
+      "parent": "text",
+      "condition": "exclude(/\n/)",
+      "description": "one line of text",
+      "HTML type": "text"
+    },
+    "label": {
+      "parent": "line",
+      "condition": "match(/[^\\s]+.+[^\\s]/)",
+      "description": "text that does not begin or end with whitespace"
+    },
+    "word": {
+      "parent": "label",
+      "condition": "exclude(/\\W/)",
+      "description": "a single word: letters, numbers, underscore"
+    },
+    "table_type": {
+      "parent": "word",
+      "condition": "in('table', 'column', 'datatype')",
+      "description": "a VALVE table type",
+      "HTML type": "select"
+    }
+  },
+  "row": [
+    {
+      "table": {
+        "value": "table",
+        "datatype": "label"
+      },
+      "path": {
+        "value": "src/schema/table.tsv",
+        "datatype": "line"
+      },
+      "description": {
+        "value": "All of the tables in this project.",
+        "datatype": "text"
+      },
+      "type": {
+        "value": "table",
+        "datatype": "table_type"
+      }
+    }
+  ]
+}

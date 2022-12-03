@@ -1,3 +1,6 @@
+mod get;
+mod serve;
+
 use clap::{command, Command};
 use std::fs;
 use std::path::Path;
@@ -141,17 +144,28 @@ fn config(file_path: &str) -> Result<String, String> {
 }
 
 fn main() {
+    // initialize tracing
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(tracing::Level::INFO)
+        // completes the builder.
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
     let matches = command!() // requires `cargo` feature
         .propagate_version(true)
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommand(Command::new("init").about("Initialises things"))
         .subcommand(Command::new("config").about("Configures things"))
+        .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
     let exit_result = match matches.subcommand() {
         Some(("init", _sub_matches)) => init(),
         Some(("config", _sub_matches)) => config("nanobot.toml"),
+        Some(("serve", _sub_matches)) => serve::main(),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
