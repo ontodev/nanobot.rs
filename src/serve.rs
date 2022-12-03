@@ -1,5 +1,6 @@
 use crate::get;
 use axum::extract::{Path, RawQuery};
+use axum::response::Html;
 use axum::routing::get;
 use axum::Router;
 use std::net::SocketAddr;
@@ -25,11 +26,12 @@ pub async fn main() -> Result<String, String> {
     Ok(hello)
 }
 
-async fn root() -> String {
-    get::table(String::from("table")).await
+async fn root() -> Html<String> {
+    tracing::info!("request root");
+    Html(get::table(String::from("table")).await)
 }
 
-async fn table(Path(table): Path<String>, RawQuery(query): RawQuery) -> String {
-    tracing::info!("query {:?}", query);
-    get::table(table).await
+async fn table(Path(table): Path<String>, RawQuery(query): RawQuery) -> Html<String> {
+    tracing::info!("request table {:?} {:?}", table, query);
+    Html(get::table(table).await)
 }

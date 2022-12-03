@@ -1,5 +1,6 @@
 {% extends "page.html" %}
 {% block content %}
+<h2>{{ table.path }}</h2>
 <table class="table">
   <tr>
     {% for name, value in column|items -%}
@@ -8,8 +9,12 @@
   </tr>
   {% for r in row -%}
   <tr>
-    {# {% for column, cell in r|items -%} #}
-    {% for column, value in r|items %}
+    {#
+    {% for column, cell in r|items -%}
+    <td>{{ cell.value }}</td>
+    {% endfor %}
+    #}
+    {% for column, value in r|items -%}
     <td>{{ value }}</td>
     {% endfor %}
   </tr>
