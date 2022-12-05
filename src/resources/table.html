@@ -20,4 +20,13 @@
   </tr>
   {% endfor %}
 </table>
+
+<pre>
+  <code>
+    PAGE {{ page|tojson(true) }}
+    TABLE {{ table|tojson(true) }}
+    COLUMN {{ column|tojson(true) }}
+    ROW {{ row|tojson(true) }}
+  </code>
+</pre>
 {% endblock %}

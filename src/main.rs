@@ -1,5 +1,5 @@
-mod get;
-mod serve;
+pub mod get;
+pub mod serve;
 
 use clap::{command, Command};
 use std::fs;

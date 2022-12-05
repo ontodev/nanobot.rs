@@ -1,9 +1,75 @@
+use crate::serve;
 use minijinja::Environment;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::Row;
 
-pub async fn table(table: String) -> Result<String, sqlx::Error> {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub enum Direction {
+    ASC,
+    DESC,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct Query {
+    pub table: String,
+    pub select: Vec<String>,
+    pub filter: Vec<String>,
+    pub order: Vec<(String, Direction)>,
+    pub limit: usize,
+    pub offset: usize,
+}
+
+/// Convert a Query struct to a SQL string.
+///
+/// ```sql
+/// SELECT json_object(
+///     'table', "table",
+///     'path', "path",
+///     'type', "type",
+///     'description', "description"
+/// ) AS json_result
+/// FROM "table";
+/// ```
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!("foo", "foo");
+/// ```
+#[allow(dead_code)]
+pub fn query_to_sql(q: &Query) -> String {
+    let mut lines: Vec<String> = vec!["SELECT json_object(".to_string()];
+    let parts: Vec<String> = q
+        .select
+        .iter()
+        .map(|c| format!(r#"'{}', "{}""#, c, c))
+        .collect();
+    lines.push(format!("  {}", parts.join(",\n  ")));
+    lines.push(") AS json_result".to_string());
+    lines.push(format!(r#"FROM "{}""#, q.table));
+    if q.filter.len() > 0 {
+        lines.push(format!("WHERE {}", q.filter.join("\n  AND ")));
+    }
+    if q.order.len() > 0 {
+        let parts: Vec<String> = q
+            .order
+            .iter()
+            .map(|(c, d)| format!(r#""{}" {:?}"#, c, d))
+            .collect();
+        lines.push(format!("ORDER BY {}", parts.join(", ")));
+    }
+    if q.limit > 0 {
+        lines.push(format!("LIMIT {}", q.limit));
+    }
+    if q.offset > 0 {
+        lines.push(format!("OFFSET {}", q.offset));
+    }
+    lines.join("\n")
+}
+
+pub async fn get_table(table: String, params: serve::Params) -> Result<String, sqlx::Error> {
     // 1. connect to the database
     // 2. get the 'table' table
     // 3. get columns
@@ -23,22 +89,45 @@ pub async fn table(table: String) -> Result<String, sqlx::Error> {
         .await
         .unwrap();
 
-    let columns = vec!["table", "path", "type", "description"];
-    let filter = None;
-    let table_rows = get_table_from_pool(&pool, "table", columns, filter).await?;
+    let query = Query {
+        table: "table".to_string(),
+        select: vec!["table", "path", "type", "description"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        ..Default::default()
+    };
+    let table_rows = get_table_from_pool(&pool, &query).await?;
     let table_map = rows_to_map(table_rows, "table");
 
-    let columns = vec!["column", "nulltype", "datatype", "structure", "description"];
-    let f = format!(r#"WHERE "table" = '{}'"#, table);
-    let filter = Some(f.as_str());
-    let column_rows = get_table_from_pool(&pool, "column", columns, filter).await?;
+    let query = Query {
+        table: "column".to_string(),
+        select: vec!["column", "nulltype", "datatype", "structure", "description"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        filter: vec![format!(r#""table" = '{}'"#, table)],
+        ..Default::default()
+    };
+    let column_rows = get_table_from_pool(&pool, &query).await?;
     let column_map = rows_to_map(column_rows, "column");
 
     // TODO: collect and fetch datatypes
 
-    let columns = column_map.keys().map(|k| k.as_str()).collect();
-    let filter = None;
-    let rows = get_table_from_pool(&pool, &table, columns, filter).await?;
+    let mut limit = 100;
+    if let Some(x) = params.limit {
+        if x < limit {
+            limit = x;
+        }
+    }
+    let query = Query {
+        table: table.clone(),
+        select: column_map.keys().map(|k| k.to_string()).collect(),
+        limit: limit.clone(),
+        offset: params.offset.unwrap_or_default(),
+        ..Default::default()
+    };
+    let rows = get_table_from_pool(&pool, &query).await?;
 
     // TODO: get the nulltypes
     // TODO: get the messages
@@ -46,7 +135,10 @@ pub async fn table(table: String) -> Result<String, sqlx::Error> {
 
     let data: Value = json!({
         "page": {
-            "title": table
+            "project_name": "Nanobot",
+            "title": table,
+            "params": params,
+            "query": query,
         },
         "table": table_map,
         "column": column_map,
@@ -65,35 +157,9 @@ pub async fn table(table: String) -> Result<String, sqlx::Error> {
     Ok(template.render(data).unwrap())
 }
 
-async fn get_table_from_pool(
-    pool: &SqlitePool,
-    table: &str,
-    columns: Vec<&str>,
-    filter: Option<&str>,
-) -> Result<Vec<Value>, sqlx::Error> {
-    // Build a SQLite query string that returns JSON, like:
-    //     SELECT json_object(
-    //         'table', "table",
-    //         'path', "path",
-    //         'type', "type",
-    //         'description', "description"
-    //     ) AS json_result
-    //     FROM "table";
-    let mut query = vec!["SELECT json_object(".to_string()];
-    for t in &columns {
-        let mut x = ",";
-        if t == columns.last().unwrap() {
-            x = ""
-        }
-        query.push(format!(r#"  '{}', "{}"{}"#, t, t, x));
-    }
-    query.push(") AS json_result".to_string());
-    query.push(format!(r#"FROM "{}""#, table));
-    if let Some(filter) = filter {
-        query.push(filter.to_string());
-    }
-    let query_string = query.join("\n");
-    let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(pool).await?;
+async fn get_table_from_pool(pool: &SqlitePool, query: &Query) -> Result<Vec<Value>, sqlx::Error> {
+    let sql = query_to_sql(query);
+    let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
     Ok(rows
         .iter()
         .map(|row| {

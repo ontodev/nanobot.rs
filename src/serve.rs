@@ -1,10 +1,17 @@
 use crate::get;
-use axum::extract::{Path, RawQuery};
+use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Params {
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
 
 #[tokio::main]
 pub async fn main() -> Result<String, String> {
@@ -32,9 +39,9 @@ async fn root() -> impl IntoResponse {
     Redirect::permanent("/table")
 }
 
-async fn table(Path(table): Path<String>, RawQuery(query): RawQuery) -> impl IntoResponse {
-    tracing::info!("request table {:?} {:?}", table, query);
-    match get::table(table).await {
+async fn table(Path(table): Path<String>, params: Query<Params>) -> impl IntoResponse {
+    tracing::info!("request table {:?} {:?}", table, params.0);
+    match get::get_table(table, params.0).await {
         Ok(html) => (StatusCode::FOUND, Html(html)),
         Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())),
     }
