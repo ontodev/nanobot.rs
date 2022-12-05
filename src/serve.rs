@@ -1,6 +1,7 @@
 use crate::get;
 use axum::extract::{Path, RawQuery};
-use axum::response::Html;
+use axum::http::StatusCode;
+use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use std::net::SocketAddr;
@@ -26,12 +27,15 @@ pub async fn main() -> Result<String, String> {
     Ok(hello)
 }
 
-async fn root() -> Html<String> {
+async fn root() -> impl IntoResponse {
     tracing::info!("request root");
-    Html(get::table(String::from("table")).await)
+    Redirect::permanent("/table")
 }
 
-async fn table(Path(table): Path<String>, RawQuery(query): RawQuery) -> Html<String> {
+async fn table(Path(table): Path<String>, RawQuery(query): RawQuery) -> impl IntoResponse {
     tracing::info!("request table {:?} {:?}", table, query);
-    Html(get::table(table).await)
+    match get::table(table).await {
+        Ok(html) => (StatusCode::FOUND, Html(html)),
+        Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())),
+    }
 }

@@ -1,10 +1,9 @@
 use minijinja::Environment;
 use serde_json::{from_str, json, Map, Value};
-use sqlx::sqlite::SqliteRow;
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::Row;
 
-pub async fn table(table: String) -> String {
+pub async fn table(table: String) -> Result<String, sqlx::Error> {
     // 1. connect to the database
     // 2. get the 'table' table
     // 3. get columns
@@ -26,20 +25,20 @@ pub async fn table(table: String) -> String {
 
     let columns = vec!["table", "path", "type", "description"];
     let filter = None;
-    let table_rows = get_table_from_pool(&pool, "table", columns, filter).await;
+    let table_rows = get_table_from_pool(&pool, "table", columns, filter).await?;
     let table_map = rows_to_map(table_rows, "table");
 
     let columns = vec!["column", "nulltype", "datatype", "structure", "description"];
     let f = format!(r#"WHERE "table" = '{}'"#, table);
     let filter = Some(f.as_str());
-    let column_rows = get_table_from_pool(&pool, "column", columns, filter).await;
+    let column_rows = get_table_from_pool(&pool, "column", columns, filter).await?;
     let column_map = rows_to_map(column_rows, "column");
 
     // TODO: collect and fetch datatypes
 
     let columns = column_map.keys().map(|k| k.as_str()).collect();
     let filter = None;
-    let rows = get_table_from_pool(&pool, &table, columns, filter).await;
+    let rows = get_table_from_pool(&pool, &table, columns, filter).await?;
 
     // TODO: get the nulltypes
     // TODO: get the messages
@@ -63,7 +62,7 @@ pub async fn table(table: String) -> String {
         .unwrap();
 
     let template = env.get_template("table.html").unwrap();
-    template.render(data).unwrap()
+    Ok(template.render(data).unwrap())
 }
 
 async fn get_table_from_pool(
@@ -71,7 +70,7 @@ async fn get_table_from_pool(
     table: &str,
     columns: Vec<&str>,
     filter: Option<&str>,
-) -> Vec<Value> {
+) -> Result<Vec<Value>, sqlx::Error> {
     // Build a SQLite query string that returns JSON, like:
     //     SELECT json_object(
     //         'table', "table",
@@ -94,13 +93,14 @@ async fn get_table_from_pool(
         query.push(filter.to_string());
     }
     let query_string = query.join("\n");
-    let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(pool).await.unwrap();
-    rows.iter()
+    let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(pool).await?;
+    Ok(rows
+        .iter()
         .map(|row| {
             let result: &str = row.get("json_result");
             from_str(&result).unwrap()
         })
-        .collect()
+        .collect())
 }
 
 fn rows_to_map(rows: Vec<Value>, column: &str) -> Map<String, Value> {
