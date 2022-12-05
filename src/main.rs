@@ -1,4 +1,6 @@
 use clap::{arg, command, value_parser, Command};
+use serde_json::json;
+use serde_json::{Map as JSONMap, Value as JSONValue};
 use sqlx::sqlite::SqlitePoolOptions;
 use sqlx::sqlite::SqliteRow;
 use sqlx::Row;
@@ -54,7 +56,40 @@ fn format_table_stdout(rows: &Vec<SqliteRow>) -> String {
     result
 }
 
-async fn get_table_from_database(database: &str, table: &str, format: &str) -> Result<String, String> {
+fn format_table_json(rows: &Vec<SqliteRow>) -> String {
+    let json_vector = rows
+        .iter()
+        .map(|r| {
+            let mut map = JSONMap::new();
+            map.insert(
+                String::from("table"),
+                JSONValue::String(r.get::<String, _>("table")),
+            );
+            map.insert(
+                String::from("path"),
+                JSONValue::String(r.get::<String, _>("path")),
+            );
+            map.insert(
+                String::from("description"),
+                JSONValue::String(r.get::<String, _>("description")),
+            );
+            map.insert(
+                String::from("type"),
+                JSONValue::String(r.get::<String, _>("type")),
+            );
+            JSONValue::Object(map)
+        })
+        .collect::<Vec<JSONValue>>();
+
+    let array = JSONValue::Array(json_vector);
+    array.to_string()
+}
+
+async fn get_table_from_database(
+    database: &str,
+    table: &str,
+    format: &str,
+) -> Result<String, String> {
     let connection_string = format!("sqlite://{}?mode=rwc", database);
 
     let pool = SqlitePoolOptions::new()
@@ -71,11 +106,11 @@ async fn get_table_from_database(database: &str, table: &str, format: &str) -> R
     let query_string = format!("SELECT * FROM '{}'", &table_checked);
     let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(&pool).await.unwrap();
 
-
     let result = match format {
         "stdout" => format_table_stdout(&rows),
-        _ => panic!("Format '{}' not supported", format) 
-    }; 
+        "json" => format_table_json(&rows),
+        _ => panic!("Format '{}' not supported", format),
+    };
 
     Ok(result)
 }
@@ -216,15 +251,17 @@ async fn main() {
         .subcommand(Command::new("init").about("Initialises things"))
         .subcommand(Command::new("config").about("Configures things"))
         .subcommand(
-            Command::new("get").about("Gets things from a table").arg(
-                arg!(<TABLE> "A database table")
-                    .required(true)
-                    .value_parser(value_parser!(String)),
-            )
-            .arg(
-                arg!(-f --format <FORMAT> "Specifies an output format, e.g., json")
-                    .required(false)
-                    .value_parser(value_parser!(String)),
+            Command::new("get")
+                .about("Gets things from a table")
+                .arg(
+                    arg!(<TABLE> "A database table")
+                        .required(true)
+                        .value_parser(value_parser!(String)),
+                )
+                .arg(
+                    arg!(-f --format <FORMAT> "Specifies an output format, e.g., json")
+                        .required(false)
+                        .value_parser(value_parser!(String)),
                 ),
         )
         .get_matches();
@@ -233,19 +270,17 @@ async fn main() {
         Some(("init", _sub_matches)) => init(),
         Some(("config", _sub_matches)) => config("nanobot.toml"),
         Some(("get", sub_matches)) => {
-
             let table = match sub_matches.get_one::<String>("TABLE") {
                 Some(x) => x,
-                _  => panic!("No table given")
+                _ => panic!("No table given"),
             };
 
             let format = match sub_matches.get_one::<String>("format") {
                 Some(x) => x,
-                _  => "stdout" //default behavior: print to STDOUT
-            }; 
+                _ => "stdout", //default behavior: print to STDOUT
+            };
 
             get_table_from_database(".nanobot.db", table, format).await
-
         }
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
