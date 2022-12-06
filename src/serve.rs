@@ -11,6 +11,8 @@ use std::net::SocketAddr;
 pub struct Params {
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+    // TODO: this is a hack to allow for one PostgREST-style column filter
+    pub table: Option<String>,
 }
 
 #[tokio::main]

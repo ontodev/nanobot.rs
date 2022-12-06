@@ -120,18 +120,48 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
             limit = x;
         }
     }
+    let mut filter: Vec<String> = vec![];
+    if let Some(value) = &params.table {
+        let v = value.clone().replace("eq.", "");
+        if table_map.contains_key(&v) {
+            filter.push(format!(r#""table" = '{}'"#, &v));
+        }
+    }
     let query = Query {
         table: table.clone(),
         select: column_map.keys().map(|k| k.to_string()).collect(),
+        filter: filter,
         limit: limit.clone(),
         offset: params.offset.unwrap_or_default(),
         ..Default::default()
     };
-    let rows = get_table_from_pool(&pool, &query).await?;
+    let value_rows = get_table_from_pool(&pool, &query).await?;
 
     // TODO: get the nulltypes
     // TODO: get the messages
-    // TODO: merge into cells
+
+    // convert value_rows to cell_rows
+    let mut cell_rows: Vec<Map<String, Value>> = vec![];
+    for row in &value_rows {
+        let mut crow: Map<String, Value> = Map::new();
+        for (k, v) in row.iter() {
+            let mut cell: Map<String, Value> = Map::new();
+            cell.insert("value".to_string(), v.clone());
+            let datatype = column_map.get(k).unwrap().get("datatype").unwrap();
+            cell.insert("datatype".to_string(), datatype.clone());
+            let structure = column_map.get(k).unwrap().get("structure").unwrap();
+            if structure == "from(table.table)" {
+                let href = format!("/table?table=eq.{}", v.as_str().unwrap().to_string());
+                cell.insert("href".to_string(), Value::String(href));
+            } else if k == "table" && table == "table" {
+                // In the 'table' table, link to the other tables
+                let href = format!("/{}", v.as_str().unwrap().to_string());
+                cell.insert("href".to_string(), Value::String(href));
+            }
+            crow.insert(k.to_string(), Value::Object(cell));
+        }
+        cell_rows.push(crow);
+    }
 
     let data: Value = json!({
         "page": {
@@ -142,7 +172,7 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         },
         "table": table_map,
         "column": column_map,
-        "row": rows
+        "row": cell_rows,
     });
 
     let mut env = Environment::new();
@@ -157,26 +187,29 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
     Ok(template.render(data).unwrap())
 }
 
-async fn get_table_from_pool(pool: &SqlitePool, query: &Query) -> Result<Vec<Value>, sqlx::Error> {
+async fn get_table_from_pool(
+    pool: &SqlitePool,
+    query: &Query,
+) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
     let sql = query_to_sql(query);
     let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
     Ok(rows
         .iter()
         .map(|row| {
             let result: &str = row.get("json_result");
-            from_str(&result).unwrap()
+            from_str::<Map<String, Value>>(&result).unwrap()
         })
         .collect())
 }
 
-fn rows_to_map(rows: Vec<Value>, column: &str) -> Map<String, Value> {
+fn rows_to_map(rows: Vec<Map<String, Value>>, column: &str) -> Map<String, Value> {
     let mut map = Map::new();
     for row in rows.iter() {
         // we want to drop one key (column), but remove does not preserve order
         // https://github.com/serde-rs/json/issues/807
         let mut r = Map::new();
         let mut key = String::from("");
-        for (k, v) in row.as_object().unwrap().iter() {
+        for (k, v) in row.iter() {
             if k == column {
                 key = v.as_str().unwrap().to_string();
             } else {
