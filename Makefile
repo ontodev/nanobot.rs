@@ -1,18 +1,21 @@
+.PHONY: deps
 deps:
-	sudo apt-get install rustc cargo
-	#Install tesh (requires python >= 3.9)
-	sudo add-apt-repository ppa:deadsnakes/ppa
-	sudo apt update
-	sudo apt install python3.10 
-	sudo apt install python3-pip
+	sudo apt-get install -y rustc cargo
+	sudo apt-get install -y python3-pip
 	sudo pip install tesh
 
+.PHONY: format
 format:
 	cargo fmt
 
-build:
+.PHONY: build
+build: target/release/nanobot
+
+target/release/nanobot:
 	cargo build --release
 
-test:
-	cargo test
-	tesh ./doc
+.PHONY: test
+test: target/release/nanobot
+	cargo fmt --check
+	cargo test --release
+	PATH="$${PATH}:$$(pwd)/target/release"; tesh ./doc

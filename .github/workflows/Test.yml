@@ -8,18 +8,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3 
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check 
       - run: |
-          python --version
           make deps
-          make build
+          make target/release/nanobot
+          make test
       - uses: actions/upload-artifact@v3
         with:
           name: nanobot
           path: target/release/nanobot
           if-no-files-found: error 
-      - run: |
-          make test
