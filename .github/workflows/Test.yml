@@ -13,6 +13,7 @@ jobs:
           command: fmt
           args: --all -- --check 
       - run: |
+          python --version
           make deps
           make build
       - uses: actions/upload-artifact@v3
