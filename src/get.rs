@@ -38,7 +38,6 @@ pub struct Query {
 /// ```
 /// assert_eq!("foo", "foo");
 /// ```
-#[allow(dead_code)]
 pub fn query_to_sql(q: &Query) -> String {
     let mut lines: Vec<String> = vec!["SELECT json_object(".to_string()];
     let parts: Vec<String> = q
