@@ -5,6 +5,9 @@ use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::Row;
 
+const LIMIT_MAX: usize = 100;
+const LIMIT_DEFAULT: usize = 10; // TODO: 100?
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum Operator {
     EQUALS,
@@ -81,6 +84,7 @@ pub fn query_to_sql(q: &Query) -> String {
     lines.join("\n")
 }
 
+// TODO: remove duplicate code
 pub fn query_to_sql_count(q: &Query) -> String {
     let mut lines: Vec<String> = vec!["SELECT COUNT(*) AS count".to_string()];
     lines.push(format!(r#"FROM "{}""#, q.table));
@@ -98,6 +102,37 @@ pub fn query_to_sql_count(q: &Query) -> String {
     lines.join("\n")
 }
 
+pub fn query_to_url(q: &Query) -> String {
+    let mut params: Vec<String> = vec![];
+    if q.filter.len() > 0 {
+        for filter in &q.filter {
+            params.push(format!(
+                r#"{}=eq.{}"#,
+                filter.0,
+                filter.2.as_str().unwrap().to_string()
+            ));
+        }
+    }
+    if q.order.len() > 0 {
+        let parts: Vec<String> = q
+            .order
+            .iter()
+            .map(|(c, d)| format!(r#"{}.{}"#, c, format!("{:?}", d).to_lowercase()))
+            .collect();
+        params.push(format!("order={}", parts.join(", ")));
+    }
+    if q.limit > 0 && q.limit != LIMIT_DEFAULT {
+        params.push(format!("limit={}", q.limit));
+    }
+    if q.offset > 0 {
+        params.push(format!("offset={}", q.offset));
+    }
+    if params.len() > 0 {
+        format!("{}?{}", q.table, params.join("&"))
+    } else {
+        q.table.clone()
+    }
+}
 pub async fn get_table(table: String, params: serve::Params) -> Result<String, sqlx::Error> {
     // 1. connect to the database
     // 2. get the 'table' table
@@ -148,10 +183,9 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
 
     // TODO: collect and fetch datatypes
 
-    // let mut limit = 100;
-    let mut limit = 10;
+    let mut limit = LIMIT_DEFAULT;
     if let Some(x) = params.limit {
-        if x < limit {
+        if x < LIMIT_MAX {
             limit = x;
         }
     }
@@ -246,24 +280,38 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
     // Pagination
     // TODO: Account for the current filters
     if query.offset > 0 {
-        this_table.insert("first".to_string(), json!(format!("/{}", table)));
+        let href = query_to_url(&Query {
+            offset: 0,
+            ..query.clone()
+        });
+        this_table.insert("first".to_string(), json!(href));
         if query.offset > query.limit {
-            let prev = query.offset - query.limit;
-            this_table.insert("previous".to_string(), json!(format!("?offset={}", prev)));
+            let href = query_to_url(&Query {
+                offset: query.offset - query.limit,
+                ..query.clone()
+            });
+            this_table.insert("previous".to_string(), json!(href));
         } else {
-            this_table.insert("previous".to_string(), json!(format!("/{}", table)));
+            this_table.insert("previous".to_string(), json!(href));
         }
     }
     if end < count {
-        let next = query.offset + query.limit;
-        this_table.insert("next".to_string(), json!(format!("?offset={}", next)));
+        let href = query_to_url(&Query {
+            offset: query.offset + query.limit,
+            ..query.clone()
+        });
+        this_table.insert("next".to_string(), json!(href));
         let remainder = count % query.limit;
         let last = if remainder == 0 {
             count - query.limit
         } else {
             count - (count % query.limit)
         };
-        this_table.insert("last".to_string(), json!(format!("?offset={}", last)));
+        let href = query_to_url(&Query {
+            offset: last,
+            ..query.clone()
+        });
+        this_table.insert("last".to_string(), json!(href));
     }
 
     let mut tables = Map::new();
