@@ -251,8 +251,17 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         for (k, v) in row.iter() {
             let mut cell: Map<String, Value> = Map::new();
             cell.insert("value".to_string(), v.clone());
-            let datatype = column_map.get(k).unwrap().get("datatype").unwrap();
-            cell.insert("datatype".to_string(), datatype.clone());
+            if v.is_null() {
+                if let Some(nulltype) = column_map.get(k).unwrap().get("nulltype") {
+                    if nulltype.is_string() {
+                        cell.insert("nulltype".to_string(), nulltype.clone());
+                    }
+                }
+            }
+            if !cell.contains_key("nulltype") {
+                let datatype = column_map.get(k).unwrap().get("datatype").unwrap();
+                cell.insert("datatype".to_string(), datatype.clone());
+            }
             let structure = column_map.get(k).unwrap().get("structure").unwrap();
             if structure == "from(table.table)" {
                 let href = format!("/table?table=eq.{}", v.as_str().unwrap().to_string());
@@ -278,7 +287,6 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
     this_table.insert("count".to_string(), json!(count));
 
     // Pagination
-    // TODO: Account for the current filters
     if query.offset > 0 {
         let href = query_to_url(&Query {
             offset: 0,

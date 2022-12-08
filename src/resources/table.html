@@ -60,7 +60,9 @@
   {% for r in row -%}
   <tr>
     {% for column, cell in r|items -%}
-    {% if cell.href %}
+    {% if cell.nulltype %}
+    <td class="bg-null"></td>
+    {% elif cell.href %}
     <td><a href="{{ cell.href }}">{{ cell.value }}</a></td>
     {% else %}
     <td>{{ cell.value }}</td>
