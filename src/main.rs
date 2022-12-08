@@ -6,8 +6,10 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{prelude::*, BufReader};
 use std::path::Path;
+use toml::map::Map;
+use toml::Value;
 
-fn add_to_gitignore(input: &str) -> Result<&'static str, &'static str> {
+fn add_to_gitignore(input: &str) -> Result<String, String> {
     if Path::new(".gitignore").exists() {
         let file = File::open(".gitignore").unwrap();
         let reader = BufReader::new(file);
@@ -49,7 +51,7 @@ fn add_to_gitignore(input: &str) -> Result<&'static str, &'static str> {
                 if let Err(e) = write!(file, "{}", file_res) {
                     eprintln!("Couldn't write to file: {}", e);
                 }
-                Ok("NotFound-Modified")
+                Ok(String::from("NotFound-Modified"))
             } else {
                 let mut file = OpenOptions::new()
                     .write(true)
@@ -70,41 +72,41 @@ fn add_to_gitignore(input: &str) -> Result<&'static str, &'static str> {
                 if let Err(e) = writeln!(file, "{}", input) {
                     eprintln!("Couldn't write to file: {}", e);
                 }
-                Ok("NotFound-NotModified")
+                Ok(String::from("NotFound-NotModified"))
             }
         } else {
             //input is already in .gitignore
-            Ok("Found")
+            Ok(String::from("Found"))
         }
     } else {
-        Ok("No .gitignore")
+        Ok(String::from("No .gitignore"))
     }
 }
 
-async fn init(database: &str) -> Result<&'static str, &'static str> {
+async fn init(database: &str) -> Result<String, String> {
     match fs::create_dir_all("src/schema") {
-        Err(_x) => return Err("Couldn't create folder src/schema"),
+        Err(_x) => return Err(String::from("Couldn't create folder src/schema")),
         Ok(_x) => {}
     };
 
     match create_table_tsv() {
-        Err(_x) => return Err("Couldn't write table.tsv"),
+        Err(_x) => return Err(String::from("Couldn't write table.tsv")),
         Ok(_x) => {}
     };
 
     match create_column_tsv() {
-        Err(_x) => return Err("Couldn't write column.tsv"),
+        Err(_x) => return Err(String::from("Couldn't write column.tsv")),
         Ok(_x) => {}
     };
 
     match create_datatype_tsv() {
-        Err(_x) => return Err("Couldn't write datatype.tsv"),
+        Err(_x) => return Err(String::from("Couldn't write datatype.tsv")),
         Ok(_x) => {}
     };
 
     //create database
     match File::create(database) {
-        Err(_x) => return Err("Couldn't create database"),
+        Err(_x) => return Err(String::from("Couldn't create database")),
         Ok(_x) => {}
     }
 
@@ -118,7 +120,7 @@ async fn init(database: &str) -> Result<&'static str, &'static str> {
     let _config = configure_and_or_load("src/schema/table.tsv", database, true).await;
 
     if Path::new("nanobot.toml").exists() {
-        Err("nanobot.toml file already exists.")
+        Err(String::from("nanobot.toml file already exists."))
     } else {
         let toml = r#"[tool]
 name = "nanobot"
@@ -128,7 +130,7 @@ edition = "2021"
 
         fs::write("nanobot.toml", toml).expect("Unable to write file");
 
-        Ok("Hello world")
+        Ok(String::from("Hello world"))
     }
 }
 
@@ -183,6 +185,134 @@ html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')	an 
     Ok(())
 }
 
+
+/// Merge two toml::Values.
+/// The second argument is given priority in case of conflicts.
+/// So, given two toml::Values d and c,
+/// where d is considered a default configuartion,
+/// and a is a custom configuration deviating from d.
+/// Then, merge(d,c) keeps the custom values specified in c
+/// and includes default values from d not specified in c.
+///
+/// #Examples
+///
+/// ```
+/// use toml::Value;
+///
+/// let s1 = r#"
+/// [package]
+/// name = "macrobot"
+/// version = "0.1.0"
+/// edition = "2021"
+/// "#;
+///
+/// let s2 = r#"
+/// [package]
+/// name = "nanobot"
+/// version = "0.1.0"
+/// "#;
+///
+/// let s3 = r#"
+/// [package]
+/// name = "nanobot"
+/// version = "0.1.0"
+/// edition = "2021"
+/// "#;
+///
+/// let v1 = s1.parse::<Value>().unwrap();
+/// let v2 = s2.parse::<Value>().unwrap();
+/// let expected = s3.parse::<Value>().unwrap();
+///
+/// let merged = merge(v1,v2);
+///
+/// assert_eq!(expected, merged);
+/// ```
+fn merge(v1: &Value, v2: &Value) -> Value {
+    match v1 {
+        Value::Table(x) => match v2 {
+            Value::Table(y) => {
+                let mut merge_table = Map::new();
+                for (k, v) in x {
+                    if y.contains_key(k) {
+                        let yv = y.get(k).unwrap();
+                        let m = merge(v, yv);
+                        merge_table.insert(k.clone(), m);
+                    } else {
+                        merge_table.insert(k.clone(), v.clone());
+                    }
+                }
+                for (k, v) in y {
+                    if !merge_table.contains_key(k) {
+                        merge_table.insert(k.clone(), v.clone());
+                    }
+                }
+                Value::Table(merge_table)
+            }
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+        Value::Array(x) => match v2 {
+            Value::Array(y) => {
+                let mut merged = [&x[..], &y[..]].concat();
+                merged.dedup();
+                Value::Array(merged)
+            }
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+        Value::String(_x) => match v2 {
+            Value::String(y) => Value::String(y.clone()),
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+        Value::Integer(_x) => match v2 {
+            Value::Integer(y) => Value::Integer(y.clone()),
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+        Value::Float(_x) => match v2 {
+            Value::Float(y) => Value::Float(y.clone()),
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+        Value::Boolean(_x) => match v2 {
+            Value::Boolean(y) => Value::Boolean(y.clone()),
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+        Value::Datetime(_x) => match v2 {
+            Value::Datetime(y) => Value::Datetime(y.clone()),
+            _ => panic!("Cannot merge inconsistent types."),
+        },
+    }
+}
+
+fn config(file_path: &str) -> Result<String, String> {
+    let default_config = fs::read_to_string("src/resources/default_config.toml")
+        .expect("Should have been able to read the file");
+
+    let input_config =
+        fs::read_to_string(file_path).expect("Should have been able to read the file");
+
+    let input_value = input_config.parse::<Value>().unwrap();
+    let default_value = default_config.parse::<Value>().unwrap();
+
+    let value_table = input_value.as_table().unwrap();
+    let default_table = default_value.as_table().unwrap();
+
+    let mut merge_table = Map::new();
+    merge_table.clone_from(&value_table);
+
+    for (k, v) in default_table.iter() {
+        if !value_table.contains_key(k) {
+            merge_table.insert(k.clone(), v.clone());
+        } else {
+            let v2 = value_table.get(k).unwrap();
+            let merged = merge(v, v2);
+            merge_table.insert(k.clone(), merged);
+        }
+    }
+
+    let merge_value = Value::Table(merge_table);
+    let toml = toml::to_string(&merge_value).unwrap();
+
+    Ok(toml)
+}
+
 #[async_std::main]
 async fn main() {
     let matches = command!() // requires `cargo` feature
@@ -198,18 +328,20 @@ async fn main() {
                 .value_parser(value_parser!(String)),
             ),
         )
+        .subcommand(Command::new("config").about("Configures things"))
         .get_matches();
 
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
-            Some(x) => init(x),
-            _ => init(".nanobot.db"),
+            Some(x) => init(x).await,
+            _ => init(".nanobot.db").await,
         },
+        Some(("config", _sub_matches)) => config("nanobot.toml"), 
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
     //print exit message
-    match exit_result.await {
+    match exit_result {
         Err(x) => {
             println!("{}", x);
             std::process::exit(1)
