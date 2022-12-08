@@ -117,7 +117,7 @@ async fn init(database: &str) -> Result<String, String> {
     }
 
     //load tables into database
-    let _config = configure_and_or_load("src/schema/table.tsv", database, true).await;
+    let _config = configure_and_or_load("src/schema/table.tsv", database, true, false).await;
 
     if Path::new("nanobot.toml").exists() {
         Err(String::from("nanobot.toml file already exists."))
