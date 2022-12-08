@@ -1,5 +1,5 @@
-use nanobot::get::{query_to_sql, Direction, Query};
-use serde_json::{from_value, json};
+use nanobot::get::{query_to_sql, Direction, Operator, Query};
+use serde_json::{from_value, json, Value};
 
 const SQL_SMALL: &str = r#"SELECT json_object(
   'table', "table",
@@ -30,8 +30,16 @@ fn test_query() {
             .map(|s| s.to_string())
             .collect(),
         filter: vec![
-            r#""table" = 'table'"#.to_string(),
-            r#""type" = 'table'"#.to_string(),
+            (
+                "table".to_string(),
+                Operator::EQUALS,
+                Value::String("table".to_string()),
+            ),
+            (
+                "type".to_string(),
+                Operator::EQUALS,
+                Value::String("table".to_string()),
+            ),
         ],
         order: vec![("path".to_string(), Direction::DESC)],
         limit: 1,
@@ -46,8 +54,8 @@ fn test_query_json() {
         "table": "table",
         "select": ["table", "path", "type", "description"],
         "filter": [
-            r#""table" = 'table'"#,
-            r#""type" = 'table'"#
+            ["table", "EQUALS", "table"],
+            ["type", "EQUALS", "table"]
         ],
         "order": [("path", "DESC")],
         "limit": 1,
