@@ -185,7 +185,6 @@ html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')	an 
     Ok(())
 }
 
-
 /// Merge two toml::Values.
 /// The second argument is given priority in case of conflicts.
 /// So, given two toml::Values d and c,
@@ -336,7 +335,7 @@ async fn main() {
             Some(x) => init(x).await,
             _ => init(".nanobot.db").await,
         },
-        Some(("config", _sub_matches)) => config("nanobot.toml"), 
+        Some(("config", _sub_matches)) => config("nanobot.toml"),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
