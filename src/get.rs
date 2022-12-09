@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::Row;
+use std::io::Write;
+use tabwriter::TabWriter;
 
 const LIMIT_MAX: usize = 100;
 const LIMIT_DEFAULT: usize = 10; // TODO: 100?
@@ -133,6 +135,96 @@ pub fn query_to_url(q: &Query) -> String {
         q.table.clone()
     }
 }
+
+fn format_table_stdout(rows: &Vec<SqliteRow>) -> String {
+    //transform rows into a single string
+    let rows_string = rows
+        .iter()
+        .map(|r| {
+            format!(
+                "{}\t{}\t{}\t{}",
+                r.get::<String, _>("table"),
+                r.get::<String, _>("path"),
+                r.get::<String, _>("description"),
+                r.get::<String, _>("type")
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    //add header information
+    let mut rows_with_header: String = "table\tpath\tdescription\ttype\n".to_owned();
+    rows_with_header.push_str(&rows_string);
+
+    //format using elastic tabstops
+    let mut tw = TabWriter::new(vec![]);
+    write!(&mut tw, "{}", rows_with_header).unwrap();
+    tw.flush().unwrap();
+
+    //return result
+    let result = String::from_utf8(tw.into_inner().unwrap()).unwrap();
+    result
+}
+
+fn format_table_json(rows: &Vec<SqliteRow>) -> String {
+    let json_vector = rows
+        .iter()
+        .map(|r| {
+            let mut map = Map::new();
+            map.insert(
+                String::from("table"),
+                Value::String(r.get::<String, _>("table")),
+            );
+            map.insert(
+                String::from("path"),
+                Value::String(r.get::<String, _>("path")),
+            );
+            map.insert(
+                String::from("description"),
+                Value::String(r.get::<String, _>("description")),
+            );
+            map.insert(
+                String::from("type"),
+                Value::String(r.get::<String, _>("type")),
+            );
+            Value::Object(map)
+        })
+        .collect::<Vec<Value>>();
+
+    let array = Value::Array(json_vector);
+    array.to_string()
+}
+
+pub async fn get_table_from_database(
+    database: &str,
+    table: &str,
+    format: &str,
+) -> Result<String, String> {
+    let connection_string = format!("sqlite://{}?mode=rwc", database);
+
+    let pool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
+
+    let table_checked = match table {
+        "table" => "table",
+        _ => panic!("Unsupported table"),
+    };
+
+    let query_string = format!("SELECT * FROM '{}'", &table_checked);
+    let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(&pool).await.unwrap();
+
+    let result = match format {
+        "stdout" => format_table_stdout(&rows),
+        "json" => format_table_json(&rows),
+        _ => panic!("Format '{}' not supported", format),
+    };
+
+    Ok(result)
+}
+
 pub async fn get_table(table: String, params: serve::Params) -> Result<String, sqlx::Error> {
     // 1. connect to the database
     // 2. get the 'table' table

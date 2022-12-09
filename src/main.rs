@@ -29,6 +29,20 @@ async fn main() {
             ),
         )
         .subcommand(Command::new("config").about("Configures things"))
+        .subcommand(
+            Command::new("get")
+                .about("Gets things from a table")
+                .arg(
+                    arg!(<TABLE> "A database table")
+                        .required(true)
+                        .value_parser(value_parser!(String)),
+                )
+                .arg(
+                    arg!(-f --format <FORMAT> "Specifies an output format, e.g., json")
+                        .required(false)
+                        .value_parser(value_parser!(String)),
+                ),
+        )
         .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
@@ -38,6 +52,19 @@ async fn main() {
             _ => init::init(".nanobot.db").await,
         },
         Some(("config", _sub_matches)) => config::config("nanobot.toml"),
+        Some(("get", sub_matches)) => {
+            let table = match sub_matches.get_one::<String>("TABLE") {
+                Some(x) => x,
+                _ => panic!("No table given"),
+            };
+
+            let format = match sub_matches.get_one::<String>("format") {
+                Some(x) => x,
+                _ => "stdout", //default behavior: print to STDOUT
+            };
+
+            get::get_table_from_database(".nanobot.db", table, format).await
+        }
         Some(("serve", _sub_matches)) => serve::main(),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
