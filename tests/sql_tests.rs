@@ -1,4 +1,4 @@
-use nanobot::sql::{query_to_sql, query_to_url, Direction, Operator, Query};
+use nanobot::sql::{select_to_sql, select_to_url, Direction, Operator, Select};
 use serde_json::{from_value, json, Value};
 
 const SQL_SMALL: &str = r#"SELECT json_object(
@@ -25,8 +25,8 @@ OFFSET 1"#;
 const URL_BIG: &str = "table?table=eq.table&type=eq.table&order=path.desc&limit=1&offset=1";
 
 #[test]
-fn test_query_to_sql() {
-    let query = Query {
+fn test_select_to_sql() {
+    let select = Select {
         table: "table".to_string(),
         select: ["table", "path", "type", "description"]
             .iter()
@@ -48,12 +48,12 @@ fn test_query_to_sql() {
         limit: 1,
         offset: 1,
     };
-    assert_eq!(query_to_sql(&query), SQL_BIG);
+    assert_eq!(select_to_sql(&select), SQL_BIG);
 }
 
 #[test]
-fn test_query_to_sql_json() {
-    let query: Query = from_value(json!({
+fn test_select_to_sql_json() {
+    let select: Select = from_value(json!({
         "table": "table",
         "select": ["table", "path", "type", "description"],
         "filter": [
@@ -65,26 +65,26 @@ fn test_query_to_sql_json() {
         "offset": 1
     }))
     .unwrap();
-    assert_eq!(query_to_sql(&query), SQL_BIG);
+    assert_eq!(select_to_sql(&select), SQL_BIG);
 }
 
 #[test]
-fn test_query_to_sql_default() {
+fn test_select_to_sql_default() {
     let tables = ["table", "path", "type", "description"]
         .iter()
         .map(|s| s.to_string())
         .collect();
-    let query = Query {
+    let select = Select {
         table: "table".to_string(),
         select: tables,
         ..Default::default()
     };
-    assert_eq!(query_to_sql(&query), SQL_SMALL);
+    assert_eq!(select_to_sql(&select), SQL_SMALL);
 }
 
 #[test]
-fn test_query_to_url() {
-    let query: Query = from_value(json!({
+fn test_select_to_url() {
+    let select: Select = from_value(json!({
         "table": "table",
         "select": ["table", "path", "type", "description"],
         "filter": [
@@ -96,19 +96,19 @@ fn test_query_to_url() {
         "offset": 1
     }))
     .unwrap();
-    assert_eq!(query_to_url(&query), URL_BIG);
+    assert_eq!(select_to_url(&select), URL_BIG);
 }
 
 #[test]
-fn test_query_to_url_default() {
+fn test_select_to_url_default() {
     let tables = ["table", "path", "type", "description"]
         .iter()
         .map(|s| s.to_string())
         .collect();
-    let query = Query {
+    let select = Select {
         table: "table".to_string(),
         select: tables,
         ..Default::default()
     };
-    assert_eq!(query_to_url(&query), URL_SMALL);
+    assert_eq!(select_to_url(&select), URL_SMALL);
 }

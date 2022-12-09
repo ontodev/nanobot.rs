@@ -20,7 +20,7 @@ For machine-readability use `--format json`.
 The output is designed to match [PostgREST](https://postgrest.org).
 Piping the output through `jq` makes it easier to read:
 
-```console tesh-session="get"
+```console
 $ nanobot get table --format json | jq
 [
   {

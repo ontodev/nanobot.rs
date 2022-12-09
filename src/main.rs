@@ -39,7 +39,12 @@ async fn main() {
                         .value_parser(value_parser!(String)),
                 )
                 .arg(
-                    arg!(-f --format <FORMAT> "Specifies an output format, e.g., json")
+                    arg!(-s --shape <SHAPE> "Specifies a data 'shape', e.g. value_rows")
+                        .required(false)
+                        .value_parser(value_parser!(String)),
+                )
+                .arg(
+                    arg!(-f --format <FORMAT> "Specifies an output format, e.g. json")
                         .required(false)
                         .value_parser(value_parser!(String)),
                 ),
@@ -58,13 +63,19 @@ async fn main() {
                 Some(x) => x,
                 _ => panic!("No table given"),
             };
-
+            let shape = match sub_matches.get_one::<String>("shape") {
+                Some(x) => x,
+                _ => "value_rows",
+            };
             let format = match sub_matches.get_one::<String>("format") {
                 Some(x) => x,
-                _ => "stdout", //default behavior: print to STDOUT
+                _ => "text",
             };
-
-            get::get_table_from_database(".nanobot.db", table, format).await
+            let result = match get::get_table(".nanobot.db", table, shape, format).await {
+                Ok(x) => x,
+                Err(x) => format!("ERROR: {:?}", x),
+            };
+            Ok(result)
         }
         Some(("serve", _sub_matches)) => serve::main(),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),

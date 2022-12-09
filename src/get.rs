@@ -1,118 +1,65 @@
-use crate::serve;
 use crate::sql::{
-    get_count_from_pool, get_table_from_pool, query_to_url, rows_to_map, Operator, Query,
+    get_count_from_pool, get_table_from_pool, rows_to_map, select_to_url, Operator, Select,
     LIMIT_DEFAULT, LIMIT_MAX,
 };
 use minijinja::Environment;
 use serde_json::{json, Map, Value};
-use sqlx::sqlite::{SqlitePoolOptions, SqliteRow};
-use sqlx::Row;
+use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use std::error::Error;
+use std::fmt;
 use std::io::Write;
 use tabwriter::TabWriter;
 
-fn format_table_stdout(rows: &Vec<SqliteRow>) -> String {
-    //transform rows into a single string
-    let rows_string = rows
-        .iter()
-        .map(|r| {
-            format!(
-                "{}\t{}\t{}\t{}",
-                r.get::<String, _>("table"),
-                r.get::<String, _>("path"),
-                r.get::<String, _>("type"),
-                r.get::<String, _>("description")
-            )
-        })
-        .collect::<Vec<String>>()
-        .join("\n");
-
-    //add header information
-    let mut rows_with_header: String = "table\tpath\ttype\tdescription\n".to_owned();
-    rows_with_header.push_str(&rows_string);
-
-    //format using elastic tabstops
-    let mut tw = TabWriter::new(vec![]);
-    write!(&mut tw, "{}", rows_with_header).unwrap();
-    tw.flush().unwrap();
-
-    //return result
-    let result = String::from_utf8(tw.into_inner().unwrap()).unwrap();
-    result
+#[derive(Debug)]
+pub struct GetError {
+    details: String,
 }
 
-fn format_table_json(rows: &Vec<SqliteRow>) -> String {
-    let json_vector = rows
-        .iter()
-        .map(|r| {
-            let mut map = Map::new();
-            map.insert(
-                String::from("table"),
-                Value::String(r.get::<String, _>("table")),
-            );
-            map.insert(
-                String::from("path"),
-                Value::String(r.get::<String, _>("path")),
-            );
-            map.insert(
-                String::from("type"),
-                Value::String(r.get::<String, _>("type")),
-            );
-            map.insert(
-                String::from("description"),
-                Value::String(r.get::<String, _>("description")),
-            );
-            Value::Object(map)
-        })
-        .collect::<Vec<Value>>();
-
-    let array = Value::Array(json_vector);
-    array.to_string()
+impl GetError {
+    fn new(msg: String) -> GetError {
+        GetError { details: msg }
+    }
 }
 
-pub async fn get_table_from_database(
+impl fmt::Display for GetError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.details)
+    }
+}
+
+impl Error for GetError {
+    fn description(&self) -> &str {
+        &self.details
+    }
+}
+
+impl From<sqlx::Error> for GetError {
+    fn from(error: sqlx::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
+pub async fn get_table(
     database: &str,
     table: &str,
+    shape: &str,
     format: &str,
-) -> Result<String, String> {
-    let connection_string = format!("sqlite://{}?mode=rwc", database);
-
-    let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(&connection_string)
-        .await
-        .unwrap();
-
-    let table_checked = match table {
-        "table" => "table",
-        _ => panic!("Unsupported table"),
+) -> Result<String, GetError> {
+    let select = Select {
+        table: table.to_string(),
+        limit: LIMIT_DEFAULT,
+        ..Default::default()
     };
-
-    let query_string = format!("SELECT * FROM '{}'", &table_checked);
-    let rows: Vec<SqliteRow> = sqlx::query(&query_string).fetch_all(&pool).await.unwrap();
-
-    let result = match format {
-        "stdout" => format_table_stdout(&rows),
-        "json" => format_table_json(&rows),
-        _ => panic!("Format '{}' not supported", format),
-    };
-
-    Ok(result)
+    get_rows(database, &select, shape, format).await
 }
 
-pub async fn get_table(table: String, params: serve::Params) -> Result<String, sqlx::Error> {
-    // 1. connect to the database
-    // 2. get the 'table' table
-    // 3. get columns
-    // 4. get datatype tree
-    // 5. get the actual rows
-    // 6. get the nulltypes
-    // 7. get the messages
-    // 8. merge
-    // 9. render template
-
-    let database = ".nanobot.db";
+pub async fn get_rows(
+    database: &str,
+    base_select: &Select,
+    shape: &str,
+    format: &str,
+) -> Result<String, GetError> {
     let connection_string = format!("sqlite://{}?mode=rwc", database);
-
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
@@ -120,7 +67,7 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         .unwrap();
 
     // Get all the tables
-    let query = Query {
+    let select = Select {
         table: "table".to_string(),
         select: vec!["table", "path", "type", "description"]
             .iter()
@@ -128,11 +75,17 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
             .collect(),
         ..Default::default()
     };
-    let table_rows = get_table_from_pool(&pool, &query).await?;
+    let table_rows = get_table_from_pool(&pool, &select).await?;
     let table_map = rows_to_map(table_rows, "table");
+    if !table_map.contains_key(&base_select.table) {
+        return Err(GetError::new(format!(
+            "Invalid table '{}'",
+            &base_select.table
+        )));
+    }
 
     // Get the columns for the selected table
-    let query = Query {
+    let select = Select {
         table: "column".to_string(),
         select: vec!["column", "nulltype", "datatype", "structure", "description"]
             .iter()
@@ -141,48 +94,69 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         filter: vec![(
             "table".to_string(),
             Operator::EQUALS,
-            Value::String(table.clone()),
+            Value::String(base_select.table.clone()),
         )],
         ..Default::default()
     };
-    let column_rows = get_table_from_pool(&pool, &query).await?;
+    let column_rows = get_table_from_pool(&pool, &select).await?;
 
-    // TODO: collect and fetch datatypes
-
-    let mut limit = LIMIT_DEFAULT;
-    if let Some(x) = params.limit {
-        if x < LIMIT_MAX {
-            limit = x;
-        }
+    let mut columns: Vec<String> = vec![];
+    if shape == "page" {
+        columns.push("row_number".to_string());
     }
-    let mut filter: Vec<(String, Operator, Value)> = vec![];
-    if let Some(value) = &params.table {
-        let v = value.clone().replace("eq.", "");
-        if table_map.contains_key(&v) {
-            filter.push((
-                "table".to_string(),
-                Operator::EQUALS,
-                Value::String(v.clone()),
-            ));
-        }
-    }
-    let mut select: Vec<String> = vec!["row_number".to_string()];
-    select.append(
+    columns.append(
         &mut column_rows
             .clone()
             .into_iter()
             .map(|r| r.get("column").unwrap().as_str().unwrap().to_string())
             .collect(),
     );
-    let query = Query {
-        table: table.clone(),
-        select: select,
-        filter: filter,
-        limit: limit.clone(),
-        offset: params.offset.unwrap_or_default(),
-        ..Default::default()
+    let mut limit = base_select.limit;
+    if limit > LIMIT_MAX {
+        limit = LIMIT_MAX;
+    } else if limit == 0 {
+        limit = LIMIT_DEFAULT;
+    }
+    let select = Select {
+        select: columns,
+        limit,
+        ..base_select.clone()
     };
-    let value_rows = get_table_from_pool(&pool, &query).await?;
+
+    match shape {
+        "value_rows" => {
+            let value_rows = get_table_from_pool(&pool, &select).await?;
+            match format {
+                "text" => Ok(value_rows_to_text(&value_rows)),
+                "json" => Ok(json!(value_rows).to_string()),
+                &_ => Err(GetError::new(format!(
+                    "Shape '{}' does not support format '{}'",
+                    shape, format
+                ))),
+            }
+        }
+        "page" => {
+            let page: Value = get_page(&pool, &select, &table_map, &column_rows).await?;
+            match format {
+                "json" => Ok(page.to_string()),
+                "html" => Ok(page_to_html(&page)),
+                &_ => Err(GetError::new(format!(
+                    "Shape '{}' does not support format '{}'",
+                    shape, format
+                ))),
+            }
+        }
+        _ => Err(GetError::new(format!("Invalid shape '{}'", shape))),
+    }
+}
+
+async fn get_page(
+    pool: &SqlitePool,
+    select: &Select,
+    table_map: &Map<String, Value>,
+    column_rows: &Vec<Map<String, Value>>,
+) -> Result<Value, GetError> {
+    let value_rows = get_table_from_pool(&pool, &select).await?;
 
     let mut column_map = Map::new();
     for row in column_rows.iter() {
@@ -196,7 +170,7 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
             }
         }
         let mut filters: Vec<Value> = vec![];
-        for filter in &query.filter {
+        for filter in &select.filter {
             if filter.0 == key {
                 filters.push(json!([
                     filter.0.clone(),
@@ -241,7 +215,7 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
             if structure == "from(table.table)" {
                 let href = format!("/table?table=eq.{}", v.as_str().unwrap().to_string());
                 cell.insert("href".to_string(), Value::String(href));
-            } else if k == "table" && table == "table" {
+            } else if k == "table" && select.table == "table" {
                 // In the 'table' table, link to the other tables
                 let href = format!("/{}", v.as_str().unwrap().to_string());
                 cell.insert("href".to_string(), Value::String(href));
@@ -251,27 +225,32 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         cell_rows.push(crow);
     }
 
-    let count = get_count_from_pool(&pool, &query).await?;
-    let end = query.offset + cell_rows.len();
+    let count = get_count_from_pool(&pool, &select).await?;
+    let end = select.offset + cell_rows.len();
 
-    let mut this_table = table_map.get(&table).unwrap().as_object().unwrap().clone();
-    this_table.insert("table".to_string(), json!(table.clone()));
-    this_table.insert("href".to_string(), json!(format!("/{}", table)));
-    this_table.insert("start".to_string(), json!(query.offset + 1));
+    let mut this_table = table_map
+        .get(&select.table)
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .clone();
+    this_table.insert("table".to_string(), json!(select.table.clone()));
+    this_table.insert("href".to_string(), json!(format!("/{}", select.table)));
+    this_table.insert("start".to_string(), json!(select.offset + 1));
     this_table.insert("end".to_string(), json!(end));
     this_table.insert("count".to_string(), json!(count));
 
     // Pagination
-    if query.offset > 0 {
-        let href = query_to_url(&Query {
+    if select.offset > 0 {
+        let href = select_to_url(&Select {
             offset: 0,
-            ..query.clone()
+            ..select.clone()
         });
         this_table.insert("first".to_string(), json!(href));
-        if query.offset > query.limit {
-            let href = query_to_url(&Query {
-                offset: query.offset - query.limit,
-                ..query.clone()
+        if select.offset > select.limit {
+            let href = select_to_url(&Select {
+                offset: select.offset - select.limit,
+                ..select.clone()
             });
             this_table.insert("previous".to_string(), json!(href));
         } else {
@@ -279,20 +258,20 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         }
     }
     if end < count {
-        let href = query_to_url(&Query {
-            offset: query.offset + query.limit,
-            ..query.clone()
+        let href = select_to_url(&Select {
+            offset: select.offset + select.limit,
+            ..select.clone()
         });
         this_table.insert("next".to_string(), json!(href));
-        let remainder = count % query.limit;
+        let remainder = count % select.limit;
         let last = if remainder == 0 {
-            count - query.limit
+            count - select.limit
         } else {
-            count - (count % query.limit)
+            count - (count % select.limit)
         };
-        let href = query_to_url(&Query {
+        let href = select_to_url(&Select {
             offset: last,
-            ..query.clone()
+            ..select.clone()
         });
         this_table.insert("last".to_string(), json!(href));
     }
@@ -302,27 +281,63 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         tables.insert(key.clone(), Value::String(format!("/{}", key)));
     }
 
-    let data: Value = json!({
+    let result: Value = json!({
         "page": {
             "project_name": "Nanobot",
             "tables": tables,
-            "title": table,
-            "params": params,
-            "query": query,
+            "title": select.table,
+            "select": select,
         },
         "table": this_table,
         "column": column_map,
         "row": cell_rows,
     });
+    Ok(result)
+}
 
+fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
+    if rows.len() == 0 {
+        return "".to_string();
+    }
+
+    // This would be nicer with map, but I got weird borrowing errors.
+    let mut lines: Vec<String> = vec![];
+    let mut line: Vec<String> = vec![];
+    for key in rows.first().unwrap().keys() {
+        line.push(key.clone());
+    }
+    lines.push(line.join("\t"));
+    for row in rows {
+        let mut line: Vec<String> = vec![];
+        for cell in row.values() {
+            let mut value = cell.clone().to_string();
+            if cell.is_string() {
+                value = cell.as_str().unwrap().to_string();
+            } else if cell.is_null() {
+                value = "".to_string();
+            }
+            line.push(value);
+        }
+        lines.push(line.join("\t"));
+    }
+
+    // Format using elastic tabstops
+    let mut tw = TabWriter::new(vec![]);
+    write!(&mut tw, "{}", lines.join("\n")).unwrap();
+    tw.flush().unwrap();
+
+    String::from_utf8(tw.into_inner().unwrap()).unwrap()
+}
+
+fn page_to_html(page: &Value) -> String {
     let mut env = Environment::new();
-    env.add_template("debug.html", include_str!("resources/debug.html"))
-        .unwrap();
+    // env.add_template("debug.html", include_str!("resources/debug.html"))
+    //     .unwrap();
     env.add_template("page.html", include_str!("resources/page.html"))
         .unwrap();
     env.add_template("table.html", include_str!("resources/table.html"))
         .unwrap();
 
     let template = env.get_template("table.html").unwrap();
-    Ok(template.render(data).unwrap())
+    template.render(page).unwrap()
 }

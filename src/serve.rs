@@ -1,4 +1,4 @@
-use crate::get;
+use crate::{get, sql};
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
@@ -43,7 +43,14 @@ async fn root() -> impl IntoResponse {
 
 async fn table(Path(table): Path<String>, params: Query<Params>) -> impl IntoResponse {
     tracing::info!("request table {:?} {:?}", table, params.0);
-    match get::get_table(table, params.0).await {
+    let select = sql::Select {
+        table,
+        limit: params.limit.unwrap_or_default(),
+        offset: params.offset.unwrap_or_default(),
+        // TODO: restore filters
+        ..Default::default()
+    };
+    match get::get_rows(".nanobot.db", &select, "page", "html").await {
         Ok(html) => (StatusCode::FOUND, Html(html)),
         Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())),
     }

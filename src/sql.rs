@@ -18,7 +18,7 @@ pub enum Direction {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub struct Query {
+pub struct Select {
     pub table: String,
     pub select: Vec<String>,
     pub filter: Vec<(String, Operator, Value)>,
@@ -27,7 +27,7 @@ pub struct Query {
     pub offset: usize,
 }
 
-/// Convert a Query struct to a SQL string.
+/// Convert a Select struct to a SQL string.
 ///
 /// ```sql
 /// SELECT json_object(
@@ -44,19 +44,19 @@ pub struct Query {
 /// ```
 /// assert_eq!("foo", "foo");
 /// ```
-pub fn query_to_sql(q: &Query) -> String {
+pub fn select_to_sql(s: &Select) -> String {
     let mut lines: Vec<String> = vec!["SELECT json_object(".to_string()];
-    let parts: Vec<String> = q
+    let parts: Vec<String> = s
         .select
         .iter()
         .map(|c| format!(r#"'{}', "{}""#, c, c))
         .collect();
     lines.push(format!("  {}", parts.join(",\n  ")));
     lines.push(") AS json_result".to_string());
-    lines.push(format!(r#"FROM "{}""#, q.table));
+    lines.push(format!(r#"FROM "{}""#, s.table));
     let mut filters: Vec<String> = vec![];
-    if q.filter.len() > 0 {
-        for filter in &q.filter {
+    if s.filter.len() > 0 {
+        for filter in &s.filter {
             filters.push(format!(
                 r#""{}" = '{}'"#,
                 filter.0,
@@ -65,30 +65,30 @@ pub fn query_to_sql(q: &Query) -> String {
         }
         lines.push(format!("WHERE {}", filters.join("\n  AND ")));
     }
-    if q.order.len() > 0 {
-        let parts: Vec<String> = q
+    if s.order.len() > 0 {
+        let parts: Vec<String> = s
             .order
             .iter()
             .map(|(c, d)| format!(r#""{}" {:?}"#, c, d))
             .collect();
         lines.push(format!("ORDER BY {}", parts.join(", ")));
     }
-    if q.limit > 0 {
-        lines.push(format!("LIMIT {}", q.limit));
+    if s.limit > 0 {
+        lines.push(format!("LIMIT {}", s.limit));
     }
-    if q.offset > 0 {
-        lines.push(format!("OFFSET {}", q.offset));
+    if s.offset > 0 {
+        lines.push(format!("OFFSET {}", s.offset));
     }
     lines.join("\n")
 }
 
 // TODO: remove duplicate code
-pub fn query_to_sql_count(q: &Query) -> String {
+pub fn select_to_sql_count(s: &Select) -> String {
     let mut lines: Vec<String> = vec!["SELECT COUNT(*) AS count".to_string()];
-    lines.push(format!(r#"FROM "{}""#, q.table));
+    lines.push(format!(r#"FROM "{}""#, s.table));
     let mut filters: Vec<String> = vec![];
-    if q.filter.len() > 0 {
-        for filter in &q.filter {
+    if s.filter.len() > 0 {
+        for filter in &s.filter {
             filters.push(format!(
                 r#""{}" = '{}'"#,
                 filter.0,
@@ -100,10 +100,10 @@ pub fn query_to_sql_count(q: &Query) -> String {
     lines.join("\n")
 }
 
-pub fn query_to_url(q: &Query) -> String {
+pub fn select_to_url(s: &Select) -> String {
     let mut params: Vec<String> = vec![];
-    if q.filter.len() > 0 {
-        for filter in &q.filter {
+    if s.filter.len() > 0 {
+        for filter in &s.filter {
             params.push(format!(
                 r#"{}=eq.{}"#,
                 filter.0,
@@ -111,32 +111,32 @@ pub fn query_to_url(q: &Query) -> String {
             ));
         }
     }
-    if q.order.len() > 0 {
-        let parts: Vec<String> = q
+    if s.order.len() > 0 {
+        let parts: Vec<String> = s
             .order
             .iter()
             .map(|(c, d)| format!(r#"{}.{}"#, c, format!("{:?}", d).to_lowercase()))
             .collect();
         params.push(format!("order={}", parts.join(", ")));
     }
-    if q.limit > 0 && q.limit != LIMIT_DEFAULT {
-        params.push(format!("limit={}", q.limit));
+    if s.limit > 0 && s.limit != LIMIT_DEFAULT {
+        params.push(format!("limit={}", s.limit));
     }
-    if q.offset > 0 {
-        params.push(format!("offset={}", q.offset));
+    if s.offset > 0 {
+        params.push(format!("offset={}", s.offset));
     }
     if params.len() > 0 {
-        format!("{}?{}", q.table, params.join("&"))
+        format!("{}?{}", s.table, params.join("&"))
     } else {
-        q.table.clone()
+        s.table.clone()
     }
 }
 
 pub async fn get_table_from_pool(
     pool: &SqlitePool,
-    query: &Query,
+    select: &Select,
 ) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
-    let sql = query_to_sql(query);
+    let sql = select_to_sql(select);
     let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
     Ok(rows
         .iter()
@@ -147,8 +147,8 @@ pub async fn get_table_from_pool(
         .collect())
 }
 
-pub async fn get_count_from_pool(pool: &SqlitePool, query: &Query) -> Result<usize, sqlx::Error> {
-    let sql = query_to_sql_count(query);
+pub async fn get_count_from_pool(pool: &SqlitePool, select: &Select) -> Result<usize, sqlx::Error> {
+    let sql = select_to_sql_count(select);
     let row: SqliteRow = sqlx::query(&sql).fetch_one(pool).await?;
     let count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
     Ok(count)
