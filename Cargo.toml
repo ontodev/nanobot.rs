@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.27", features = ["cargo", "derive"] }
+ontodev_valve = "0.1.14"
+async-std = { version = "1", features = [ "attributes" ] } 
 toml = { version = "0.5.9" }
