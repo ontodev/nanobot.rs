@@ -81,53 +81,20 @@ fn add_to_gitignore(input: &str) -> Result<String, String> {
 }
 
 fn create_table_tsv() -> Result<(), Box<dyn error::Error>> {
-    let data = r#"table	path	description	type
-table	src/schema/table.tsv	All of the tables in this project.	table
-column	src/schema/column.tsv	Columns for all of the tables.	column
-datatype	src/schema/datatype.tsv	Datatypes for all of the columns	datatype
-"#;
+    let data = include_str!("resources/table.tsv");
     fs::write("src/schema/table.tsv", data).expect("Unable to write file");
-
     Ok(())
 }
 
 fn create_column_tsv() -> Result<(), Box<dyn error::Error>> {
-    let data = r#"table	column	nulltype	datatype	structure	description
-table	table		label	unique	name of this table
-table	path		line		path to the TSV file for this table, relative to the table.tsv file
-table	type	empty	table_type		type of this table, used for tables with special meanings
-table	description	empty	text		a description of this table
-column	table		label	from(table.table)	the table that this column belongs to
-column	column		label		the name of this column
-column	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
-column	datatype		word	from(datatype.datatype)	the datatype for this column
-column	structure	empty	label		schema information for this column
-column	description	empty	text		a description of this column
-datatype	datatype		word	primary	the name of this datatype
-datatype	parent	empty	word	tree(datatype)	the parent datatype
-datatype	condition	empty	line		the method for testing the datatype
-datatype	description	empty	text		a description of this datatype
-datatype	SQL type	empty	sql_type		the SQL type for representing this data
-datatype	HTML type	empty	html_type		the HTML type for viewing and editing this data
-"#;
+    let data = include_str!("resources/column.tsv");
     fs::write("src/schema/column.tsv", data).expect("Unable to write file");
-
     Ok(())
 }
 
 fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
-    let data = r#"datatype	parent	condition	description	SQL type	HTML type
-text			any text	TEXT	textarea
-empty	text	equals('')	the empty string	NULL	
-line	text	exclude(/\\\\\\\n/)	one line of text		text
-label	line	match(/[^\s]+.+[^\s]/)	text that does not begin or end with whitespace		
-word	label	exclude(/\W/)	a single word: letters, numbers, underscore		
-table_type	word	in('table', 'column', 'datatype')	a VALVE table type		search
-sql_type	word	in('NULL', 'TEXT', 'INT')	a SQL type		search
-html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')	an HTML form type		search
-"#;
+    let data = include_str!("resources/datatype.tsv");
     fs::write("src/schema/datatype.tsv", data).expect("Unable to write file");
-
     Ok(())
 }
 
@@ -170,14 +137,8 @@ pub async fn init(database: &str) -> Result<String, String> {
     if Path::new("nanobot.toml").exists() {
         Err(String::from("nanobot.toml file already exists."))
     } else {
-        let toml = r#"[tool]
-name = "nanobot"
-version = "0.1.0"
-edition = "2021"
-"#;
-
+        let toml = include_str!("resources/default_config.toml");
         fs::write("nanobot.toml", toml).expect("Unable to write file");
-
         Ok(String::from("Hello world"))
     }
 }
