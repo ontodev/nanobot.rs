@@ -1,0 +1,20 @@
+on: [push, pull_request]
+
+name: Continuous integration
+
+jobs: 
+  build_and_test:
+    name: Test nanobot
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3 
+      - name: Build and test
+        run: |
+          make deps
+          make target/release/nanobot
+          make test
+      - uses: actions/upload-artifact@v3
+        with:
+          name: nanobot
+          path: target/release/nanobot
+          if-no-files-found: error 
