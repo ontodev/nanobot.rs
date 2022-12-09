@@ -1,4 +1,4 @@
-use nanobot::get::{query_to_sql, query_to_url, Direction, Operator, Query};
+use nanobot::sql::{query_to_sql, query_to_url, Direction, Operator, Query};
 use serde_json::{from_value, json, Value};
 
 const SQL_SMALL: &str = r#"SELECT json_object(

@@ -3,6 +3,7 @@ pub mod config;
 pub mod get;
 pub mod init;
 pub mod serve;
+pub mod sql;
 
 #[async_std::main]
 async fn main() {

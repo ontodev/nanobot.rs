@@ -4,8 +4,9 @@ usage:
 	@echo "  format     reformat code"
 	@echo "  build      build release"
 	@echo "  test       run all tests"
-	@echo "  dev-serve  watch for changes and run server"
+	@echo "  dev-check  watch for changes and run cargo check"
 	@echo "  dev-test   watch for changes and run tests"
+	@echo "  dev-serve  watch for changes and run server"
 
 .PHONY: deps
 deps:
@@ -29,10 +30,15 @@ test: target/release/nanobot
 	cargo test --release
 	PATH="$${PATH}:$$(pwd)/target/release"; tesh --debug false ./doc
 
-.PHONY: dev-serve
-dev-serve:
-	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
+.PHONY: dev-check
+dev-check:
+	find src/ tests/ | entr -rs 'cargo check --release'
 
 .PHONY: dev-test
 dev-test:
 	find src/ test/ | entr -rs 'cargo test --release'
+
+.PHONY: dev-serve
+dev-serve:
+	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
+
