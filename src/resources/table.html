@@ -2,6 +2,36 @@
 {% block content %}
 <h2>{{ table.table }}</h2>
 
+{% for name, value in column|items -%}
+<div class="modal fade" id="{{name}}Modal" tabindex="-1" aria-labelledby="{{ name }}ModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h1 class="modal-title fs-5" id="{{ name }}ModalLabel">{{ name }}</h1>
+        <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        {% if value.description %}
+        <p>{{ value.description }}</p>
+        {% endif %}
+        <p>TODO: sort and filter</p>
+        {% if value.filters %}
+        <ul>
+          {% for filter in value.filters %}
+          <li>{{ filter[0] }} {{ filter[1] }} {{ filter[2] }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <pre><code>{{ value|tojson(true) }}</code></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary">Update</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 <div class="row justify-content-end">
   <div class="col-auto">
     <a class="btn btn-outline-primary" href="{{ table.href }}">Reset</a>
@@ -42,11 +72,12 @@
     </nav>
   </div>
 </div>
+
 <table class="table">
   <tr>
     {% for name, value in column|items -%}
     <th>
-      {{ name }}
+      <a class="" data-bs-toggle="modal" href="#{{ name }}Modal" role="button">{{ name }}</a>
       {% if value.filters %}
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel-fill"
         viewBox="0 0 16 16">
@@ -60,12 +91,14 @@
   {% for r in row -%}
   <tr>
     {% for column, cell in r|items -%}
+    {% if column != "row_number" %}
     {% if cell.nulltype %}
     <td class="bg-null"></td>
     {% elif cell.href %}
     <td><a href="{{ cell.href }}">{{ cell.value }}</a></td>
     {% else %}
     <td>{{ cell.value }}</td>
+    {% endif %}
     {% endif %}
     {% endfor %}
   </tr>

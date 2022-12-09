@@ -8,18 +8,18 @@ use sqlx::Row;
 const LIMIT_MAX: usize = 100;
 const LIMIT_DEFAULT: usize = 10; // TODO: 100?
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
     EQUALS,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Direction {
     ASC,
     DESC,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Query {
     pub table: String,
     pub select: Vec<String>,
@@ -200,13 +200,17 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
             ));
         }
     }
-    let query = Query {
-        table: table.clone(),
-        select: column_rows
+    let mut select: Vec<String> = vec!["row_number".to_string()];
+    select.append(
+        &mut column_rows
             .clone()
             .into_iter()
             .map(|r| r.get("column").unwrap().as_str().unwrap().to_string())
             .collect(),
+    );
+    let query = Query {
+        table: table.clone(),
+        select: select,
         filter: filter,
         limit: limit.clone(),
         offset: params.offset.unwrap_or_default(),
@@ -251,6 +255,11 @@ pub async fn get_table(table: String, params: serve::Params) -> Result<String, s
         for (k, v) in row.iter() {
             let mut cell: Map<String, Value> = Map::new();
             cell.insert("value".to_string(), v.clone());
+            if k == "row_number" {
+                cell.insert("datatype".to_string(), Value::String("integer".to_string()));
+                crow.insert(k.to_string(), Value::Object(cell));
+                continue;
+            }
             if v.is_null() {
                 if let Some(nulltype) = column_map.get(k).unwrap().get("nulltype") {
                     if nulltype.is_string() {
