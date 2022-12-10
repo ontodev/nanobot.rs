@@ -129,6 +129,7 @@ pub async fn get_rows(
             match format {
                 "text" => Ok(value_rows_to_text(&value_rows)),
                 "json" => Ok(json!(value_rows).to_string()),
+                "pretty.json" => Ok(serde_json::to_string_pretty(&json!(value_rows)).unwrap()),
                 &_ => Err(GetError::new(format!(
                     "Shape '{}' does not support format '{}'",
                     shape, format
@@ -139,6 +140,7 @@ pub async fn get_rows(
             let page: Value = get_page(&pool, &select, &table_map, &column_rows).await?;
             match format {
                 "json" => Ok(page.to_string()),
+                "pretty.json" => Ok(serde_json::to_string_pretty(&page).unwrap()),
                 "html" => Ok(page_to_html(&page)),
                 &_ => Err(GetError::new(format!(
                     "Shape '{}' does not support format '{}'",
@@ -240,6 +242,19 @@ async fn get_page(
     this_table.insert("end".to_string(), json!(end));
     this_table.insert("count".to_string(), json!(count));
 
+    let mut formats = Map::new();
+    let href = select_to_url(&Select {
+        table: format!("{}.json", select.table),
+        ..select.clone()
+    });
+    formats.insert("JSON".to_string(), json!(href));
+    let href = select_to_url(&Select {
+        table: format!("{}.pretty.json", select.table),
+        ..select.clone()
+    });
+    formats.insert("JSON (Pretty)".to_string(), json!(href));
+    this_table.insert("formats".to_string(), json!(formats));
+
     // Pagination
     if select.offset > 0 {
         let href = select_to_url(&Select {
@@ -314,6 +329,7 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
             if cell.is_string() {
                 value = cell.as_str().unwrap().to_string();
             } else if cell.is_null() {
+                // TODO: better null handling
                 value = "".to_string();
             }
             line.push(value);

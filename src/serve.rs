@@ -41,8 +41,17 @@ async fn root() -> impl IntoResponse {
     Redirect::permanent("/table")
 }
 
-async fn table(Path(table): Path<String>, params: Query<Params>) -> impl IntoResponse {
-    tracing::info!("request table {:?} {:?}", table, params.0);
+async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResponse {
+    tracing::info!("request table {:?} {:?}", path, params.0);
+    let mut table = path.clone();
+    let mut format = "html";
+    if path.ends_with(".pretty.json") {
+        table = path.replace(".pretty.json", "");
+        format = "pretty.json";
+    } else if path.ends_with(".json") {
+        table = path.replace(".json", "");
+        format = "json";
+    }
     let select = sql::Select {
         table,
         limit: params.limit.unwrap_or_default(),
@@ -50,8 +59,13 @@ async fn table(Path(table): Path<String>, params: Query<Params>) -> impl IntoRes
         // TODO: restore filters
         ..Default::default()
     };
-    match get::get_rows(".nanobot.db", &select, "page", "html").await {
-        Ok(html) => (StatusCode::FOUND, Html(html)),
-        Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())),
+    match get::get_rows(".nanobot.db", &select, "page", &format).await {
+        Ok(x) => match format {
+            "html" => Html(x).into_response(),
+            "json" => ([("content-type", "application/json; charset=utf-8")], x).into_response(),
+            "pretty.json" => x.into_response(),
+            _ => unreachable!("Unsupported format"),
+        },
+        Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response(),
     }
 }

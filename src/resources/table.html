@@ -34,6 +34,19 @@
 
 <div class="row justify-content-end">
   <div class="col-auto">
+    <div class="dropdown">
+      <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+        aria-expanded="false">
+        Format
+      </button>
+      <ul class="dropdown-menu">
+        {% for name, href in table.formats|items %}
+        <li><a class="dropdown-item" href="{{ href }}">{{ name }}</a></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  <div class="col-auto">
     <a class="btn btn-outline-primary" href="{{ table.href }}">Reset</a>
   </div>
   <div class="col-auto">
@@ -104,13 +117,4 @@
   </tr>
   {% endfor %}
 </table>
-
-<pre>
-  <code>
-    PAGE {{ page|tojson(true) }}
-    TABLE {{ table|tojson(true) }}
-    COLUMN {{ column|tojson(true) }}
-    ROW {{ row|tojson(true) }}
-  </code>
-</pre>
 {% endblock %}
