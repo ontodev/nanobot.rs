@@ -158,6 +158,7 @@ async fn get_page(
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
+    let start = std::time::Instant::now();
     let value_rows = get_table_from_pool(&pool, &select).await?;
 
     let mut column_map = Map::new();
@@ -189,26 +190,58 @@ async fn get_page(
 
     // TODO: get the nulltypes
     // TODO: get the messages
+    let row_numbers: Vec<Value> = value_rows
+        .clone()
+        .into_iter()
+        .map(|r| r.get("row_number").unwrap().clone())
+        .collect();
+    let select_messages = Select {
+        table: "message".to_string(),
+        select: vec!["table", "row", "column", "level", "rule", "message"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        filter: vec![
+            (
+                "table".to_string(),
+                Operator::EQUALS,
+                json!(select.table.clone()),
+            ),
+            ("row".to_string(), Operator::IN, json!(row_numbers.clone())),
+        ],
+        limit: 1000,
+        ..Default::default()
+    };
+    let message_rows = get_table_from_pool(&pool, &select_messages).await?;
 
     // convert value_rows to cell_rows
     let mut cell_rows: Vec<Map<String, Value>> = vec![];
     for row in &value_rows {
         let mut crow: Map<String, Value> = Map::new();
+        let row_number = row.get("row_number").unwrap();
         for (k, v) in row.iter() {
             let mut cell: Map<String, Value> = Map::new();
+            let mut classes: Vec<String> = vec![];
+
+            // handle the value
             cell.insert("value".to_string(), v.clone());
             if k == "row_number" {
                 cell.insert("datatype".to_string(), Value::String("integer".to_string()));
                 crow.insert(k.to_string(), Value::Object(cell));
                 continue;
             }
+
+            // handle null and nulltype
             if v.is_null() {
+                classes.push("bg-null".to_string());
                 if let Some(nulltype) = column_map.get(k).unwrap().get("nulltype") {
                     if nulltype.is_string() {
                         cell.insert("nulltype".to_string(), nulltype.clone());
                     }
                 }
             }
+
+            // handle datatype
             if !cell.contains_key("nulltype") {
                 let datatype = column_map.get(k).unwrap().get("datatype").unwrap();
                 cell.insert("datatype".to_string(), datatype.clone());
@@ -222,6 +255,33 @@ async fn get_page(
                 let href = format!("/{}", v.as_str().unwrap().to_string());
                 cell.insert("href".to_string(), Value::String(href));
             }
+
+            // collect messages
+            let mut messages: Vec<Map<String, Value>> = vec![];
+            let mut level = "".to_string();
+            for message in &message_rows {
+                if row_number == message.get("row").unwrap() && k == message.get("column").unwrap()
+                {
+                    let mut m = Map::new();
+                    for (key, value) in message {
+                        if key == "table" || key == "row" || key == "column" {
+                            continue;
+                        }
+                        m.insert(key.clone(), value.clone());
+                    }
+                    messages.push(m);
+                    level = message.get("level").unwrap().as_str().unwrap().to_string();
+                }
+            }
+            if messages.len() > 0 {
+                classes.push(format!("bg-{}", level));
+                cell.insert("message_level".to_string(), json!(level));
+                cell.insert("messages".to_string(), json!(messages));
+            }
+            if classes.len() > 0 {
+                cell.insert("classes".to_string(), json!(classes));
+            }
+
             crow.insert(k.to_string(), Value::Object(cell));
         }
         cell_rows.push(crow);
@@ -302,6 +362,7 @@ async fn get_page(
             "tables": tables,
             "title": select.table,
             "select": select,
+            "elapsed": start.elapsed().as_millis() as usize,
         },
         "table": this_table,
         "column": column_map,

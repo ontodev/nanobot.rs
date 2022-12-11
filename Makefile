@@ -21,7 +21,7 @@ format:
 .PHONY: build
 build: target/release/nanobot
 
-target/release/nanobot:
+target/release/nanobot: src/
 	cargo build --release
 
 .PHONY: test

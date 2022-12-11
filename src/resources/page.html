@@ -20,6 +20,10 @@
     .bg-null:before {
       content: "null";
     }
+
+    .bg-error {
+      background-color: #ffabab !important;
+    }
   </style>
 </head>
 
@@ -44,6 +48,7 @@
     </div>
   </nav>
   <div id="content" class="container">
+    {% if page.elapsed %}<p class="float-end">{{ page.elapsed }}ms</p>{% endif %}
     {% block content %}{% endblock %}
   </div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
