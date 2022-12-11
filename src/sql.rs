@@ -9,6 +9,7 @@ pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
     EQUALS,
+    IN,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -25,6 +26,34 @@ pub struct Select {
     pub order: Vec<(String, Direction)>,
     pub limit: usize,
     pub offset: usize,
+}
+
+fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
+    match filter.1 {
+        Operator::EQUALS => format!(
+            r#""{}" = '{}'"#,
+            filter.0,
+            filter.2.as_str().unwrap().to_string()
+        ),
+        Operator::IN => format!(
+            r#""{}" IN ({})"#,
+            filter.0,
+            // WARN: This is not a good idea!
+            filter
+                .2
+                .to_string()
+                .trim_start_matches("[")
+                .trim_end_matches("]")
+        ),
+    }
+}
+
+fn filters_to_sql(filters: &Vec<(String, Operator, Value)>) -> String {
+    let mut parts: Vec<String> = vec![];
+    for filter in filters {
+        parts.push(filter_to_sql(&filter));
+    }
+    format!("WHERE {}", parts.join("\n  AND "))
 }
 
 /// Convert a Select struct to a SQL string.
@@ -54,16 +83,8 @@ pub fn select_to_sql(s: &Select) -> String {
     lines.push(format!("  {}", parts.join(",\n  ")));
     lines.push(") AS json_result".to_string());
     lines.push(format!(r#"FROM "{}""#, s.table));
-    let mut filters: Vec<String> = vec![];
     if s.filter.len() > 0 {
-        for filter in &s.filter {
-            filters.push(format!(
-                r#""{}" = '{}'"#,
-                filter.0,
-                filter.2.as_str().unwrap().to_string()
-            ));
-        }
-        lines.push(format!("WHERE {}", filters.join("\n  AND ")));
+        lines.push(filters_to_sql(&s.filter));
     }
     if s.order.len() > 0 {
         let parts: Vec<String> = s
@@ -86,16 +107,8 @@ pub fn select_to_sql(s: &Select) -> String {
 pub fn select_to_sql_count(s: &Select) -> String {
     let mut lines: Vec<String> = vec!["SELECT COUNT(*) AS count".to_string()];
     lines.push(format!(r#"FROM "{}""#, s.table));
-    let mut filters: Vec<String> = vec![];
     if s.filter.len() > 0 {
-        for filter in &s.filter {
-            filters.push(format!(
-                r#""{}" = '{}'"#,
-                filter.0,
-                filter.2.as_str().unwrap().to_string()
-            ));
-        }
-        lines.push(format!("WHERE {}", filters.join("\n  AND ")));
+        lines.push(filters_to_sql(&s.filter));
     }
     lines.join("\n")
 }
@@ -104,11 +117,24 @@ pub fn select_to_url(s: &Select) -> String {
     let mut params: Vec<String> = vec![];
     if s.filter.len() > 0 {
         for filter in &s.filter {
-            params.push(format!(
-                r#"{}=eq.{}"#,
-                filter.0,
-                filter.2.as_str().unwrap().to_string()
-            ));
+            let x = match filter.1 {
+                Operator::EQUALS => format!(
+                    r#"{}=eq.{}"#,
+                    filter.0,
+                    filter.2.as_str().unwrap().to_string()
+                ),
+                Operator::IN => format!(
+                    r#"{}=in.({})"#,
+                    filter.0,
+                    // WARN: This is not a good idea!
+                    filter
+                        .2
+                        .to_string()
+                        .trim_start_matches("[")
+                        .trim_end_matches("]")
+                ),
+            };
+            params.push(x);
         }
     }
     if s.order.len() > 0 {

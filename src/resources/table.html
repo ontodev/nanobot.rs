@@ -104,14 +104,28 @@
   {% for r in row -%}
   <tr>
     {% for column, cell in r|items -%}
+    {% set column_id = column|escape %}
+    {% set cell_id = ["row", r.row_number.value, column_id]|join("-") %}
     {% if column != "row_number" %}
-    {% if cell.nulltype %}
-    <td class="bg-null"></td>
-    {% elif cell.href %}
-    <td><a href="{{ cell.href }}">{{ cell.value }}</a></td>
-    {% else %}
-    <td>{{ cell.value }}</td>
-    {% endif %}
+    <td class="{{ cell.classes|join(" , ") }}">
+      {% if cell.nulltype %}
+      {% elif cell.href %}
+      <a href="{{ cell.href }}">{{ cell.value }}</a>
+      {% else %}
+      {{ cell.value }}
+      {% endif %}
+      {% if cell.messages %}
+      <a data-bs-toggle="collapse" href="#{{ cell_id }}-messages" class="float-end" role="button" aria-expanded="false"
+        aria-controls="{{ cell_id }}-messages">
+        <i class="bi bi-exclamation-octagon-fill"></i>
+      </a>
+      <ul id="{{ cell_id }}-messages" class="collapse">
+        {% for message in cell.messages %}
+        <li>{{ message.level }} [{{ message.rule }}] {{ message.message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    </td>
     {% endif %}
     {% endfor %}
   </tr>
