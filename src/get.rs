@@ -3,6 +3,7 @@ use crate::sql::{
     LIMIT_DEFAULT, LIMIT_MAX,
 };
 use minijinja::Environment;
+use regex::Regex;
 use serde_json::{json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::error::Error;
@@ -189,7 +190,7 @@ async fn get_page(
     }
 
     // TODO: get the nulltypes
-    // TODO: get the messages
+
     let row_numbers: Vec<Value> = value_rows
         .clone()
         .into_iter()
@@ -258,7 +259,8 @@ async fn get_page(
 
             // collect messages
             let mut messages: Vec<Map<String, Value>> = vec![];
-            let mut level = "".to_string();
+            let mut max_level: usize = 0;
+            let mut message_level = "info".to_string();
             for message in &message_rows {
                 if row_number == message.get("row").unwrap() && k == message.get("column").unwrap()
                 {
@@ -270,12 +272,16 @@ async fn get_page(
                         m.insert(key.clone(), value.clone());
                     }
                     messages.push(m);
-                    level = message.get("level").unwrap().as_str().unwrap().to_string();
+                    let level = message.get("level").unwrap().as_str().unwrap().to_string();
+                    let lvl = level_to_int(&level);
+                    if lvl > max_level {
+                        max_level = lvl;
+                        message_level = level;
+                    }
                 }
             }
             if messages.len() > 0 {
-                classes.push(format!("bg-{}", level));
-                cell.insert("message_level".to_string(), json!(level));
+                cell.insert("message_level".to_string(), json!(message_level));
                 cell.insert("messages".to_string(), json!(messages));
             }
             if classes.len() > 0 {
@@ -406,10 +412,33 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
     String::from_utf8(tw.into_inner().unwrap()).unwrap()
 }
 
+fn level_to_int(level: &String) -> usize {
+    match level.to_lowercase().as_str() {
+        "error" => 3,
+        "warn" => 2,
+        "info" => 1,
+        _ => 0,
+    }
+}
+
+fn level_to_bootstrap(level: String) -> String {
+    match level.to_lowercase().as_str() {
+        "error" => "danger",
+        "warn" => "warning",
+        x => x,
+    }
+    .to_string()
+}
+
+fn name_to_id(name: String) -> String {
+    let re: Regex = Regex::new(r"\W").unwrap();
+    re.replace_all(&name, "-").to_string()
+}
+
 fn page_to_html(page: &Value) -> String {
     let mut env = Environment::new();
-    // env.add_template("debug.html", include_str!("resources/debug.html"))
-    //     .unwrap();
+    env.add_filter("level_to_bootstrap", level_to_bootstrap);
+    env.add_filter("id", name_to_id);
     env.add_template("page.html", include_str!("resources/page.html"))
         .unwrap();
     env.add_template("table.html", include_str!("resources/table.html"))

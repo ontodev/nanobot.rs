@@ -3,11 +3,12 @@
 <h2>{{ table.table }}</h2>
 
 {% for name, value in column|items -%}
-<div class="modal fade" id="{{name}}Modal" tabindex="-1" aria-labelledby="{{ name }}ModalLabel" aria-hidden="true">
+<div class="modal fade" id="{{ name|id }}Modal" tabindex="-1" aria-labelledby="{{ name|id }}ModalLabel"
+  aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h1 class="modal-title fs-5" id="{{ name }}ModalLabel">{{ name }}</h1>
+        <h1 class="modal-title fs-5" id="{{ name|id }}ModalLabel">{{ name }}</h1>
         <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -90,7 +91,7 @@
   <tr>
     {% for name, value in column|items -%}
     <th>
-      <a class="" data-bs-toggle="modal" href="#{{ name }}Modal" role="button">{{ name }}</a>
+      <a class="" data-bs-toggle="modal" href="#{{ name|id }}Modal" role="button">{{ name }}</a>
       {% if value.filters %}
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel-fill"
         viewBox="0 0 16 16">
@@ -104,8 +105,6 @@
   {% for r in row -%}
   <tr>
     {% for column, cell in r|items -%}
-    {% set column_id = column|escape %}
-    {% set cell_id = ["row", r.row_number.value, column_id]|join("-") %}
     {% if column != "row_number" %}
     <td class="{{ cell.classes|join(" , ") }}">
       {% if cell.nulltype %}
@@ -115,16 +114,32 @@
       {{ cell.value }}
       {% endif %}
       {% if cell.messages %}
-      <a data-bs-toggle="collapse" href="#{{ cell_id }}-messages" class="float-end" role="button" aria-expanded="false"
-        aria-controls="{{ cell_id }}-messages">
-        <i class="bi bi-exclamation-octagon-fill"></i>
-      </a>
-      <ul id="{{ cell_id }}-messages" class="collapse">
-        {% for message in cell.messages %}
-        <li>{{ message.level }} [{{ message.rule }}] {{ message.message }}</li>
-        {% endfor %}
-      </ul>
-      {% endif %}
+      <div class="dropdown float-end">
+        <button type="button" class="badge text-bg-{{ cell.message_level|level_to_bootstrap }} rounded-pill"
+          data-bs-toggle="dropdown" aria-expanded="true" data-bs-auto-close="outside">
+          {{ cell.messages|length }}
+        </button>
+        <ul class="dropdown-menu">
+          {% for message in cell.messages %}
+          <li>
+            <a class="dropdown-item" href="#">
+              {% if message.level == "error" %}
+              <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+              {% elif message.level == "warn" %}
+              <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+              {% elif message.level == "info" %}
+              <i class="bi bi-info-circle-fill text-info"></i>
+              {% else %}
+              <i class="bi bi-question-circle-fill"></i>
+              {% endif %}
+              {{ message.message }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </td>
+    {% endif %}
     </td>
     {% endif %}
     {% endfor %}
