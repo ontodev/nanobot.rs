@@ -1,4 +1,4 @@
-table	path	description	type
-table	src/schema/table.tsv	All of the tables in this project.	table
-column	src/schema/column.tsv	Columns for all of the tables.	column
-datatype	src/schema/datatype.tsv	Datatypes for all of the columns	datatype
+table	path	type	description
+table	src/schema/table.tsv	table	All of the tables in this project.
+column	src/schema/column.tsv	column	Columns for all of the tables.
+datatype	src/schema/datatype.tsv	datatype	Datatypes for all of the columns

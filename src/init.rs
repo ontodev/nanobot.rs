@@ -126,7 +126,7 @@ pub async fn init(database: &str) -> Result<String, String> {
     }
 
     //add database to .gitignore
-    match add_to_gitignore(database) {
+    match add_to_gitignore(format!("{}*", database).as_str()) {
         Err(x) => return Err(x),
         Ok(_x) => {}
     }
@@ -139,6 +139,6 @@ pub async fn init(database: &str) -> Result<String, String> {
     } else {
         let toml = include_str!("resources/default_config.toml");
         fs::write("nanobot.toml", toml).expect("Unable to write file");
-        Ok(String::from("Hello world"))
+        Ok(String::from("Initialized a Nanobot project"))
     }
 }
