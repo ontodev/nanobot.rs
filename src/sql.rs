@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_str, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
+use tree_sitter::{Node, Parser};
 
 pub const LIMIT_MAX: usize = 100;
 pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
@@ -9,6 +10,8 @@ pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
     EQUALS,
+    LESS,
+    GREATER,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -171,4 +174,132 @@ pub fn rows_to_map(rows: Vec<Map<String, Value>>, column: &str) -> Map<String, V
         map.insert(key, Value::Object(r));
     }
     map
+}
+
+pub fn parse(input: &str) -> Select {
+    let mut parser = Parser::new();
+
+    parser
+        .set_language(tree_sitter_sqlrest::language())
+        .expect("Error loading manchester grammar");
+
+    let tree = parser.parse(input, None).unwrap();
+
+    let mut query = Select {
+        table: String::from("no table given"),
+        select: Vec::new(),
+        filter: Vec::new(),
+        order: Vec::new(),
+        limit: 0,
+        offset: 0,
+    };
+
+    transduce(&tree.root_node(), input, &mut query);
+    query
+}
+
+pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
+    match n.kind() {
+        "query" => transduce_children(n, raw, query),
+        "select" => transduce_select(n, raw, query),
+        "table" => transduce_table(n, raw, query),
+        "expression" => transduce_children(n, raw, query),
+        "part" => transduce_children(n, raw, query),
+        "filter" => transduce_filter(n, raw, query),
+        "order" => transduce_order(n, raw, query),
+        "limit" => transduce_limit(n, raw, query),
+        "offset" => transduce_offset(n, raw, query),
+        "STRING" => panic!("Encountered STRING in top level translation"),
+        _ => {
+            panic!("Parsing Error");
+        }
+    }
+}
+
+pub fn transduce_table(n: &Node, raw: &str, query: &mut Select) {
+    let table = get_from_raw(&n.named_child(0).unwrap(), raw);
+    query.table = table;
+}
+
+pub fn transduce_offset(n: &Node, raw: &str, query: &mut Select) {
+    let offset_string = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let offset: usize = offset_string.parse().unwrap();
+    query.offset = offset;
+}
+
+pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
+    let limit_string = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let limit: usize = limit_string.parse().unwrap();
+    query.limit = limit;
+}
+
+fn get_operator(operator_string: &str) -> Operator {
+    match operator_string {
+        "lt." => Operator::LESS,
+        "eq." => Operator::EQUALS,
+        "gt." => Operator::GREATER,
+        _ => panic!("Operator {} not supported", operator_string),
+    }
+}
+
+pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
+    let column = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw);
+    let value = get_from_raw(&n.named_child(2).unwrap(), raw);
+
+    let operator = get_operator(&operator_string);
+
+    let filter = (column, operator, Value::String(value));
+    query.filter.push(filter);
+}
+
+fn get_ordering(ordering_string: &str) -> Direction {
+    match ordering_string {
+        ".asc" => Direction::ASC,
+        ".desc" => Direction::DESC,
+        _ => panic!("Ordering {} not supported", ordering_string),
+    }
+}
+
+pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
+    let child_count = n.named_child_count();
+    let mut position = 0;
+
+    while position < child_count {
+        let column = get_from_raw(&n.named_child(position).unwrap(), raw);
+        position = position + 1;
+        if position < child_count && n.named_child(position).unwrap().kind().eq("ordering") {
+            let ordering_string = get_from_raw(&n.named_child(position).unwrap(), raw);
+            let ordering = get_ordering(&ordering_string);
+            position = position + 1;
+            let order = (column, ordering);
+            query.order.push(order);
+        } else {
+            let ordering = Direction::ASC; //default ordering is ASC
+            let order = (column, ordering);
+            query.order.push(order);
+        }
+    }
+}
+
+pub fn transduce_select(n: &Node, raw: &str, query: &mut Select) {
+    let child_count = n.named_child_count();
+    for position in 0..child_count {
+        let column = get_from_raw(&n.named_child(position).unwrap(), raw);
+        query.select.push(column);
+    }
+}
+
+pub fn get_from_raw(n: &Node, raw: &str) -> String {
+    let start = n.start_position().column;
+    let end = n.end_position().column;
+    let extract = &raw[start..end];
+    String::from(extract)
+}
+
+pub fn transduce_children(n: &Node, raw: &str, q: &mut Select) {
+    let child_count = n.named_child_count();
+    for i in 0..child_count {
+        transduce(&n.named_child(i).unwrap(), raw, q);
+    }
 }
