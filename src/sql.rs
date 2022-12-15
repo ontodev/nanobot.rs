@@ -10,8 +10,15 @@ pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
     EQUALS,
+    NOT_EQUALS,
     LESS,
     GREATER,
+    LESS_EQUALS,
+    GREATER_EQUALS,
+    LIKE,
+    ILIKE,
+    IS,
+    IN,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -181,7 +188,7 @@ pub fn parse(input: &str) -> Select {
 
     parser
         .set_language(tree_sitter_sqlrest::language())
-        .expect("Error loading manchester grammar");
+        .expect("Error loading sqlrest grammar");
 
     let tree = parser.parse(input, None).unwrap();
 
@@ -205,7 +212,10 @@ pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
         "table" => transduce_table(n, raw, query),
         "expression" => transduce_children(n, raw, query),
         "part" => transduce_children(n, raw, query),
-        "filter" => transduce_filter(n, raw, query),
+        "filter" => transduce_children(n, raw, query),
+        "simple_filter" => transduce_filter(n, raw, query),
+        "special_filter" => transduce_children(n, raw, query),
+        "in" => transduce_in(n, raw, query),
         "order" => transduce_order(n, raw, query),
         "limit" => transduce_limit(n, raw, query),
         "offset" => transduce_offset(n, raw, query),
@@ -214,6 +224,36 @@ pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
             panic!("Parsing Error");
         }
     }
+}
+
+pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) {
+    let column = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let value = transduce_list(&n.named_child(1).unwrap(), raw);
+
+    let filter = (column, Operator::IN , value);
+    query.filter.push(filter); 
+}
+
+pub fn transduce_list(n: &Node, raw: &str) -> Value {
+
+    let quoted_strings = match n.kind() {
+        "list" => false,
+        "list_of_strings" => true,
+        _ => panic!("Not a valid list")
+    };
+
+    let mut vec = Vec::new();
+
+    let child_count = n.named_child_count();
+    for i in 0..child_count {
+        if quoted_strings {
+            let quoted_string = format!("{}", get_from_raw(&n.named_child(i).unwrap(), raw)); 
+             vec.push(Value::String(quoted_string));
+        } else {
+             vec.push(Value::String(get_from_raw(&n.named_child(i).unwrap(), raw))); 
+        } 
+    };
+    Value::Array(vec)
 }
 
 pub fn transduce_table(n: &Node, raw: &str, query: &mut Select) {
@@ -236,8 +276,15 @@ pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
 fn get_operator(operator_string: &str) -> Operator {
     match operator_string {
         "lt." => Operator::LESS,
+        "lte." => Operator::LESS_EQUALS,
         "eq." => Operator::EQUALS,
+        "neq." => Operator::NOT_EQUALS,
         "gt." => Operator::GREATER,
+        "gte." => Operator::GREATER_EQUALS,
+        "is." => Operator::IS,
+        "like." => Operator::LIKE,
+        "ilike." => Operator::ILIKE,
+        "in." => Operator::IN,
         _ => panic!("Operator {} not supported", operator_string),
     }
 }
