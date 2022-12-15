@@ -180,6 +180,34 @@ pub async fn get_count_from_pool(pool: &SqlitePool, select: &Select) -> Result<u
     Ok(count)
 }
 
+pub async fn get_total_from_pool(pool: &SqlitePool, table: &String) -> Result<usize, sqlx::Error> {
+    let sql = format!(r#"SELECT COUNT() AS count FROM "{}""#, table);
+    let row = sqlx::query(&sql).fetch_one(pool).await?;
+    let count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+    Ok(count)
+}
+
+pub async fn get_message_counts_from_pool(
+    pool: &SqlitePool,
+    table: &String,
+) -> Result<Map<String, Value>, sqlx::Error> {
+    let sql = format!(
+        r#"SELECT json_object(
+          'message', COUNT(),
+          'error', SUM(level = 'error'),
+          'warn', SUM(level = 'warn'),
+          'info', SUM(level = 'info') 
+        ) AS json_result
+        FROM message
+        WHERE "table" = '{}'"#,
+        table
+    );
+    let row = sqlx::query(&sql).fetch_one(pool).await?;
+    let result: &str = row.get("json_result");
+    let map = from_str::<Map<String, Value>>(&result).unwrap();
+    Ok(map)
+}
+
 pub fn rows_to_map(rows: Vec<Map<String, Value>>, column: &str) -> Map<String, Value> {
     let mut map = Map::new();
     for row in rows.iter() {

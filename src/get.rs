@@ -1,6 +1,6 @@
 use crate::sql::{
-    get_count_from_pool, get_table_from_pool, rows_to_map, select_to_url, Operator, Select,
-    LIMIT_DEFAULT, LIMIT_MAX,
+    get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
+    rows_to_map, select_to_url, Operator, Select, LIMIT_DEFAULT, LIMIT_MAX,
 };
 use minijinja::Environment;
 use regex::Regex;
@@ -214,6 +214,7 @@ async fn get_page(
         ..Default::default()
     };
     let message_rows = get_table_from_pool(&pool, &select_messages).await?;
+    let message_counts = get_message_counts_from_pool(&pool, &select.table.clone()).await?;
 
     // convert value_rows to cell_rows
     let mut cell_rows: Vec<Map<String, Value>> = vec![];
@@ -294,6 +295,14 @@ async fn get_page(
     }
 
     let count = get_count_from_pool(&pool, &select).await?;
+    let total = get_total_from_pool(&pool, &select.table).await?;
+    let mut counts = Map::new();
+    counts.insert("count".to_string(), json!(count));
+    counts.insert("total".to_string(), json!(total));
+    for (k, v) in message_counts {
+        counts.insert(k, v);
+    }
+
     let end = select.offset + cell_rows.len();
 
     let mut this_table = table_map
@@ -306,7 +315,7 @@ async fn get_page(
     this_table.insert("href".to_string(), json!(format!("/{}", select.table)));
     this_table.insert("start".to_string(), json!(select.offset + 1));
     this_table.insert("end".to_string(), json!(end));
-    this_table.insert("count".to_string(), json!(count));
+    this_table.insert("counts".to_string(), json!(counts));
 
     let mut formats = Map::new();
     let href = select_to_url(&Select {

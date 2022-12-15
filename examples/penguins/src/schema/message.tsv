@@ -4,3 +4,5 @@ table	1	table	warn	test	Test warning message
 table	1	table	info	test	Test info message
 table	1	path	warn	test	Test warning message
 table	1	path	info	test	Test info message
+table	2	table	warn	test	Test warning message
+table	3	table	info	test	Test info message

@@ -33,9 +33,31 @@
 </div>
 {% endfor %}
 
-<div class="row justify-content-end">
-  <div class="col-auto">
-    <div class="dropdown">
+<div class="row">
+  <div class="col">
+    {{ table.start }}-{{ table.end }} of {{ table.counts.count }} rows
+    {% if table.counts.total > table.counts.count %}
+    ({{ table.counts.total }} total)
+    {% endif %}
+    {% if table.counts.message %}
+    with
+    {% if table.counts.error %}
+    <strong>{{ table.counts.error }}</strong>
+    <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+    {% endif %}
+    {% if table.counts.warn %}
+    <strong>{{ table.counts.warn }}</strong>
+    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+    {% endif %}
+    {% if table.counts.info %}
+    <strong>{{ table.counts.info}}</strong>
+    <i class="bi bi-info-circle-fill text-info"></i>
+    {% endif %}
+    messages
+    {% endif %}
+  </div>
+  <div class="col text-end">
+    <div class="btn-group">
       <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
         aria-expanded="false">
         Format
@@ -46,13 +68,9 @@
         {% endfor %}
       </ul>
     </div>
-  </div>
-  <div class="col-auto">
     <a class="btn btn-outline-primary" href="{{ table.href }}">Reset</a>
-  </div>
-  <div class="col-auto">
-    <nav aria-label="Page navigation">
-      <ul class="pagination">
+    <nav style="display: inline-block" aria-label="Page navigation">
+      <ul class="pagination justify-content-end">
         <li class="page-item">
           <a class="page-link {{ 'disabled' if not table.first }}" href="{{ table.first }}" aria-label="First">
             <span aria-hidden="true"><i class="bi bi-chevron-bar-left"></i></span>
@@ -67,7 +85,7 @@
         </li>
         <li class="page-item">
           <a class="page-link" href="#">
-            {{ table.start }}-{{ table.end }} of {{ table.count }}
+            {{ table.start }}-{{ table.end }}
           </a>
         </li>
         <li class="page-item">
@@ -93,11 +111,7 @@
     <th>
       <a class="" data-bs-toggle="modal" href="#{{ name|id }}Modal" role="button">{{ name }}</a>
       {% if value.filters %}
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-funnel-fill"
-        viewBox="0 0 16 16">
-        <path
-          d="M1.5 1.5A.5.5 0 0 1 2 1h12a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-.128.334L10 8.692V13.5a.5.5 0 0 1-.342.474l-3 1A.5.5 0 0 1 6 14.5V8.692L1.628 3.834A.5.5 0 0 1 1.5 3.5v-2z" />
-      </svg>
+      <i class="bi bi-filter-circle-fill float-end"></i>
       {% endif %}
     </th>
     {% endfor %}
@@ -115,10 +129,20 @@
       {% endif %}
       {% if cell.messages %}
       <div class="dropdown float-end">
-        <button type="button" class="badge text-bg-{{ cell.message_level|level_to_bootstrap }} rounded-pill"
-          data-bs-toggle="dropdown" aria-expanded="true" data-bs-auto-close="outside">
-          {{ cell.messages|length }}
-        </button>
+        <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
+          {% if cell.messages|length > 1 %}
+          <strong>{{ cell.messages|length }}</strong>
+          {% endif %}
+          {% if cell.message_level == "error" %}
+          <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+          {% elif cell.message_level == "warn" %}
+          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+          {% elif cell.message_level == "info" %}
+          <i class="bi bi-info-circle-fill text-info"></i>
+          {% else %}
+          <i class="bi bi-question-circle-fill"></i>
+          {% endif %}
+        </a>
         <ul class="dropdown-menu">
           {% for message in cell.messages %}
           <li>

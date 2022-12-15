@@ -1,5 +1,5 @@
 use crate::{get, sql};
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, RawQuery};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
@@ -41,8 +41,12 @@ async fn root() -> impl IntoResponse {
     Redirect::permanent("/table")
 }
 
-async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResponse {
-    tracing::info!("request table {:?} {:?}", path, params.0);
+async fn table(
+    Path(path): Path<String>,
+    params: Query<Params>,
+    RawQuery(query): RawQuery,
+) -> impl IntoResponse {
+    tracing::info!("request table {:?} {:?} {:?}", path, params.0, query);
     let mut table = path.clone();
     let mut format = "html";
     if path.ends_with(".pretty.json") {
@@ -66,6 +70,9 @@ async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResp
             "pretty.json" => x.into_response(),
             _ => unreachable!("Unsupported format"),
         },
-        Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response(),
+        Err(x) => {
+            tracing::info!("Get Error: {:?}", x);
+            (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response()
+        }
     }
 }
