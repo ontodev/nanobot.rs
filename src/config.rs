@@ -1,6 +1,23 @@
+use serde::{Deserialize, Serialize};
 use std::fs;
 use toml::map::Map;
 use toml::Value;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+pub enum Debug {
+    INFO,
+    WARN,
+    ERROR,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Config {
+    pub name: String,
+    pub version: String,
+    pub edition: String,
+    pub connection: String,
+    pub debug: Debug,
+}
 
 /// Merge two toml::Values.
 /// The second argument is given priority in case of conflicts.
@@ -95,6 +112,56 @@ fn merge(v1: &Value, v2: &Value) -> Value {
             _ => panic!("Cannot merge inconsistent types."),
         },
     }
+}
+
+pub fn get_config() -> Config {
+    //set default configuration (using default_config.toml)
+    let default_config_file = fs::read_to_string("src/resources/default_config.toml")
+        .expect("Should have been able to read the file");
+
+    let default_config = default_config_file.parse::<Value>().unwrap();
+    let default_values = &default_config["tool"];
+
+    let mut config = Config {
+        //set in default_config.toml
+        name: String::from(default_values["name"].as_str().unwrap()),
+        version: String::from(default_values["version"].as_str().unwrap()),
+        edition: String::from(default_values["edition"].as_str().unwrap()),
+        //not set in default_config.toml
+        connection: String::from("db://name.example.com:27017"),
+        debug: Debug::INFO,
+    };
+
+    //update with user configuration (using nanobot.toml)
+    let user_config_file = fs::read_to_string("nanobot.toml");
+
+    match user_config_file {
+        Ok(x) => {
+            let user_config = x.parse::<Value>().unwrap();
+            let user_values = &user_config["tool"]; //TODO: do we require 'tool' here?
+            match user_values["name"].as_str() {
+                Some(x) => {
+                    config.name = String::from(x);
+                }
+                _ => (),
+            };
+            match user_values["version"].as_str() {
+                Some(x) => {
+                    config.version = String::from(x);
+                }
+                _ => (),
+            };
+            match user_values["edition"].as_str() {
+                Some(x) => {
+                    config.edition = String::from(x);
+                }
+                _ => (),
+            };
+        }
+        Err(_x) => (),
+    };
+
+    config
 }
 
 pub fn config(file_path: &str) -> Result<String, String> {
