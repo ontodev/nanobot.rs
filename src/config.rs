@@ -128,7 +128,7 @@ pub fn get_config() -> Config {
         version: String::from(default_values["version"].as_str().unwrap()),
         edition: String::from(default_values["edition"].as_str().unwrap()),
         //not set in default_config.toml
-        connection: String::from("db://name.example.com:27017"),
+        connection: String::from(".nanobot.db"),
         debug: Debug::INFO,
     };
 
