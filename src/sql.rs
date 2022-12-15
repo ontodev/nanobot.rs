@@ -9,6 +9,8 @@ pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
     EQUALS,
+    LT,
+    GT,
     IN,
 }
 
@@ -34,6 +36,16 @@ fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
             r#""{}" = '{}'"#,
             filter.0,
             filter.2.as_str().unwrap().to_string()
+        ),
+        Operator::LT => format!(
+            r#""{}" < {}"#,
+            filter.0,
+            filter.2.as_u64().unwrap().to_string()
+        ),
+        Operator::GT => format!(
+            r#""{}" > {}"#,
+            filter.0,
+            filter.2.as_u64().unwrap().to_string()
         ),
         Operator::IN => format!(
             r#""{}" IN ({})"#,
@@ -122,6 +134,16 @@ pub fn select_to_url(s: &Select) -> String {
                     filter.0,
                     filter.2.as_str().unwrap().to_string()
                 ),
+                Operator::LT => format!(
+                    r#"{}=lt.{}"#,
+                    filter.0,
+                    filter.2.as_u64().unwrap().to_string()
+                ),
+                Operator::GT => format!(
+                    r#"{}=gt.{}"#,
+                    filter.0,
+                    filter.2.as_u64().unwrap().to_string()
+                ),
                 Operator::IN => format!(
                     r#"{}=in.({})"#,
                     filter.0,
@@ -162,10 +184,25 @@ pub async fn get_table_from_pool(
     select: &Select,
 ) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
     let mut new_select = select.clone();
+
+    // Order by row_number by default
     if select.order.len() == 0 {
         new_select = Select {
             order: vec![("row_number".to_string(), Direction::ASC)],
             ..select.clone()
+        };
+    }
+
+    // For basic queries, use row_number instead of offset
+    if select.filter.len() == 0 && select.offset > 0 {
+        new_select = Select {
+            filter: vec![(
+                "row_number".to_string(),
+                Operator::GT,
+                serde_json::json!(select.offset),
+            )],
+            offset: 0,
+            ..new_select.clone()
         };
     }
 
