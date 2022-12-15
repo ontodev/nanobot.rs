@@ -103,9 +103,8 @@ pub fn select_to_sql(s: &Select) -> String {
     lines.join("\n")
 }
 
-// TODO: remove duplicate code
 pub fn select_to_sql_count(s: &Select) -> String {
-    let mut lines: Vec<String> = vec!["SELECT COUNT(*) AS count".to_string()];
+    let mut lines: Vec<String> = vec!["SELECT COUNT() AS count".to_string()];
     lines.push(format!(r#"FROM "{}""#, s.table));
     if s.filter.len() > 0 {
         lines.push(filters_to_sql(&s.filter));
@@ -162,7 +161,15 @@ pub async fn get_table_from_pool(
     pool: &SqlitePool,
     select: &Select,
 ) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
-    let sql = select_to_sql(select);
+    let mut new_select = select.clone();
+    if select.order.len() == 0 {
+        new_select = Select {
+            order: vec![("row_number".to_string(), Direction::ASC)],
+            ..select.clone()
+        };
+    }
+
+    let sql = select_to_sql(&new_select);
     let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
     Ok(rows
         .iter()
