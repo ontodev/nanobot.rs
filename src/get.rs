@@ -1,6 +1,6 @@
 use crate::sql::{
-    get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
-    rows_to_map, select_to_url, Operator, Select, LIMIT_DEFAULT, LIMIT_MAX,
+    get_count_from_pool, get_message_counts_from_pool, get_rows_from_pool, get_table_from_pool,
+    get_total_from_pool, rows_to_map, select_to_url, Operator, Select, LIMIT_DEFAULT, LIMIT_MAX,
 };
 use minijinja::Environment;
 use regex::Regex;
@@ -159,14 +159,7 @@ async fn get_page(
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
-    let start = std::time::Instant::now();
-
-    let view_select = Select {
-        table: format!("{}_view", select.table.clone()),
-        ..select.clone()
-    };
-    let value_rows = get_table_from_pool(&pool, &view_select).await?;
-
+    // Annotate columns with filters and sorting
     let mut column_map = Map::new();
     for row in column_rows.iter() {
         let mut r = Map::new();
@@ -191,11 +184,54 @@ async fn get_page(
         if filters.len() > 0 {
             r.insert("filters".to_string(), Value::Array(filters));
         }
+        // TODO: order
         column_map.insert(key, Value::Object(r));
     }
 
-    // TODO: get the nulltypes
+    // get the data and the messages
+    let start = std::time::Instant::now();
+    let mut view_select = Select {
+        table: format!("{}_view", select.table.clone()),
+        ..select.clone()
+    };
 
+    // If we're filtering for rows with messages
+    if select.message != "" {
+        let sql = format!(
+            r#"
+            SELECT json_object('row', row) AS json_result
+            FROM (
+              SELECT DISTINCT row
+              FROM message
+              WHERE "table" = '{}'
+              ORDER BY row
+              LIMIT {}
+              OFFSET {}
+            )
+        "#,
+            select.table, select.limit, select.offset
+        );
+        tracing::info!("MESSAGE SQL: {}", sql);
+        let result = get_rows_from_pool(&pool, &sql).await?;
+        let row_numbers: Vec<Value> = result
+            .clone()
+            .into_iter()
+            .map(|r| r.get("row").unwrap().clone())
+            .collect();
+        tracing::info!("{:?}", row_numbers);
+        view_select = Select {
+            filter: vec![(
+                "row_number".to_string(),
+                Operator::IN,
+                json!(row_numbers.clone()),
+            )],
+            offset: 0,
+            ..view_select
+        };
+    }
+
+    // Use the view to select the data
+    let value_rows = get_table_from_pool(&pool, &view_select).await?;
     let row_numbers: Vec<Value> = value_rows
         .clone()
         .into_iter()
@@ -299,11 +335,19 @@ async fn get_page(
         cell_rows.push(crow);
     }
 
-    let count = get_count_from_pool(&pool, &select).await?;
-    let total = get_total_from_pool(&pool, &select.table).await?;
-
     let mut counts = Map::new();
+    let mut count = get_count_from_pool(&pool, &select).await?;
+    if select.message != "" {
+        count = message_counts
+            .get("message_row")
+            .unwrap()
+            .as_u64()
+            .unwrap()
+            .clone() as usize;
+    }
     counts.insert("count".to_string(), json!(count));
+
+    let total = get_total_from_pool(&pool, &select.table).await?;
     counts.insert("total".to_string(), json!(total));
     for (k, v) in message_counts {
         counts.insert(k, v);

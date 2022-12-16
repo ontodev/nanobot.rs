@@ -35,12 +35,44 @@
 
 <div class="row">
   <div class="col">
-    {{ table.start }}-{{ table.end }} of {{ table.counts.count }} rows
-    {% if table.counts.total > table.counts.count %}
-    ({{ table.counts.total }} total)
+    {# range #}
+    {{ table.start }}-{{ table.end }} of
+    {% if table.counts.count == 1 %}
+    1 row
+    {% else %}
+    {{ table.counts.count }} rows
     {% endif %}
+    {% if table.counts.total > table.counts.count %}
+    filtered from {{ table.counts.total }}.
+    {% else %}
+    .
+    {% endif %}
+    <a href="{{ table.href }}">Reset</a>
+  </div>
+
+  <div class="col text-center">
+    {# message_rows #}
+    {% if table.counts.message_row == 1 %}
+    1
+    <a href="{{ table.href }}?message=any">row</a>
+    has
+    {% elif table.counts.message_row > 1 %}
+    {{ table.counts.message_row }}
+    <a href="{{ table.href }}?message=any">rows</a>
+    have
+    {% endif %}
+
+    {# message counts #}
+    {% if table.counts.message == 1 %}
+    1
+    <a href="/message?table=eq.{{ table.table }}">message</a>:
+    {% elif table.counts.message > 1 %}
+    {{ table.counts.message }}
+    <a href="/message?table=eq.{{ table.table }}">messages</a>:
+    {% endif %}
+
+    {# message types #}
     {% if table.counts.message %}
-    with
     {% if table.counts.error %}
     <strong>{{ table.counts.error }}</strong>
     <i class="bi bi-exclamation-octagon-fill text-danger"></i>
@@ -53,22 +85,20 @@
     <strong>{{ table.counts.info}}</strong>
     <i class="bi bi-info-circle-fill text-info"></i>
     {% endif %}
-    messages
     {% endif %}
   </div>
-  <div class="col text-end">
+  <div class="col col-auto text-end">
     <div class="btn-group">
-      <button class="btn btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown"
+      <a class="btn dropdown-toggle" href="" data-bs-toggle="dropdown"
         aria-expanded="false">
         Format
-      </button>
+      </a>
       <ul class="dropdown-menu">
         {% for name, href in table.formats|items %}
         <li><a class="dropdown-item" href="{{ href }}">{{ name }}</a></li>
         {% endfor %}
       </ul>
     </div>
-    <a class="btn btn-outline-primary" href="{{ table.href }}">Reset</a>
     <nav style="display: inline-block" aria-label="Page navigation">
       <ul class="pagination justify-content-end">
         <li class="page-item">

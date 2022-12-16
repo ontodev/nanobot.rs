@@ -5,6 +5,7 @@ use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -13,6 +14,8 @@ pub struct Params {
     pub offset: Option<usize>,
     // TODO: this is a hack to allow for one PostgREST-style column filter
     pub table: Option<String>,
+    // TODO: this is a hack to allow for message filtering
+    pub message: Option<String>,
 }
 
 #[tokio::main]
@@ -56,10 +59,20 @@ async fn table(
         table = path.replace(".json", "");
         format = "json";
     }
+    let mut filter: Vec<(String, sql::Operator, serde_json::Value)> = vec![];
+    if let Some(t) = &params.table {
+        filter.push((
+            "table".to_string(),
+            sql::Operator::EQUALS,
+            serde_json::json!(t.replace("eq.", "")),
+        ));
+    }
     let select = sql::Select {
         table,
+        filter,
         limit: params.limit.unwrap_or_default(),
         offset: params.offset.unwrap_or_default(),
+        message: params.message.clone().unwrap_or_default(),
         // TODO: restore filters
         ..Default::default()
     };

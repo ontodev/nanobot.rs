@@ -28,6 +28,7 @@ pub struct Select {
     pub order: Vec<(String, Direction)>,
     pub limit: usize,
     pub offset: usize,
+    pub message: String,
 }
 
 fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
@@ -129,6 +130,9 @@ pub fn select_to_sql_count(s: &Select) -> String {
 
 pub fn select_to_url(s: &Select) -> String {
     let mut params: Vec<String> = vec![];
+    if s.message != "" {
+        params.push(format!("message={}", s.message));
+    }
     if s.filter.len() > 0 {
         for filter in &s.filter {
             let x = match filter.1 {
@@ -220,6 +224,20 @@ pub async fn get_table_from_pool(
         .collect())
 }
 
+pub async fn get_rows_from_pool(
+    pool: &SqlitePool,
+    sql: &String,
+) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
+    let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let result: &str = row.get("json_result");
+            from_str::<Map<String, Value>>(&result).unwrap()
+        })
+        .collect())
+}
+
 pub async fn get_count_from_pool(pool: &SqlitePool, select: &Select) -> Result<usize, sqlx::Error> {
     let sql = select_to_sql_count(select);
     let row: SqliteRow = sqlx::query(&sql).fetch_one(pool).await?;
@@ -253,6 +271,7 @@ pub async fn get_message_counts_from_pool(
     let sql = format!(
         r#"SELECT json_object(
           'message', COUNT(),
+          'message_row', COUNT(DISTINCT row),
           'error', SUM(level = 'error'),
           'warn', SUM(level = 'warn'),
           'info', SUM(level = 'info') 
