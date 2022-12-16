@@ -7,7 +7,10 @@ const SQL_SMALL: &str = r#"SELECT json_object(
   'type', "type",
   'description', "description"
 ) AS json_result
-FROM "table""#;
+FROM (
+  SELECT *
+  FROM "table"
+)"#;
 const URL_SMALL: &str = "table";
 
 const SQL_BIG: &str = r#"SELECT json_object(
@@ -16,12 +19,15 @@ const SQL_BIG: &str = r#"SELECT json_object(
   'type', "type",
   'description', "description"
 ) AS json_result
-FROM "table"
-WHERE "table" = 'table'
-  AND "type" IN (1,2,3)
-ORDER BY "path" DESC
-LIMIT 1
-OFFSET 1"#;
+FROM (
+  SELECT *
+  FROM "table"
+  WHERE "table" = 'table'
+    AND "type" IN (1,2,3)
+  ORDER BY "path" DESC
+  LIMIT 1
+  OFFSET 1
+)"#;
 const URL_BIG: &str = "table?table=eq.table&type=in.(1,2,3)&order=path.desc&limit=1&offset=1";
 
 #[test]
@@ -43,6 +49,7 @@ fn test_select_to_sql() {
         order: vec![("path".to_string(), Direction::DESC)],
         limit: 1,
         offset: 1,
+        message: "".to_string(),
     };
     assert_eq!(select_to_sql(&select), SQL_BIG);
 }
@@ -58,7 +65,8 @@ fn test_select_to_sql_json() {
         ],
         "order": [("path", "DESC")],
         "limit": 1,
-        "offset": 1
+        "offset": 1,
+        "message": ""
     }))
     .unwrap();
     assert_eq!(select_to_sql(&select), SQL_BIG);
@@ -89,7 +97,8 @@ fn test_select_to_url() {
         ],
         "order": [("path", "DESC")],
         "limit": 1,
-        "offset": 1
+        "offset": 1,
+        "message": ""
     }))
     .unwrap();
     assert_eq!(select_to_url(&select), URL_BIG);

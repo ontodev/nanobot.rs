@@ -61,12 +61,13 @@ fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
     }
 }
 
-fn filters_to_sql(filters: &Vec<(String, Operator, Value)>) -> String {
+fn filters_to_sql(indent: &str, filters: &Vec<(String, Operator, Value)>) -> String {
     let mut parts: Vec<String> = vec![];
     for filter in filters {
         parts.push(filter_to_sql(&filter));
     }
-    format!("WHERE {}", parts.join("\n  AND "))
+    let joiner = format!("\n{}  AND ", indent);
+    format!("{}WHERE {}", indent, parts.join(&joiner))
 }
 
 /// Convert a Select struct to a SQL string.
@@ -78,7 +79,10 @@ fn filters_to_sql(filters: &Vec<(String, Operator, Value)>) -> String {
 ///     'type', "type",
 ///     'description', "description"
 /// ) AS json_result
-/// FROM "table";
+/// FROM (
+///   SELECT *
+///   FROM "table"
+/// )
 /// ```
 ///
 /// # Examples
@@ -96,10 +100,10 @@ pub fn select_to_sql(s: &Select) -> String {
     lines.push(format!("  {}", parts.join(",\n  ")));
     lines.push(") AS json_result".to_string());
     lines.push("FROM (".to_string());
-    lines.push("SELECT *".to_string());
-    lines.push(format!(r#"FROM "{}""#, s.table));
+    lines.push("  SELECT *".to_string());
+    lines.push(format!(r#"  FROM "{}""#, s.table));
     if s.filter.len() > 0 {
-        lines.push(filters_to_sql(&s.filter));
+        lines.push(filters_to_sql("  ", &s.filter));
     }
     if s.order.len() > 0 {
         let parts: Vec<String> = s
@@ -107,13 +111,13 @@ pub fn select_to_sql(s: &Select) -> String {
             .iter()
             .map(|(c, d)| format!(r#""{}" {:?}"#, c, d))
             .collect();
-        lines.push(format!("ORDER BY {}", parts.join(", ")));
+        lines.push(format!("  ORDER BY {}", parts.join(", ")));
     }
     if s.limit > 0 {
-        lines.push(format!("LIMIT {}", s.limit));
+        lines.push(format!("  LIMIT {}", s.limit));
     }
     if s.offset > 0 {
-        lines.push(format!("OFFSET {}", s.offset));
+        lines.push(format!("  OFFSET {}", s.offset));
     }
     lines.push(")".to_string());
     lines.join("\n")
@@ -123,7 +127,7 @@ pub fn select_to_sql_count(s: &Select) -> String {
     let mut lines: Vec<String> = vec!["SELECT COUNT() AS count".to_string()];
     lines.push(format!(r#"FROM "{}""#, s.table));
     if s.filter.len() > 0 {
-        lines.push(filters_to_sql(&s.filter));
+        lines.push(filters_to_sql("", &s.filter));
     }
     lines.join("\n")
 }
