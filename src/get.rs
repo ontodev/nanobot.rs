@@ -160,7 +160,12 @@ async fn get_page(
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
     let start = std::time::Instant::now();
-    let value_rows = get_table_from_pool(&pool, &select).await?;
+
+    let view_select = Select {
+        table: format!("{}_view", select.table.clone()),
+        ..select.clone()
+    };
+    let value_rows = get_table_from_pool(&pool, &view_select).await?;
 
     let mut column_map = Map::new();
     for row in column_rows.iter() {
@@ -296,6 +301,7 @@ async fn get_page(
 
     let count = get_count_from_pool(&pool, &select).await?;
     let total = get_total_from_pool(&pool, &select.table).await?;
+
     let mut counts = Map::new();
     counts.insert("count".to_string(), json!(count));
     counts.insert("total".to_string(), json!(total));

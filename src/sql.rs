@@ -94,6 +94,8 @@ pub fn select_to_sql(s: &Select) -> String {
         .collect();
     lines.push(format!("  {}", parts.join(",\n  ")));
     lines.push(") AS json_result".to_string());
+    lines.push("FROM (".to_string());
+    lines.push("SELECT *".to_string());
     lines.push(format!(r#"FROM "{}""#, s.table));
     if s.filter.len() > 0 {
         lines.push(filters_to_sql(&s.filter));
@@ -112,6 +114,7 @@ pub fn select_to_sql(s: &Select) -> String {
     if s.offset > 0 {
         lines.push(format!("OFFSET {}", s.offset));
     }
+    lines.push(")".to_string());
     lines.join("\n")
 }
 
@@ -220,15 +223,27 @@ pub async fn get_table_from_pool(
 pub async fn get_count_from_pool(pool: &SqlitePool, select: &Select) -> Result<usize, sqlx::Error> {
     let sql = select_to_sql_count(select);
     let row: SqliteRow = sqlx::query(&sql).fetch_one(pool).await?;
-    let count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
-    Ok(count)
+    let value_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+
+    let conflict_select = Select {
+        table: format!("{}_conflict", select.table.clone()),
+        ..select.clone()
+    };
+    let sql = select_to_sql_count(&conflict_select);
+    let row: SqliteRow = sqlx::query(&sql).fetch_one(pool).await?;
+    let conflict_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+    Ok(value_count + conflict_count)
 }
 
 pub async fn get_total_from_pool(pool: &SqlitePool, table: &String) -> Result<usize, sqlx::Error> {
     let sql = format!(r#"SELECT COUNT() AS count FROM "{}""#, table);
     let row = sqlx::query(&sql).fetch_one(pool).await?;
-    let count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
-    Ok(count)
+    let value_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+
+    let sql = format!(r#"SELECT COUNT() AS count FROM "{}_conflict""#, table);
+    let row = sqlx::query(&sql).fetch_one(pool).await?;
+    let conflict_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+    Ok(value_count + conflict_count)
 }
 
 pub async fn get_message_counts_from_pool(
