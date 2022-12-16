@@ -85,12 +85,15 @@
     <strong>{{ table.counts.info}}</strong>
     <i class="bi bi-info-circle-fill text-info"></i>
     {% endif %}
+    {% if table.counts.update %}
+    <strong>{{ table.counts.update}}</strong>
+    <i class="bi bi-check-square-fill text-success"></i>
+    {% endif %}
     {% endif %}
   </div>
   <div class="col col-auto text-end">
-    <div class="btn-group">
-      <a class="btn dropdown-toggle" href="" data-bs-toggle="dropdown"
-        aria-expanded="false">
+    <span class="align-top me-2">
+      <a class="dropdown-toggle" href="" data-bs-toggle="dropdown" aria-expanded="false">
         Format
       </a>
       <ul class="dropdown-menu">
@@ -98,7 +101,7 @@
         <li><a class="dropdown-item" href="{{ href }}">{{ name }}</a></li>
         {% endfor %}
       </ul>
-    </div>
+    </span>
     <nav style="display: inline-block" aria-label="Page navigation">
       <ul class="pagination justify-content-end">
         <li class="page-item">
@@ -169,6 +172,8 @@
           <i class="bi bi-exclamation-triangle-fill text-warning"></i>
           {% elif cell.message_level == "info" %}
           <i class="bi bi-info-circle-fill text-info"></i>
+          {% elif cell.message_level == "update" %}
+          <i class="bi bi-check-square-fill text-success"></i>
           {% else %}
           <i class="bi bi-question-circle-fill"></i>
           {% endif %}
@@ -183,6 +188,8 @@
               <i class="bi bi-exclamation-triangle-fill text-warning"></i>
               {% elif message.level == "info" %}
               <i class="bi bi-info-circle-fill text-info"></i>
+              {% elif message.level == "update" %}
+              <i class="bi bi-check-square-fill text-success"></i>
               {% else %}
               <i class="bi bi-question-circle-fill"></i>
               {% endif %}

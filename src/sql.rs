@@ -274,7 +274,8 @@ pub async fn get_message_counts_from_pool(
           'message_row', COUNT(DISTINCT row),
           'error', SUM(level = 'error'),
           'warn', SUM(level = 'warn'),
-          'info', SUM(level = 'info') 
+          'info', SUM(level = 'info'),
+          'update', SUM(level = 'update')
         ) AS json_result
         FROM message
         WHERE "table" = '{}'"#,

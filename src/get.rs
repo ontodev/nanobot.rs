@@ -211,7 +211,6 @@ async fn get_page(
         "#,
             select.table, select.limit, select.offset
         );
-        tracing::info!("MESSAGE SQL: {}", sql);
         let result = get_rows_from_pool(&pool, &sql).await?;
         let row_numbers: Vec<Value> = result
             .clone()
@@ -473,9 +472,10 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
 
 fn level_to_int(level: &String) -> usize {
     match level.to_lowercase().as_str() {
-        "error" => 3,
-        "warn" => 2,
-        "info" => 1,
+        "error" => 4,
+        "warn" => 3,
+        "info" => 2,
+        "update" => 1,
         _ => 0,
     }
 }
@@ -484,6 +484,7 @@ fn level_to_bootstrap(level: String) -> String {
     match level.to_lowercase().as_str() {
         "error" => "danger",
         "warn" => "warning",
+        "update" => "success",
         x => x,
     }
     .to_string()
