@@ -1,3 +1,4 @@
+use crate::config::get_config;
 use crate::{get, sql};
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
@@ -59,7 +60,10 @@ async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResp
         // TODO: restore filters
         ..Default::default()
     };
-    match get::get_rows(".nanobot.db", &select, "page", &format).await {
+
+    //TODO: pass config struct instead of using the default
+    let config = get_config();
+    match get::get_rows(&config, &select, "page", &format).await {
         Ok(x) => match format {
             "html" => Html(x).into_response(),
             "json" => ([("content-type", "application/json; charset=utf-8")], x).into_response(),

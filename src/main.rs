@@ -7,6 +7,9 @@ pub mod sql;
 
 #[async_std::main]
 async fn main() {
+    // initialize configuration
+    let config = config::get_config();
+
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
@@ -54,8 +57,12 @@ async fn main() {
 
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
-            Some(x) => init::init(x).await,
-            _ => init::init(".nanobot.db").await,
+            Some(x) => {
+                let mut user_config = config.clone();
+                user_config.connection = String::from(x);
+                init::init(&user_config).await
+            }
+            _ => init::init(&config).await,
         },
         Some(("config", _sub_matches)) => config::config("nanobot.toml"),
         Some(("get", sub_matches)) => {
@@ -71,7 +78,7 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result = match get::get_table(".nanobot.db", table, shape, format).await {
+            let result = match get::get_table(&config, table, shape, format).await {
                 Ok(x) => x,
                 Err(x) => format!("ERROR: {:?}", x),
             };

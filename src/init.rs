@@ -1,3 +1,4 @@
+use crate::config::Config;
 use ontodev_valve::configure_and_or_load;
 use std::error;
 use std::fs;
@@ -98,7 +99,8 @@ fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-pub async fn init(database: &str) -> Result<String, String> {
+pub async fn init(config: &Config) -> Result<String, String> {
+    let database = config.connection.to_owned();
     match fs::create_dir_all("src/schema") {
         Err(_x) => return Err(String::from("Couldn't create folder src/schema")),
         Ok(_x) => {}
@@ -120,19 +122,19 @@ pub async fn init(database: &str) -> Result<String, String> {
     };
 
     //create database
-    match File::create(database) {
+    match File::create(&database) {
         Err(_x) => return Err(String::from("Couldn't create database")),
         Ok(_x) => {}
     }
 
     //add database to .gitignore
-    match add_to_gitignore(format!("{}*", database).as_str()) {
+    match add_to_gitignore(format!("{}*", &database).as_str()) {
         Err(x) => return Err(x),
         Ok(_x) => {}
     }
 
     //load tables into database
-    let _config = configure_and_or_load("src/schema/table.tsv", database, true, false).await;
+    let _config = configure_and_or_load("src/schema/table.tsv", &database, true, false).await;
 
     if Path::new("nanobot.toml").exists() {
         Err(String::from("nanobot.toml file already exists."))

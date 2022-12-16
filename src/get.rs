@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::sql::{
     get_count_from_pool, get_table_from_pool, rows_to_map, select_to_url, Operator, Select,
     LIMIT_DEFAULT, LIMIT_MAX,
@@ -40,7 +41,7 @@ impl From<sqlx::Error> for GetError {
 }
 
 pub async fn get_table(
-    database: &str,
+    config: &Config,
     table: &str,
     shape: &str,
     format: &str,
@@ -50,15 +51,16 @@ pub async fn get_table(
         limit: LIMIT_DEFAULT,
         ..Default::default()
     };
-    get_rows(database, &select, shape, format).await
+    get_rows(config, &select, shape, format).await
 }
 
 pub async fn get_rows(
-    database: &str,
+    config: &Config,
     base_select: &Select,
     shape: &str,
     format: &str,
 ) -> Result<String, GetError> {
+    let database = config.connection.to_owned();
     let connection_string = format!("sqlite://{}?mode=rwc", database);
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
