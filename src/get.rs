@@ -217,7 +217,6 @@ async fn get_page(
             .into_iter()
             .map(|r| r.get("row").unwrap().clone())
             .collect();
-        tracing::info!("{:?}", row_numbers);
         view_select = Select {
             filter: vec![(
                 "row_number".to_string(),
