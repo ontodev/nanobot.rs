@@ -63,7 +63,7 @@ async fn table(
     if let Some(t) = &params.table {
         filter.push((
             "table".to_string(),
-            sql::Operator::EQUALS,
+            sql::Operator::Equals,
             serde_json::json!(t.replace("eq.", "")),
         ));
     }

@@ -9,22 +9,22 @@ pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
-    EQUALS,
-    NOT_EQUALS,
-    LESS,
-    GREATER,
-    LESS_EQUALS,
-    GREATER_EQUALS,
-    LIKE,
-    ILIKE,
-    IS,
-    IN,
+    Equals,
+    NotEquals,
+    LessThan,
+    GreaterThan,
+    LessThanEquals,
+    GreaterThanEquals,
+    Like,
+    ILike,
+    Is,
+    In,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Direction {
-    ASC,
-    DESC,
+    Ascending,
+    Descending,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -40,22 +40,22 @@ pub struct Select {
 
 fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
     match filter.1 {
-        Operator::EQUALS => format!(
+        Operator::Equals => format!(
             r#""{}" = '{}'"#,
             filter.0,
             filter.2.as_str().unwrap().to_string()
         ),
-        Operator::LESS => format!(
+        Operator::LessThan => format!(
             r#""{}" < {}"#,
             filter.0,
             filter.2.as_u64().unwrap().to_string()
         ),
-        Operator::GREATER => format!(
+        Operator::GreaterThan => format!(
             r#""{}" > {}"#,
             filter.0,
             filter.2.as_u64().unwrap().to_string()
         ),
-        Operator::IN => format!(
+        Operator::In => format!(
             r#""{}" IN ({})"#,
             filter.0,
             // WARN: This is not a good idea!
@@ -117,7 +117,13 @@ pub fn select_to_sql(s: &Select) -> String {
         let parts: Vec<String> = s
             .order
             .iter()
-            .map(|(c, d)| format!(r#""{}" {:?}"#, c, d))
+            .map(|(c, d)| {
+                let dir = match d {
+                    Direction::Ascending => "ASC",
+                    Direction::Descending => "DESC",
+                };
+                format!(r#""{}" {}"#, c, dir)
+            })
             .collect();
         lines.push(format!("  ORDER BY {}", parts.join(", ")));
     }
@@ -148,22 +154,22 @@ pub fn select_to_url(s: &Select) -> String {
     if s.filter.len() > 0 {
         for filter in &s.filter {
             let x = match filter.1 {
-                Operator::EQUALS => format!(
+                Operator::Equals => format!(
                     r#"{}=eq.{}"#,
                     filter.0,
                     filter.2.as_str().unwrap().to_string()
                 ),
-                Operator::LESS => format!(
+                Operator::LessThan => format!(
                     r#"{}=lt.{}"#,
                     filter.0,
                     filter.2.as_u64().unwrap().to_string()
                 ),
-                Operator::GREATER => format!(
+                Operator::GreaterThan => format!(
                     r#"{}=gt.{}"#,
                     filter.0,
                     filter.2.as_u64().unwrap().to_string()
                 ),
-                Operator::IN => format!(
+                Operator::In => format!(
                     r#"{}=in.({})"#,
                     filter.0,
                     // WARN: This is not a good idea!
@@ -182,7 +188,13 @@ pub fn select_to_url(s: &Select) -> String {
         let parts: Vec<String> = s
             .order
             .iter()
-            .map(|(c, d)| format!(r#"{}.{}"#, c, format!("{:?}", d).to_lowercase()))
+            .map(|(c, d)| {
+                let dir = match d {
+                    Direction::Ascending => "asc",
+                    Direction::Descending => "desc",
+                };
+                format!(r"{}.{}", c, dir)
+            })
             .collect();
         params.push(format!("order={}", parts.join(", ")));
     }
@@ -208,7 +220,7 @@ pub async fn get_table_from_pool(
     // Order by row_number by default
     if select.order.len() == 0 {
         new_select = Select {
-            order: vec![("row_number".to_string(), Direction::ASC)],
+            order: vec![("row_number".to_string(), Direction::Ascending)],
             ..select.clone()
         };
     }
@@ -218,7 +230,7 @@ pub async fn get_table_from_pool(
         new_select = Select {
             filter: vec![(
                 "row_number".to_string(),
-                Operator::GREATER,
+                Operator::GreaterThan,
                 serde_json::json!(select.offset),
             )],
             offset: 0,
@@ -367,7 +379,7 @@ pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) {
     let column = get_from_raw(&n.named_child(0).unwrap(), raw);
     let value = transduce_list(&n.named_child(1).unwrap(), raw);
 
-    let filter = (column, Operator::IN, value);
+    let filter = (column, Operator::In, value);
     query.filter.push(filter);
 }
 
@@ -411,16 +423,16 @@ pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
 
 fn get_operator(operator_string: &str) -> Operator {
     match operator_string {
-        "lt." => Operator::LESS,
-        "lte." => Operator::LESS_EQUALS,
-        "eq." => Operator::EQUALS,
-        "neq." => Operator::NOT_EQUALS,
-        "gt." => Operator::GREATER,
-        "gte." => Operator::GREATER_EQUALS,
-        "is." => Operator::IS,
-        "like." => Operator::LIKE,
-        "ilike." => Operator::ILIKE,
-        "in." => Operator::IN,
+        "lt." => Operator::LessThan,
+        "lte." => Operator::LessThanEquals,
+        "eq." => Operator::Equals,
+        "neq." => Operator::NotEquals,
+        "gt." => Operator::GreaterThan,
+        "gte." => Operator::GreaterThanEquals,
+        "is." => Operator::Is,
+        "like." => Operator::Like,
+        "ilike." => Operator::ILike,
+        "in." => Operator::In,
         _ => panic!("Operator {} not supported", operator_string),
     }
 }
@@ -438,8 +450,8 @@ pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
 
 fn get_ordering(ordering_string: &str) -> Direction {
     match ordering_string {
-        ".asc" => Direction::ASC,
-        ".desc" => Direction::DESC,
+        ".asc" => Direction::Ascending,
+        ".desc" => Direction::Descending,
         _ => panic!("Ordering {} not supported", ordering_string),
     }
 }
@@ -458,7 +470,7 @@ pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
             let order = (column, ordering);
             query.order.push(order);
         } else {
-            let ordering = Direction::ASC; //default ordering is ASC
+            let ordering = Direction::Ascending; //default ordering is ASC
             let order = (column, ordering);
             query.order.push(order);
         }
