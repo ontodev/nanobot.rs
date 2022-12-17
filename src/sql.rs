@@ -4,7 +4,7 @@ use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 
 pub const LIMIT_MAX: usize = 100;
-pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
+pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
