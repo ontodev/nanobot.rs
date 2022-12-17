@@ -1,4 +1,4 @@
-use nanobot::sql::{select_to_sql, select_to_url, Direction, Operator, Select};
+use nanobot::sql::{parse, select_to_sql, select_to_url, Direction, Operator, Select};
 use serde_json::{from_value, json, Value};
 
 const SQL_SMALL: &str = r#"SELECT json_object(
@@ -41,12 +41,12 @@ fn test_select_to_sql() {
         filter: vec![
             (
                 "table".to_string(),
-                Operator::EQUALS,
+                Operator::Equals,
                 Value::String("table".to_string()),
             ),
-            ("type".to_string(), Operator::IN, json!([1, 2, 3])),
+            ("type".to_string(), Operator::In, json!([1, 2, 3])),
         ],
-        order: vec![("path".to_string(), Direction::DESC)],
+        order: vec![("path".to_string(), Direction::Descending)],
         limit: 1,
         offset: 1,
         message: "".to_string(),
@@ -60,10 +60,10 @@ fn test_select_to_sql_json() {
         "table": "table",
         "select": ["table", "path", "type", "description"],
         "filter": [
-            ["table", "EQUALS", "table"],
-            ["type", "IN", [1, 2, 3]]
+            ["table", "Equals", "table"],
+            ["type", "In", [1, 2, 3]]
         ],
-        "order": [("path", "DESC")],
+        "order": [("path", "Descending")],
         "limit": 1,
         "offset": 1,
         "message": ""
@@ -92,10 +92,10 @@ fn test_select_to_url() {
         "table": "table",
         "select": ["table", "path", "type", "description"],
         "filter": [
-            ["table", "EQUALS", "table"],
-            ["type", "IN", [1, 2, 3]]
+            ["table", "Equals", "table"],
+            ["type", "In", [1, 2, 3]]
         ],
-        "order": [("path", "DESC")],
+        "order": [("path", "Descending")],
         "limit": 1,
         "offset": 1,
         "message": ""
@@ -116,4 +116,18 @@ fn test_select_to_url_default() {
         ..Default::default()
     };
     assert_eq!(select_to_url(&select), URL_SMALL);
+}
+
+#[test]
+fn test_parse() {
+    let url = "table?foo=eq.bar".to_string();
+    let select = parse(&url);
+    assert_eq!(select_to_url(&select), url);
+}
+
+#[test]
+fn test_parse_message() {
+    let url = "table?message=any".to_string();
+    let select = parse(&url);
+    assert_eq!(select.message, "any");
 }

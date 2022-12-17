@@ -13,6 +13,9 @@ deps:
 	sudo apt-get install -y rustc cargo
 	sudo apt-get install -y python3-pip
 	sudo pip install tesh
+	npm install -g tree-sitter-cli
+	cd .. && git clone https://github.com/ontodev/tree-sitter-sqlrest.git
+	cd ../tree-sitter-sqlrest && tree-sitter generate
 
 .PHONY: format
 format:
@@ -26,7 +29,7 @@ target/release/nanobot: src/
 	cargo build --release
 
 .PHONY: test
-test: target/release/nanobot
+test:
 	cargo fmt --check
 	cargo test --release
 	PATH="$${PATH}:$$(pwd)/target/release"; tesh --debug false ./doc
@@ -37,7 +40,7 @@ dev-check:
 
 .PHONY: dev-test
 dev-test:
-	find src/ test/ | entr -rs 'cargo test --release'
+	find src/ tests/ | entr make test
 
 .PHONY: dev-serve
 dev-serve:

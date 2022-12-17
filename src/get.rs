@@ -94,7 +94,7 @@ pub async fn get_rows(
             .collect(),
         filter: vec![(
             "table".to_string(),
-            Operator::EQUALS,
+            Operator::Equals,
             Value::String(base_select.table.clone()),
         )],
         ..Default::default()
@@ -220,7 +220,7 @@ async fn get_page(
         view_select = Select {
             filter: vec![(
                 "row_number".to_string(),
-                Operator::IN,
+                Operator::In,
                 json!(row_numbers.clone()),
             )],
             offset: 0,
@@ -244,10 +244,10 @@ async fn get_page(
         filter: vec![
             (
                 "table".to_string(),
-                Operator::EQUALS,
+                Operator::Equals,
                 json!(select.table.clone()),
             ),
-            ("row".to_string(), Operator::IN, json!(row_numbers.clone())),
+            ("row".to_string(), Operator::In, json!(row_numbers.clone())),
         ],
         limit: 1000,
         ..Default::default()
