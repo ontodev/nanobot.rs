@@ -374,13 +374,27 @@ pub fn rows_to_map(rows: Vec<Map<String, Value>>, column: &str) -> Map<String, V
 }
 
 pub fn parse(input: &str) -> Select {
+    // WARN: This is a hack to handle the special 'message' parameter.
+    let mut message = "".to_string();
+    let mut i = input.to_string();
+    if i.contains("message=any") {
+        message = "any".to_string();
+        if i.contains("?message=any&") {
+            i = i.replace("?message=any&", "");
+        } else if i.contains("?message=any") {
+            i = i.replace("?message=any", "");
+        } else if i.contains("&message=any") {
+            i = i.replace("&message=any", "");
+        }
+    }
+
     let mut parser = Parser::new();
 
     parser
         .set_language(tree_sitter_sqlrest::language())
         .expect("Error loading sqlrest grammar");
 
-    let tree = parser.parse(input, None).unwrap();
+    let tree = parser.parse(&i, None).unwrap();
 
     let mut query = Select {
         table: String::from("no table given"),
@@ -389,10 +403,10 @@ pub fn parse(input: &str) -> Select {
         order: Vec::new(),
         limit: 0,
         offset: 0,
-        message: "".to_string(),
+        message,
     };
 
-    transduce(&tree.root_node(), input, &mut query);
+    transduce(&tree.root_node(), &i, &mut query);
     query
 }
 
@@ -412,7 +426,7 @@ pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
         "offset" => transduce_offset(n, raw, query),
         "STRING" => panic!("Encountered STRING in top level translation"),
         _ => {
-            panic!("Parsing Error");
+            panic!("Parsing Error: {:?} {} {:?}", n, raw, query);
         }
     }
 }

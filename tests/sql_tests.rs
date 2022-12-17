@@ -1,4 +1,4 @@
-use nanobot::sql::{select_to_sql, select_to_url, Direction, Operator, Select};
+use nanobot::sql::{parse, select_to_sql, select_to_url, Direction, Operator, Select};
 use serde_json::{from_value, json, Value};
 
 const SQL_SMALL: &str = r#"SELECT json_object(
@@ -116,4 +116,18 @@ fn test_select_to_url_default() {
         ..Default::default()
     };
     assert_eq!(select_to_url(&select), URL_SMALL);
+}
+
+#[test]
+fn test_parse() {
+    let url = "table?foo=eq.bar".to_string();
+    let select = parse(&url);
+    assert_eq!(select_to_url(&select), url);
+}
+
+#[test]
+fn test_parse_message() {
+    let url = "table?message=any".to_string();
+    let select = parse(&url);
+    assert_eq!(select.message, "any");
 }
