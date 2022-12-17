@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_str, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
+use std::str::FromStr;
 use tree_sitter::{Node, Parser};
 
 pub const LIMIT_MAX: usize = 100;
@@ -25,6 +26,36 @@ pub enum Operator {
 pub enum Direction {
     Ascending,
     Descending,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseDirectionError;
+
+impl FromStr for Direction {
+    type Err = ParseDirectionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "asc" | "ascending" => Ok(Direction::Ascending),
+            "desc" | "descending" => Ok(Direction::Descending),
+            _ => Err(ParseDirectionError),
+        }
+    }
+}
+
+impl Direction {
+    fn to_sql(&self) -> &str {
+        match self {
+            Direction::Ascending => "ASC",
+            Direction::Descending => "DESC",
+        }
+    }
+    fn to_url(&self) -> &str {
+        match self {
+            Direction::Ascending => "asc",
+            Direction::Descending => "desc",
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -117,13 +148,7 @@ pub fn select_to_sql(s: &Select) -> String {
         let parts: Vec<String> = s
             .order
             .iter()
-            .map(|(c, d)| {
-                let dir = match d {
-                    Direction::Ascending => "ASC",
-                    Direction::Descending => "DESC",
-                };
-                format!(r#""{}" {}"#, c, dir)
-            })
+            .map(|(c, d)| format!(r#""{}" {}"#, c, d.to_sql()))
             .collect();
         lines.push(format!("  ORDER BY {}", parts.join(", ")));
     }
@@ -188,13 +213,7 @@ pub fn select_to_url(s: &Select) -> String {
         let parts: Vec<String> = s
             .order
             .iter()
-            .map(|(c, d)| {
-                let dir = match d {
-                    Direction::Ascending => "asc",
-                    Direction::Descending => "desc",
-                };
-                format!(r"{}.{}", c, dir)
-            })
+            .map(|(c, d)| format!(r"{}.{}", c, d.to_url()))
             .collect();
         params.push(format!("order={}", parts.join(", ")));
     }
@@ -448,14 +467,6 @@ pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
     query.filter.push(filter);
 }
 
-fn get_ordering(ordering_string: &str) -> Direction {
-    match ordering_string {
-        ".asc" => Direction::Ascending,
-        ".desc" => Direction::Descending,
-        _ => panic!("Ordering {} not supported", ordering_string),
-    }
-}
-
 pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
     let child_count = n.named_child_count();
     let mut position = 0;
@@ -464,11 +475,19 @@ pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
         let column = get_from_raw(&n.named_child(position).unwrap(), raw);
         position = position + 1;
         if position < child_count && n.named_child(position).unwrap().kind().eq("ordering") {
-            let ordering_string = get_from_raw(&n.named_child(position).unwrap(), raw);
-            let ordering = get_ordering(&ordering_string);
-            position = position + 1;
-            let order = (column, ordering);
-            query.order.push(order);
+            let ordering_string =
+                get_from_raw(&n.named_child(position).unwrap(), raw).replace(".", "");
+            let ordering = Direction::from_str(&ordering_string);
+            match ordering {
+                Ok(o) => {
+                    position = position + 1;
+                    let order = (column, o);
+                    query.order.push(order);
+                }
+                Err(_) => {
+                    tracing::warn!("Unhandled order param '{}'", ordering_string);
+                }
+            };
         } else {
             let ordering = Direction::Ascending; //default ordering is ASC
             let order = (column, ordering);
