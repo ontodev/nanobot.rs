@@ -230,16 +230,15 @@ pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) {
     let column = get_from_raw(&n.named_child(0).unwrap(), raw);
     let value = transduce_list(&n.named_child(1).unwrap(), raw);
 
-    let filter = (column, Operator::IN , value);
-    query.filter.push(filter); 
+    let filter = (column, Operator::IN, value);
+    query.filter.push(filter);
 }
 
 pub fn transduce_list(n: &Node, raw: &str) -> Value {
-
     let quoted_strings = match n.kind() {
         "list" => false,
         "list_of_strings" => true,
-        _ => panic!("Not a valid list")
+        _ => panic!("Not a valid list"),
     };
 
     let mut vec = Vec::new();
@@ -247,12 +246,12 @@ pub fn transduce_list(n: &Node, raw: &str) -> Value {
     let child_count = n.named_child_count();
     for i in 0..child_count {
         if quoted_strings {
-            let quoted_string = format!("{}", get_from_raw(&n.named_child(i).unwrap(), raw)); 
-             vec.push(Value::String(quoted_string));
+            let quoted_string = format!("{}", get_from_raw(&n.named_child(i).unwrap(), raw));
+            vec.push(Value::String(quoted_string));
         } else {
-             vec.push(Value::String(get_from_raw(&n.named_child(i).unwrap(), raw))); 
-        } 
-    };
+            vec.push(Value::String(get_from_raw(&n.named_child(i).unwrap(), raw)));
+        }
+    }
     Value::Array(vec)
 }
 
