@@ -1,10 +1,11 @@
 use crate::{get, sql};
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, RawQuery};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::net::SocketAddr;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -13,6 +14,8 @@ pub struct Params {
     pub offset: Option<usize>,
     // TODO: this is a hack to allow for one PostgREST-style column filter
     pub table: Option<String>,
+    // TODO: this is a hack to allow for message filtering
+    pub message: Option<String>,
 }
 
 #[tokio::main]
@@ -41,8 +44,12 @@ async fn root() -> impl IntoResponse {
     Redirect::permanent("/table")
 }
 
-async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResponse {
-    tracing::info!("request table {:?} {:?}", path, params.0);
+async fn table(
+    Path(path): Path<String>,
+    params: Query<Params>,
+    RawQuery(query): RawQuery,
+) -> impl IntoResponse {
+    tracing::info!("request table {:?} {:?} {:?}", path, params.0, query);
     let mut table = path.clone();
     let mut format = "html";
     if path.ends_with(".pretty.json") {
@@ -52,10 +59,20 @@ async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResp
         table = path.replace(".json", "");
         format = "json";
     }
+    let mut filter: Vec<(String, sql::Operator, serde_json::Value)> = vec![];
+    if let Some(t) = &params.table {
+        filter.push((
+            "table".to_string(),
+            sql::Operator::EQUALS,
+            serde_json::json!(t.replace("eq.", "")),
+        ));
+    }
     let select = sql::Select {
         table,
+        filter,
         limit: params.limit.unwrap_or_default(),
         offset: params.offset.unwrap_or_default(),
+        message: params.message.clone().unwrap_or_default(),
         // TODO: restore filters
         ..Default::default()
     };
@@ -66,6 +83,9 @@ async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResp
             "pretty.json" => x.into_response(),
             _ => unreachable!("Unsupported format"),
         },
-        Err(_) => (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response(),
+        Err(x) => {
+            tracing::info!("Get Error: {:?}", x);
+            (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response()
+        }
     }
 }

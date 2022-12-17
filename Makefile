@@ -19,9 +19,10 @@ format:
 	cargo fmt
 
 .PHONY: build
-build: target/release/nanobot
+build:
+	cargo build --release
 
-target/release/nanobot:
+target/release/nanobot: src/
 	cargo build --release
 
 .PHONY: test
