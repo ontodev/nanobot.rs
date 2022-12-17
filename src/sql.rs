@@ -22,6 +22,29 @@ pub enum Operator {
     In,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct ParseOperatorError;
+
+impl FromStr for Operator {
+    type Err = ParseOperatorError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "lt" => Ok(Operator::LessThan),
+            "lte" => Ok(Operator::LessThanEquals),
+            "eq" => Ok(Operator::Equals),
+            "neq" => Ok(Operator::NotEquals),
+            "gt" => Ok(Operator::GreaterThan),
+            "gte" => Ok(Operator::GreaterThanEquals),
+            "is" => Ok(Operator::Is),
+            "like" => Ok(Operator::Like),
+            "ilike" => Ok(Operator::ILike),
+            "in" => Ok(Operator::In),
+            _ => Err(ParseOperatorError),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Direction {
     Ascending,
@@ -440,31 +463,21 @@ pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
     query.limit = limit;
 }
 
-fn get_operator(operator_string: &str) -> Operator {
-    match operator_string {
-        "lt." => Operator::LessThan,
-        "lte." => Operator::LessThanEquals,
-        "eq." => Operator::Equals,
-        "neq." => Operator::NotEquals,
-        "gt." => Operator::GreaterThan,
-        "gte." => Operator::GreaterThanEquals,
-        "is." => Operator::Is,
-        "like." => Operator::Like,
-        "ilike." => Operator::ILike,
-        "in." => Operator::In,
-        _ => panic!("Operator {} not supported", operator_string),
-    }
-}
-
 pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
     let column = get_from_raw(&n.named_child(0).unwrap(), raw);
-    let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw);
+    let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw).replace(".", "");
     let value = get_from_raw(&n.named_child(2).unwrap(), raw);
 
-    let operator = get_operator(&operator_string);
-
-    let filter = (column, operator, Value::String(value));
-    query.filter.push(filter);
+    let operator = Operator::from_str(&operator_string);
+    match operator {
+        Ok(o) => {
+            let filter = (column, o, Value::String(value));
+            query.filter.push(filter);
+        }
+        Err(_) => {
+            tracing::warn!("Unhandled operator '{}'", operator_string);
+        }
+    };
 }
 
 pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
