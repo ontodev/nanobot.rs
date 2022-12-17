@@ -5,7 +5,7 @@ use sqlx::Row;
 use tree_sitter::{Node, Parser};
 
 pub const LIMIT_MAX: usize = 100;
-pub const LIMIT_DEFAULT: usize = 10; // TODO: 100?
+pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub enum Operator {
@@ -35,6 +35,47 @@ pub struct Select {
     pub order: Vec<(String, Direction)>,
     pub limit: usize,
     pub offset: usize,
+    pub message: String,
+}
+
+fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
+    match filter.1 {
+        Operator::EQUALS => format!(
+            r#""{}" = '{}'"#,
+            filter.0,
+            filter.2.as_str().unwrap().to_string()
+        ),
+        Operator::LESS => format!(
+            r#""{}" < {}"#,
+            filter.0,
+            filter.2.as_u64().unwrap().to_string()
+        ),
+        Operator::GREATER => format!(
+            r#""{}" > {}"#,
+            filter.0,
+            filter.2.as_u64().unwrap().to_string()
+        ),
+        Operator::IN => format!(
+            r#""{}" IN ({})"#,
+            filter.0,
+            // WARN: This is not a good idea!
+            filter
+                .2
+                .to_string()
+                .trim_start_matches("[")
+                .trim_end_matches("]")
+        ),
+        _ => todo!(),
+    }
+}
+
+fn filters_to_sql(indent: &str, filters: &Vec<(String, Operator, Value)>) -> String {
+    let mut parts: Vec<String> = vec![];
+    for filter in filters {
+        parts.push(filter_to_sql(&filter));
+    }
+    let joiner = format!("\n{}  AND ", indent);
+    format!("{}WHERE {}", indent, parts.join(&joiner))
 }
 
 /// Convert a Select struct to a SQL string.
@@ -46,7 +87,10 @@ pub struct Select {
 ///     'type', "type",
 ///     'description', "description"
 /// ) AS json_result
-/// FROM "table";
+/// FROM (
+///   SELECT *
+///   FROM "table"
+/// )
 /// ```
 ///
 /// # Examples
@@ -63,17 +107,11 @@ pub fn select_to_sql(s: &Select) -> String {
         .collect();
     lines.push(format!("  {}", parts.join(",\n  ")));
     lines.push(") AS json_result".to_string());
-    lines.push(format!(r#"FROM "{}""#, s.table));
-    let mut filters: Vec<String> = vec![];
+    lines.push("FROM (".to_string());
+    lines.push("  SELECT *".to_string());
+    lines.push(format!(r#"  FROM "{}""#, s.table));
     if s.filter.len() > 0 {
-        for filter in &s.filter {
-            filters.push(format!(
-                r#""{}" = '{}'"#,
-                filter.0,
-                filter.2.as_str().unwrap().to_string()
-            ));
-        }
-        lines.push(format!("WHERE {}", filters.join("\n  AND ")));
+        lines.push(filters_to_sql("  ", &s.filter));
     }
     if s.order.len() > 0 {
         let parts: Vec<String> = s
@@ -81,44 +119,63 @@ pub fn select_to_sql(s: &Select) -> String {
             .iter()
             .map(|(c, d)| format!(r#""{}" {:?}"#, c, d))
             .collect();
-        lines.push(format!("ORDER BY {}", parts.join(", ")));
+        lines.push(format!("  ORDER BY {}", parts.join(", ")));
     }
     if s.limit > 0 {
-        lines.push(format!("LIMIT {}", s.limit));
+        lines.push(format!("  LIMIT {}", s.limit));
     }
     if s.offset > 0 {
-        lines.push(format!("OFFSET {}", s.offset));
+        lines.push(format!("  OFFSET {}", s.offset));
     }
+    lines.push(")".to_string());
     lines.join("\n")
 }
 
-// TODO: remove duplicate code
 pub fn select_to_sql_count(s: &Select) -> String {
-    let mut lines: Vec<String> = vec!["SELECT COUNT(*) AS count".to_string()];
+    let mut lines: Vec<String> = vec!["SELECT COUNT() AS count".to_string()];
     lines.push(format!(r#"FROM "{}""#, s.table));
-    let mut filters: Vec<String> = vec![];
     if s.filter.len() > 0 {
-        for filter in &s.filter {
-            filters.push(format!(
-                r#""{}" = '{}'"#,
-                filter.0,
-                filter.2.as_str().unwrap().to_string()
-            ));
-        }
-        lines.push(format!("WHERE {}", filters.join("\n  AND ")));
+        lines.push(filters_to_sql("", &s.filter));
     }
     lines.join("\n")
 }
 
 pub fn select_to_url(s: &Select) -> String {
     let mut params: Vec<String> = vec![];
+    if s.message != "" {
+        params.push(format!("message={}", s.message));
+    }
     if s.filter.len() > 0 {
         for filter in &s.filter {
-            params.push(format!(
-                r#"{}=eq.{}"#,
-                filter.0,
-                filter.2.as_str().unwrap().to_string()
-            ));
+            let x = match filter.1 {
+                Operator::EQUALS => format!(
+                    r#"{}=eq.{}"#,
+                    filter.0,
+                    filter.2.as_str().unwrap().to_string()
+                ),
+                Operator::LESS => format!(
+                    r#"{}=lt.{}"#,
+                    filter.0,
+                    filter.2.as_u64().unwrap().to_string()
+                ),
+                Operator::GREATER => format!(
+                    r#"{}=gt.{}"#,
+                    filter.0,
+                    filter.2.as_u64().unwrap().to_string()
+                ),
+                Operator::IN => format!(
+                    r#"{}=in.({})"#,
+                    filter.0,
+                    // WARN: This is not a good idea!
+                    filter
+                        .2
+                        .to_string()
+                        .trim_start_matches("[")
+                        .trim_end_matches("]")
+                ),
+                _ => todo!(),
+            };
+            params.push(x);
         }
     }
     if s.order.len() > 0 {
@@ -146,7 +203,44 @@ pub async fn get_table_from_pool(
     pool: &SqlitePool,
     select: &Select,
 ) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
-    let sql = select_to_sql(select);
+    let mut new_select = select.clone();
+
+    // Order by row_number by default
+    if select.order.len() == 0 {
+        new_select = Select {
+            order: vec![("row_number".to_string(), Direction::ASC)],
+            ..select.clone()
+        };
+    }
+
+    // For basic queries, use row_number instead of offset
+    if select.filter.len() == 0 && select.offset > 0 {
+        new_select = Select {
+            filter: vec![(
+                "row_number".to_string(),
+                Operator::GREATER,
+                serde_json::json!(select.offset),
+            )],
+            offset: 0,
+            ..new_select.clone()
+        };
+    }
+
+    let sql = select_to_sql(&new_select);
+    let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let result: &str = row.get("json_result");
+            from_str::<Map<String, Value>>(&result).unwrap()
+        })
+        .collect())
+}
+
+pub async fn get_rows_from_pool(
+    pool: &SqlitePool,
+    sql: &String,
+) -> Result<Vec<Map<String, Value>>, sqlx::Error> {
     let rows: Vec<SqliteRow> = sqlx::query(&sql).fetch_all(pool).await?;
     Ok(rows
         .iter()
@@ -160,8 +254,50 @@ pub async fn get_table_from_pool(
 pub async fn get_count_from_pool(pool: &SqlitePool, select: &Select) -> Result<usize, sqlx::Error> {
     let sql = select_to_sql_count(select);
     let row: SqliteRow = sqlx::query(&sql).fetch_one(pool).await?;
-    let count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
-    Ok(count)
+    let value_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+
+    let conflict_select = Select {
+        table: format!("{}_conflict", select.table.clone()),
+        ..select.clone()
+    };
+    let sql = select_to_sql_count(&conflict_select);
+    let row: SqliteRow = sqlx::query(&sql).fetch_one(pool).await?;
+    let conflict_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+    Ok(value_count + conflict_count)
+}
+
+pub async fn get_total_from_pool(pool: &SqlitePool, table: &String) -> Result<usize, sqlx::Error> {
+    let sql = format!(r#"SELECT COUNT() AS count FROM "{}""#, table);
+    let row = sqlx::query(&sql).fetch_one(pool).await?;
+    let value_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+
+    let sql = format!(r#"SELECT COUNT() AS count FROM "{}_conflict""#, table);
+    let row = sqlx::query(&sql).fetch_one(pool).await?;
+    let conflict_count: usize = usize::try_from(row.get::<i64, &str>("count")).unwrap();
+    Ok(value_count + conflict_count)
+}
+
+pub async fn get_message_counts_from_pool(
+    pool: &SqlitePool,
+    table: &String,
+) -> Result<Map<String, Value>, sqlx::Error> {
+    let sql = format!(
+        r#"SELECT json_object(
+          'message', COUNT(),
+          'message_row', COUNT(DISTINCT row),
+          'error', SUM(level = 'error'),
+          'warn', SUM(level = 'warn'),
+          'info', SUM(level = 'info'),
+          'update', SUM(level = 'update')
+        ) AS json_result
+        FROM message
+        WHERE "table" = '{}'"#,
+        table
+    );
+    let row = sqlx::query(&sql).fetch_one(pool).await?;
+    let result: &str = row.get("json_result");
+    let map = from_str::<Map<String, Value>>(&result).unwrap();
+    Ok(map)
 }
 
 pub fn rows_to_map(rows: Vec<Map<String, Value>>, column: &str) -> Map<String, Value> {
@@ -199,6 +335,7 @@ pub fn parse(input: &str) -> Select {
         order: Vec::new(),
         limit: 0,
         offset: 0,
+        message: "".to_string(),
     };
 
     transduce(&tree.root_node(), input, &mut query);

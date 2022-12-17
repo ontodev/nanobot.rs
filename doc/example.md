@@ -74,7 +74,7 @@ saved to cache/<hash>-<source>.format
 In general,
 the `add` command adds a new row to a table.
 The 'cache' table is a special one for Nanobot.
-If it does not alread exist,
+If it does not already exist,
 Nanobot will create this table in `src/workflow/cache.tsv`,
 and update the 'table', 'column', and 'datatype' tables
 to include it.
