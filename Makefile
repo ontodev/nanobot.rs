@@ -13,6 +13,9 @@ deps:
 	sudo apt-get install -y rustc cargo
 	sudo apt-get install -y python3-pip
 	sudo pip install tesh
+	sudo apt-get install -y tree-sitter
+	cd .. && git clone https://github.com/ontodev/tree-sitter-sqlrest.git
+	cd ../tree-sitter-sqlrest && tree-sitter generate
 
 .PHONY: format
 format:
