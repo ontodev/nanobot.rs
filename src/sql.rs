@@ -4,6 +4,7 @@ use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::str::FromStr;
 use tree_sitter::{Node, Parser};
+use urlencoding::decode;
 
 pub const LIMIT_MAX: usize = 100;
 pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
@@ -380,7 +381,7 @@ pub fn parse(input: &str) -> Select {
     if i.contains("message=any") {
         message = "any".to_string();
         if i.contains("?message=any&") {
-            i = i.replace("?message=any&", "");
+            i = i.replace("?message=any&", "?");
         } else if i.contains("?message=any") {
             i = i.replace("?message=any", "");
         } else if i.contains("&message=any") {
@@ -432,7 +433,9 @@ pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
 }
 
 pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) {
-    let column = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+        .unwrap()
+        .into_owned();
     let value = transduce_list(&n.named_child(1).unwrap(), raw);
 
     let filter = (column, Operator::In, value);
@@ -450,18 +453,23 @@ pub fn transduce_list(n: &Node, raw: &str) -> Value {
 
     let child_count = n.named_child_count();
     for i in 0..child_count {
+        let value = decode(&get_from_raw(&n.named_child(i).unwrap(), raw))
+            .unwrap()
+            .into_owned();
         if quoted_strings {
-            let quoted_string = format!("{}", get_from_raw(&n.named_child(i).unwrap(), raw));
+            let quoted_string = format!("{}", value);
             vec.push(Value::String(quoted_string));
         } else {
-            vec.push(Value::String(get_from_raw(&n.named_child(i).unwrap(), raw)));
+            vec.push(Value::String(value));
         }
     }
     Value::Array(vec)
 }
 
 pub fn transduce_table(n: &Node, raw: &str, query: &mut Select) {
-    let table = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let table = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+        .unwrap()
+        .into_owned();
     query.table = table;
 }
 
@@ -478,14 +486,18 @@ pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
 }
 
 pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
-    let column = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+        .unwrap()
+        .into_owned();
     let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw).replace(".", "");
-    let value = get_from_raw(&n.named_child(2).unwrap(), raw);
+    let value = decode(&get_from_raw(&n.named_child(2).unwrap(), raw))
+        .unwrap()
+        .into_owned();
 
     let operator = Operator::from_str(&operator_string);
     match operator {
         Ok(o) => {
-            let filter = (column, o, Value::String(value));
+            let filter = (column, o, from_str(&value).unwrap());
             query.filter.push(filter);
         }
         Err(_) => {
@@ -499,7 +511,9 @@ pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
     let mut position = 0;
 
     while position < child_count {
-        let column = get_from_raw(&n.named_child(position).unwrap(), raw);
+        let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+            .unwrap()
+            .into_owned();
         position = position + 1;
         if position < child_count && n.named_child(position).unwrap().kind().eq("ordering") {
             let ordering_string =
