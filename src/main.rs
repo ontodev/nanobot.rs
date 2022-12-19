@@ -8,7 +8,8 @@ pub mod sql;
 #[async_std::main]
 async fn main() {
     // initialize configuration
-    let config = config::get_config();
+    // TODO: use a builder pattern?
+    let mut config: config::Config = config::Config::new().await;
 
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
@@ -58,9 +59,9 @@ async fn main() {
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
             Some(x) => {
-                let mut user_config = config.clone();
-                user_config.connection = String::from(x);
-                init::init(&user_config).await
+                //update config
+                config.connection = String::from(x);
+                init::init(&config).await
             }
             _ => init::init(&config).await,
         },

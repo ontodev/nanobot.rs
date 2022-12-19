@@ -1,4 +1,4 @@
-use crate::config::get_config;
+use crate::config::Config;
 use crate::{get, sql};
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
@@ -61,8 +61,9 @@ async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResp
         ..Default::default()
     };
 
-    //TODO: pass config struct instead of using the default
-    let config = get_config();
+    //TODO: pass config struct instead of creating one
+    let config: Config = Config::new().await;
+
     match get::get_rows(&config, &select, "page", &format).await {
         Ok(x) => match format {
             "html" => Html(x).into_response(),

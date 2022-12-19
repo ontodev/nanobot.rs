@@ -5,7 +5,7 @@ use crate::sql::{
 };
 use minijinja::Environment;
 use serde_json::{json, Map, Value};
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::sqlite::SqlitePool;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -60,14 +60,6 @@ pub async fn get_rows(
     shape: &str,
     format: &str,
 ) -> Result<String, GetError> {
-    let database = config.connection.to_owned();
-    let connection_string = format!("sqlite://{}?mode=rwc", database);
-    let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(&connection_string)
-        .await
-        .unwrap();
-
     // Get all the tables
     let select = Select {
         table: "table".to_string(),
@@ -77,7 +69,7 @@ pub async fn get_rows(
             .collect(),
         ..Default::default()
     };
-    let table_rows = get_table_from_pool(&pool, &select).await?;
+    let table_rows = get_table_from_pool(&config.pool, &select).await?;
     let table_map = rows_to_map(table_rows, "table");
     if !table_map.contains_key(&base_select.table) {
         return Err(GetError::new(format!(
@@ -100,7 +92,7 @@ pub async fn get_rows(
         )],
         ..Default::default()
     };
-    let column_rows = get_table_from_pool(&pool, &select).await?;
+    let column_rows = get_table_from_pool(&config.pool, &select).await?;
 
     let mut columns: Vec<String> = vec![];
     if shape == "page" {
@@ -127,7 +119,7 @@ pub async fn get_rows(
 
     match shape {
         "value_rows" => {
-            let value_rows = get_table_from_pool(&pool, &select).await?;
+            let value_rows = get_table_from_pool(&config.pool, &select).await?;
             match format {
                 "text" => Ok(value_rows_to_text(&value_rows)),
                 "json" => Ok(json!(value_rows).to_string()),
@@ -139,7 +131,7 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page: Value = get_page(&pool, &select, &table_map, &column_rows).await?;
+            let page: Value = get_page(&config.pool, &select, &table_map, &column_rows).await?;
             match format {
                 "json" => Ok(page.to_string()),
                 "pretty.json" => Ok(serde_json::to_string_pretty(&page).unwrap()),
