@@ -49,6 +49,7 @@ async fn table(Path(path): Path<String>, RawQuery(query): RawQuery) -> impl Into
     };
     tracing::info!("URL: {}", url);
     let select = sql::parse(&url);
+    tracing::info!("select {:?}", select);
     match get::get_rows(".nanobot.db", &select, "page", &format).await {
         Ok(x) => match format {
             "html" => Html(x).into_response(),

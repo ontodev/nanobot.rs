@@ -95,7 +95,7 @@ pub async fn get_rows(
         filter: vec![(
             "table".to_string(),
             Operator::Equals,
-            Value::String(base_select.table.clone()),
+            base_select.table.clone(),
         )],
         ..Default::default()
     };
@@ -221,7 +221,14 @@ async fn get_page(
             filter: vec![(
                 "row_number".to_string(),
                 Operator::In,
-                json!(row_numbers.clone()),
+                format!(
+                    "({})",
+                    row_numbers
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",")
+                ),
             )],
             offset: 0,
             ..view_select
@@ -242,12 +249,19 @@ async fn get_page(
             .map(|s| s.to_string())
             .collect(),
         filter: vec![
+            ("table".to_string(), Operator::Equals, select.table.clone()),
             (
-                "table".to_string(),
-                Operator::Equals,
-                json!(select.table.clone()),
+                "row".to_string(),
+                Operator::In,
+                format!(
+                    "({})",
+                    row_numbers
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",")
+                ),
             ),
-            ("row".to_string(), Operator::In, json!(row_numbers.clone())),
         ],
         limit: 1000,
         ..Default::default()

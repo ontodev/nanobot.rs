@@ -1,5 +1,5 @@
 use nanobot::sql::{parse, select_to_sql, select_to_url, Direction, Operator, Select};
-use serde_json::{from_value, json, Value};
+use serde_json::{from_value, json};
 
 const SQL_SMALL: &str = r#"SELECT json_object(
   'table', "table",
@@ -39,12 +39,8 @@ fn test_select_to_sql() {
             .map(|s| s.to_string())
             .collect(),
         filter: vec![
-            (
-                "table".to_string(),
-                Operator::Equals,
-                Value::String("table".to_string()),
-            ),
-            ("type".to_string(), Operator::In, json!([1, 2, 3])),
+            ("table".to_string(), Operator::Equals, "table".to_string()),
+            ("type".to_string(), Operator::In, "(1,2,3)".to_string()),
         ],
         order: vec![("path".to_string(), Direction::Descending)],
         limit: 1,
@@ -61,7 +57,7 @@ fn test_select_to_sql_json() {
         "select": ["table", "path", "type", "description"],
         "filter": [
             ["table", "Equals", "table"],
-            ["type", "In", [1, 2, 3]]
+            ["type", "In", "(1,2,3)"]
         ],
         "order": [("path", "Descending")],
         "limit": 1,
@@ -93,7 +89,7 @@ fn test_select_to_url() {
         "select": ["table", "path", "type", "description"],
         "filter": [
             ["table", "Equals", "table"],
-            ["type", "In", [1, 2, 3]]
+            ["type", "In", "(1,2,3)"]
         ],
         "order": [("path", "Descending")],
         "limit": 1,
