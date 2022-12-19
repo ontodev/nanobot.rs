@@ -93,6 +93,7 @@ impl Config {
 ///
 /// ```
 /// use toml::Value;
+/// use nanobot::config::merge;
 ///
 /// let s1 = r#"
 /// [package]
@@ -118,11 +119,11 @@ impl Config {
 /// let v2 = s2.parse::<Value>().unwrap();
 /// let expected = s3.parse::<Value>().unwrap();
 ///
-/// let merged = merge(v1,v2);
+/// let merged = merge(&v1,&v2);
 ///
 /// assert_eq!(expected, merged);
 /// ```
-fn merge(v1: &Value, v2: &Value) -> Value {
+pub fn merge(v1: &Value, v2: &Value) -> Value {
     match v1 {
         Value::Table(x) => match v2 {
             Value::Table(y) => {
