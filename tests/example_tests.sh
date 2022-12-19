@@ -15,6 +15,9 @@ time "$NANOBOT" init
 # tree -a
 # sqlite3 "$DB" "SELECT COUNT() FROM penguin"
 echo 'Indexing...'
-sqlite3 "$DB" 'CREATE INDEX message_table_index ON message("table")'
-sqlite3 "$DB" 'CREATE INDEX message_row_index ON message("row")'
+time sqlite3 "$DB" 'CREATE INDEX message_table_index ON message("table")'
+time sqlite3 "$DB" 'CREATE INDEX message_row_index ON message("row")'
+echo 'Analyzing'
+time sqlite3 "$DB" 'ANALYZE'
+echo 'Serving...'
 "$NANOBOT" serve

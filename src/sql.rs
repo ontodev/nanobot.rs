@@ -4,6 +4,7 @@ use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::str::FromStr;
 use tree_sitter::{Node, Parser};
+use urlencoding::decode;
 
 pub const LIMIT_MAX: usize = 100;
 pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
@@ -85,45 +86,44 @@ impl Direction {
 pub struct Select {
     pub table: String,
     pub select: Vec<String>,
-    pub filter: Vec<(String, Operator, Value)>,
+    pub filter: Vec<(String, Operator, String)>,
     pub order: Vec<(String, Direction)>,
     pub limit: usize,
     pub offset: usize,
     pub message: String,
 }
 
-fn filter_to_sql(filter: &(String, Operator, Value)) -> String {
+fn filter_to_sql(filter: &(String, Operator, String)) -> String {
+    let keywords = vec!["true".to_string(), "false".to_string(), "null".to_string()];
+    let value = if keywords.contains(&filter.2) {
+        filter.2.clone()
+    } else if filter.2.parse::<i64>().is_ok() {
+        filter.2.clone()
+    } else if filter.2.parse::<f64>().is_ok() {
+        filter.2.clone()
+    } else if filter.2.starts_with("(") && filter.2.ends_with(")") {
+        // WARN: This is not safe.
+        filter
+            .2
+            .clone()
+            .trim_start_matches("(")
+            .trim_end_matches(")")
+            .to_string()
+    } else {
+        // WARN: This is not handling single quotes propertly.
+        format!("'{}'", filter.2.replace("'", ""))
+    };
     match filter.1 {
-        Operator::Equals => format!(
-            r#""{}" = '{}'"#,
-            filter.0,
-            filter.2.as_str().unwrap().to_string()
-        ),
-        Operator::LessThan => format!(
-            r#""{}" < {}"#,
-            filter.0,
-            filter.2.as_u64().unwrap().to_string()
-        ),
-        Operator::GreaterThan => format!(
-            r#""{}" > {}"#,
-            filter.0,
-            filter.2.as_u64().unwrap().to_string()
-        ),
-        Operator::In => format!(
-            r#""{}" IN ({})"#,
-            filter.0,
-            // WARN: This is not a good idea!
-            filter
-                .2
-                .to_string()
-                .trim_start_matches("[")
-                .trim_end_matches("]")
-        ),
+        Operator::Equals => format!(r#""{}" = {}"#, filter.0, value),
+        Operator::LessThan => format!(r#""{}" < {}"#, filter.0, value),
+        Operator::GreaterThan => format!(r#""{}" > {}"#, filter.0, value),
+        // WARN: This is not handling lists properly.
+        Operator::In => format!(r#""{}" IN ({})"#, filter.0, value),
         _ => todo!(),
     }
 }
 
-fn filters_to_sql(indent: &str, filters: &Vec<(String, Operator, Value)>) -> String {
+fn filters_to_sql(indent: &str, filters: &Vec<(String, Operator, String)>) -> String {
     let mut parts: Vec<String> = vec![];
     for filter in filters {
         parts.push(filter_to_sql(&filter));
@@ -202,30 +202,14 @@ pub fn select_to_url(s: &Select) -> String {
     if s.filter.len() > 0 {
         for filter in &s.filter {
             let x = match filter.1 {
-                Operator::Equals => format!(
-                    r#"{}=eq.{}"#,
-                    filter.0,
-                    filter.2.as_str().unwrap().to_string()
-                ),
-                Operator::LessThan => format!(
-                    r#"{}=lt.{}"#,
-                    filter.0,
-                    filter.2.as_u64().unwrap().to_string()
-                ),
-                Operator::GreaterThan => format!(
-                    r#"{}=gt.{}"#,
-                    filter.0,
-                    filter.2.as_u64().unwrap().to_string()
-                ),
+                Operator::Equals => format!(r#"{}=eq.{}"#, filter.0, filter.2),
+                Operator::LessThan => format!(r#"{}=lt.{}"#, filter.0, filter.2),
+                Operator::GreaterThan => format!(r#"{}=gt.{}"#, filter.0, filter.2),
                 Operator::In => format!(
                     r#"{}=in.({})"#,
                     filter.0,
                     // WARN: This is not a good idea!
-                    filter
-                        .2
-                        .to_string()
-                        .trim_start_matches("[")
-                        .trim_end_matches("]")
+                    filter.2.trim_start_matches("(").trim_end_matches(")")
                 ),
                 _ => todo!(),
             };
@@ -273,7 +257,7 @@ pub async fn get_table_from_pool(
             filter: vec![(
                 "row_number".to_string(),
                 Operator::GreaterThan,
-                serde_json::json!(select.offset),
+                select.offset.to_string(),
             )],
             offset: 0,
             ..new_select.clone()
@@ -380,7 +364,7 @@ pub fn parse(input: &str) -> Select {
     if i.contains("message=any") {
         message = "any".to_string();
         if i.contains("?message=any&") {
-            i = i.replace("?message=any&", "");
+            i = i.replace("?message=any&", "?");
         } else if i.contains("?message=any") {
             i = i.replace("?message=any", "");
         } else if i.contains("&message=any") {
@@ -432,14 +416,16 @@ pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
 }
 
 pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) {
-    let column = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+        .unwrap()
+        .into_owned();
     let value = transduce_list(&n.named_child(1).unwrap(), raw);
 
     let filter = (column, Operator::In, value);
     query.filter.push(filter);
 }
 
-pub fn transduce_list(n: &Node, raw: &str) -> Value {
+pub fn transduce_list(n: &Node, raw: &str) -> String {
     let quoted_strings = match n.kind() {
         "list" => false,
         "list_of_strings" => true,
@@ -450,18 +436,23 @@ pub fn transduce_list(n: &Node, raw: &str) -> Value {
 
     let child_count = n.named_child_count();
     for i in 0..child_count {
+        let value = decode(&get_from_raw(&n.named_child(i).unwrap(), raw))
+            .unwrap()
+            .into_owned();
         if quoted_strings {
-            let quoted_string = format!("{}", get_from_raw(&n.named_child(i).unwrap(), raw));
-            vec.push(Value::String(quoted_string));
+            let quoted_string = format!("{}", value);
+            vec.push(quoted_string);
         } else {
-            vec.push(Value::String(get_from_raw(&n.named_child(i).unwrap(), raw)));
+            vec.push(value);
         }
     }
-    Value::Array(vec)
+    format!("({})", vec.join(","))
 }
 
 pub fn transduce_table(n: &Node, raw: &str, query: &mut Select) {
-    let table = get_from_raw(&n.named_child(0).unwrap(), raw);
+    let table = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+        .unwrap()
+        .into_owned();
     query.table = table;
 }
 
@@ -478,14 +469,18 @@ pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
 }
 
 pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
-    let column = get_from_raw(&n.named_child(0).unwrap(), raw);
-    let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw).replace(".", "");
-    let value = get_from_raw(&n.named_child(2).unwrap(), raw);
+    let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+        .unwrap()
+        .into_owned();
+    let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw);
+    let value = decode(&get_from_raw(&n.named_child(2).unwrap(), raw))
+        .unwrap()
+        .into_owned();
 
     let operator = Operator::from_str(&operator_string);
     match operator {
         Ok(o) => {
-            let filter = (column, o, Value::String(value));
+            let filter = (column, o, value);
             query.filter.push(filter);
         }
         Err(_) => {
@@ -499,11 +494,12 @@ pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
     let mut position = 0;
 
     while position < child_count {
-        let column = get_from_raw(&n.named_child(position).unwrap(), raw);
+        let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
+            .unwrap()
+            .into_owned();
         position = position + 1;
         if position < child_count && n.named_child(position).unwrap().kind().eq("ordering") {
-            let ordering_string =
-                get_from_raw(&n.named_child(position).unwrap(), raw).replace(".", "");
+            let ordering_string = get_from_raw(&n.named_child(position).unwrap(), raw);
             let ordering = Direction::from_str(&ordering_string);
             match ordering {
                 Ok(o) => {
