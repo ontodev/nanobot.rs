@@ -24,9 +24,7 @@ pub struct Config {
 impl Config {
     pub async fn new() -> Config {
         //set default configuration (using default_config.toml)
-        let default_config_file = fs::read_to_string("src/resources/default_config.toml")
-            .expect("Should have been able to read the file");
-
+        let default_config_file = include_str!("resources/default_config.toml");
         let default_config = default_config_file.parse::<Value>().unwrap();
         let default_values = &default_config["tool"];
 
@@ -178,8 +176,7 @@ pub fn merge(v1: &Value, v2: &Value) -> Value {
 }
 
 pub fn config(file_path: &str) -> Result<String, String> {
-    let default_config = fs::read_to_string("src/resources/default_config.toml")
-        .expect("Should have been able to read the file");
+    let default_config = include_str!("resources/default_config.toml");
 
     let input_config =
         fs::read_to_string(file_path).expect("Should have been able to read the file");
