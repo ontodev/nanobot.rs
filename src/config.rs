@@ -130,60 +130,29 @@ impl ConfigBuilder {
 }
 
 impl Config {
-    pub async fn new() -> Config {
-        //set default configuration (using default_config.toml)
-        let default_config_file = include_str!("resources/default_config.toml");
-        let default_config = default_config_file.parse::<Value>().unwrap();
-        let default_values = &default_config["tool"];
+    pub fn name<'a, S: Into<String>>(&'a mut self, name: S) -> &'a mut Config {
+        self.name = name.into();
+        self
+    }
 
-        let default_connection = String::from(".nanobot.db");
-        let connection_string = format!("sqlite://{}?mode=rwc", &default_connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+    pub fn version<'a, S: Into<String>>(&'a mut self, version: S) -> &'a mut Config {
+        self.version = version.into();
+        self
+    }
 
-        let mut config = Config {
-            //set in default_config.toml
-            name: String::from(default_values["name"].as_str().unwrap()),
-            version: String::from(default_values["version"].as_str().unwrap()),
-            edition: String::from(default_values["edition"].as_str().unwrap()),
-            //not set in default_config.toml
-            connection: default_connection,
-            pool: pool,
-            debug: Debug::INFO,
-        };
+    pub fn edition<'a, S: Into<String>>(&'a mut self, edition: S) -> &'a mut Config {
+        self.edition = edition.into();
+        self
+    }
 
-        //update with user configuration (using nanobot.toml)
-        let user_config_file = fs::read_to_string("nanobot.toml");
+    pub fn connection<'a, S: Into<String>>(&'a mut self, connection: S) -> &'a mut Config {
+        self.connection = connection.into();
+        self
+    }
 
-        match user_config_file {
-            Ok(x) => {
-                let user_config = x.parse::<Value>().unwrap();
-                let user_values = &user_config["tool"]; //TODO: do we require 'tool' here?
-                match user_values["name"].as_str() {
-                    Some(x) => {
-                        config.name = String::from(x);
-                    }
-                    _ => (),
-                };
-                match user_values["version"].as_str() {
-                    Some(x) => {
-                        config.version = String::from(x);
-                    }
-                    _ => (),
-                };
-                match user_values["edition"].as_str() {
-                    Some(x) => {
-                        config.edition = String::from(x);
-                    }
-                    _ => (),
-                };
-            }
-            Err(_x) => (),
-        };
-        config
+    pub fn debug<'a>(&'a mut self, debug: Debug) -> &'a mut Config {
+        self.debug = debug;
+        self
     }
 }
 

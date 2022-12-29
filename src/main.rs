@@ -59,7 +59,8 @@ async fn main() {
         Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
             Some(x) => {
                 //update config
-                config.connection = String::from(x);
+                config.connection(x);
+
                 init::init(&config).await
             }
             _ => init::init(&config).await,
