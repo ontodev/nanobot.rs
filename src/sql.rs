@@ -27,6 +27,55 @@ pub struct Select {
     pub offset: usize,
 }
 
+impl Select {
+    pub fn new() -> Select {
+        Default::default()
+    }
+
+    pub fn clone(select: &Select) -> Select {
+        Select { ..select.clone() }
+    }
+
+    pub fn table<'a, S: Into<String>>(&'a mut self, table: S) -> &'a mut Select {
+        self.table = table.into();
+        self
+    }
+
+    pub fn select<'a, S: Into<String>>(&'a mut self, select: Vec<S>) -> &'a mut Select {
+        for s in select {
+            self.select.push(s.into());
+        }
+        self
+    }
+
+    pub fn filter<'a, S: Into<String>>(
+        &'a mut self,
+        filter: Vec<(S, Operator, Value)>,
+    ) -> &'a mut Select {
+        for (s, o, v) in filter {
+            self.filter.push((s.into(), o, v));
+        }
+        self
+    }
+
+    pub fn order<'a, S: Into<String>>(&'a mut self, order: Vec<(S, Direction)>) -> &'a mut Select {
+        for (s, d) in order {
+            self.order.push((s.into(), d));
+        }
+        self
+    }
+
+    pub fn limit<'a>(&'a mut self, limit: usize) -> &'a mut Select {
+        self.limit = limit;
+        self
+    }
+
+    pub fn offset<'a>(&'a mut self, offset: usize) -> &'a mut Select {
+        self.offset = offset;
+        self
+    }
+}
+
 /// Convert a Select struct to a SQL string.
 ///
 /// ```sql
