@@ -1,0 +1,41 @@
+table	column	nulltype	datatype	structure	description
+table	table		label	unique	name of this table
+table	path		line		path to the TSV file for this table, relative to the table.tsv file
+table	type	empty	table_type		type of this table, used for tables with special meanings
+table	description	empty	text		a description of this table
+column	table		label	from(table.table)	the table that this column belongs to
+column	column		label		the name of this column
+column	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
+column	datatype		word	from(datatype.datatype)	the datatype for this column
+column	structure	empty	label		schema information for this column
+column	description	empty	text		a description of this column
+datatype	datatype		label	primary	the name of this datatype
+datatype	parent	empty	label	tree(datatype)	the parent datatype
+datatype	condition	empty	line		the method for testing the datatype
+datatype	description	empty	text		a description of this datatype
+datatype	SQL type	empty	sql_type		the SQL type for representing this data
+datatype	HTML type	empty	html_type		the HTML type for viewing and editing this data
+message	table		label		Table for this message
+message	row		natural number		Row number for this message
+message	column		label		Column for this message
+message	level		word		Severity of this message: error, warn, info, debug
+message	rule		label		Name of the rule that generated this message
+message	value		text		Value of this cell as text
+message	message		line		Content of the message
+penguin	studyName		word		Description
+penguin	Sample Number		natural number	primary	Description
+penguin	Species		label		Description
+penguin	Region		label		Description
+penguin	Island		label		Description
+penguin	Stage		label		Description
+penguin	Individual ID		word	unique	Description
+penguin	Clutch Completion		word		Description
+penguin	Date Egg		date		Description
+penguin	Culmen Length (mm)		positive decimal		Description
+penguin	Culmen Depth (mm)		positive decimal		Description
+penguin	Flipper Length (mm)		natural number		Description
+penguin	Body Mass (g)		natural number		Description
+penguin	Sex		word		Description
+penguin	Delta 15 N (o/oo)		positive decimal		Description
+penguin	Delta 13 C (o/oo)		negative decimal		Description
+penguin	Comments	empty	line		Description
