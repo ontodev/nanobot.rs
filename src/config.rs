@@ -87,32 +87,32 @@ impl ConfigBuilder {
         config
     }
 
-    pub fn name<'a, S: Into<String>>(&'a mut self, name: S) -> &'a mut ConfigBuilder {
+    pub fn name<S: Into<String>>(&mut self, name: S) -> &mut ConfigBuilder {
         self.name = name.into();
         self
     }
 
-    pub fn version<'a, S: Into<String>>(&'a mut self, version: S) -> &'a mut ConfigBuilder {
+    pub fn version<S: Into<String>>(&mut self, version: S) -> &mut ConfigBuilder {
         self.version = version.into();
         self
     }
 
-    pub fn edition<'a, S: Into<String>>(&'a mut self, edition: S) -> &'a mut ConfigBuilder {
+    pub fn edition<S: Into<String>>(&mut self, edition: S) -> &mut ConfigBuilder {
         self.edition = edition.into();
         self
     }
 
-    pub fn connection<'a, S: Into<String>>(&'a mut self, connection: S) -> &'a mut ConfigBuilder {
+    pub fn connection<S: Into<String>>(&mut self, connection: S) -> &mut ConfigBuilder {
         self.connection = connection.into();
         self
     }
 
-    pub fn pool<'a>(&'a mut self, pool: SqlitePool) -> &'a mut ConfigBuilder {
+    pub fn pool(&mut self, pool: SqlitePool) -> &mut ConfigBuilder {
         self.pool = pool;
         self
     }
 
-    pub fn debug<'a>(&'a mut self, debug: Debug) -> &'a mut ConfigBuilder {
+    pub fn debug(&mut self, debug: Debug) -> &mut ConfigBuilder {
         self.debug = debug;
         self
     }
@@ -130,27 +130,27 @@ impl ConfigBuilder {
 }
 
 impl Config {
-    pub fn name<'a, S: Into<String>>(&'a mut self, name: S) -> &'a mut Config {
+    pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Config {
         self.name = name.into();
         self
     }
 
-    pub fn version<'a, S: Into<String>>(&'a mut self, version: S) -> &'a mut Config {
+    pub fn version<S: Into<String>>(&mut self, version: S) -> &mut Config {
         self.version = version.into();
         self
     }
 
-    pub fn edition<'a, S: Into<String>>(&'a mut self, edition: S) -> &'a mut Config {
+    pub fn edition<S: Into<String>>(&mut self, edition: S) -> &mut Config {
         self.edition = edition.into();
         self
     }
 
-    pub fn connection<'a, S: Into<String>>(&'a mut self, connection: S) -> &'a mut Config {
+    pub fn connection<S: Into<String>>(&mut self, connection: S) -> &mut Config {
         self.connection = connection.into();
         self
     }
 
-    pub fn debug<'a>(&'a mut self, debug: Debug) -> &'a mut Config {
+    pub fn debug(&mut self, debug: Debug) -> &mut Config {
         self.debug = debug;
         self
     }
