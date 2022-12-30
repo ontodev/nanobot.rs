@@ -52,7 +52,7 @@ impl ConfigBuilder {
             edition: String::from(default_values["edition"].as_str().unwrap()),
             //not set in default_config.toml
             connection: default_connection,
-            pool: pool,
+            pool,
             debug: Debug::INFO,
         };
 
@@ -63,23 +63,14 @@ impl ConfigBuilder {
             Ok(x) => {
                 let user_config = x.parse::<Value>().unwrap();
                 let user_values = &user_config["tool"]; //TODO: do we require 'tool' here?
-                match user_values["name"].as_str() {
-                    Some(x) => {
-                        config.name = String::from(x);
-                    }
-                    _ => (),
-                };
-                match user_values["version"].as_str() {
-                    Some(x) => {
-                        config.version = String::from(x);
-                    }
-                    _ => (),
-                };
-                match user_values["edition"].as_str() {
-                    Some(x) => {
-                        config.edition = String::from(x);
-                    }
-                    _ => (),
+                if let Some(x) = user_values["name"].as_str() {
+                    config.name = String::from(x);
+                }
+                if let Some(x) = user_values["version"].as_str() {
+                    config.version = String::from(x);
+                }
+                if let Some(x) = user_values["edition"].as_str() {
+                    config.edition = String::from(x);
                 };
             }
             Err(_x) => (),
