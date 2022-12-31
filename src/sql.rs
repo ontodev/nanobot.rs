@@ -141,41 +141,38 @@ impl Select {
         Select { ..select.clone() }
     }
 
-    pub fn table<'a, S: Into<String>>(&'a mut self, table: S) -> &'a mut Select {
+    pub fn table<S: Into<String>>(&mut self, table: S) -> &mut Select {
         self.table = table.into();
         self
     }
 
-    pub fn select<'a, S: Into<String>>(&'a mut self, select: Vec<S>) -> &'a mut Select {
+    pub fn select<S: Into<String>>(&mut self, select: Vec<S>) -> &mut Select {
         for s in select {
             self.select.push(s.into());
         }
         self
     }
 
-    pub fn filter<'a, S: Into<String>>(
-        &'a mut self,
-        filter: Vec<(S, Operator, String)>,
-    ) -> &'a mut Select {
+    pub fn filter<S: Into<String>>(&mut self, filter: Vec<(S, Operator, String)>) -> &mut Select {
         for (s, o, v) in filter {
             self.filter.push((s.into(), o, v));
         }
         self
     }
 
-    pub fn order<'a, S: Into<String>>(&'a mut self, order: Vec<(S, Direction)>) -> &'a mut Select {
+    pub fn order<S: Into<String>>(&mut self, order: Vec<(S, Direction)>) -> &mut Select {
         for (s, d) in order {
             self.order.push((s.into(), d));
         }
         self
     }
 
-    pub fn limit<'a>(&'a mut self, limit: usize) -> &'a mut Select {
+    pub fn limit(&mut self, limit: usize) -> &mut Select {
         self.limit = limit;
         self
     }
 
-    pub fn offset<'a>(&'a mut self, offset: usize) -> &'a mut Select {
+    pub fn offset(&mut self, offset: usize) -> &mut Select {
         self.offset = offset;
         self
     }
