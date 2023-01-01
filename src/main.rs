@@ -85,7 +85,7 @@ async fn main() {
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::main(),
+        Some(("serve", _sub_matches)) => serve::app(&config),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 

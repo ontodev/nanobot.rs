@@ -1,12 +1,13 @@
-use crate::config::{Config, ConfigBuilder};
+use crate::config::Config;
 use crate::{get, sql};
-use axum::extract::{Path, Query};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Params {
@@ -16,13 +17,23 @@ pub struct Params {
     pub table: Option<String>,
 }
 
+struct AppState {
+    pub config: Config,
+}
+
 #[tokio::main]
-pub async fn main() -> Result<String, String> {
+pub async fn app(config: &Config) -> Result<String, String> {
+    let shared_state = Arc::new(AppState {
+        //TODO: use &config instead of config.clone()?
+        config: config.clone(),
+    });
+
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        .route("/:table", get(table));
+        .route("/:table", get(table))
+        .with_state(shared_state);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -42,7 +53,11 @@ async fn root() -> impl IntoResponse {
     Redirect::permanent("/table")
 }
 
-async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResponse {
+async fn table(
+    Path(path): Path<String>,
+    params: Query<Params>,
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
     tracing::info!("request table {:?} {:?}", path, params.0);
     let mut table = path.clone();
     let mut format = "html";
@@ -61,10 +76,7 @@ async fn table(Path(path): Path<String>, params: Query<Params>) -> impl IntoResp
         ..Default::default()
     };
 
-    //TODO: pass config struct instead of creating one
-    let config: Config = ConfigBuilder::new().await.build();
-
-    match get::get_rows(&config, &select, "page", &format).await {
+    match get::get_rows(&state.config, &select, "page", &format).await {
         Ok(x) => match format {
             "html" => Html(x).into_response(),
             "json" => ([("content-type", "application/json; charset=utf-8")], x).into_response(),
