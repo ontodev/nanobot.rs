@@ -82,7 +82,7 @@ impl Direction {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Select {
     pub table: String,
     pub select: Vec<String>,
