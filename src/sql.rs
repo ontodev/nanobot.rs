@@ -146,6 +146,11 @@ impl Select {
         self
     }
 
+    pub fn message<S: Into<String>>(&mut self, message: S) -> &mut Select {
+        self.message = message.into();
+        self
+    }
+
     pub fn select<S: Into<String>>(&mut self, select: Vec<S>) -> &mut Select {
         for s in select {
             self.select.push(s.into());
