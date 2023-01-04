@@ -8,7 +8,7 @@ pub mod sql;
 #[async_std::main]
 async fn main() {
     // initialize configuration
-    let mut config: config::Config = config::ConfigBuilder::new().await.build();
+    let mut config: config::Config = config::Config::new().await;
 
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
