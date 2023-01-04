@@ -121,6 +121,52 @@ impl ConfigBuilder {
 }
 
 impl Config {
+    pub async fn new() -> Config {
+        let default_config_file = include_str!("resources/default_config.toml");
+        let default_config = default_config_file.parse::<Value>().unwrap();
+        let default_values = &default_config["tool"];
+
+        let default_connection = String::from(".nanobot.db");
+        let connection_string = format!("sqlite://{}?mode=rwc", &default_connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let mut config = Config {
+            //set in default_config.toml
+            name: String::from(default_values["name"].as_str().unwrap()),
+            version: String::from(default_values["version"].as_str().unwrap()),
+            edition: String::from(default_values["edition"].as_str().unwrap()),
+            //not set in default_config.toml
+            connection: default_connection,
+            pool,
+            debug: Debug::INFO,
+        };
+
+        //update with user configuration (using nanobot.toml)
+        let user_config_file = fs::read_to_string("nanobot.toml");
+
+        match user_config_file {
+            Ok(x) => {
+                let user_config = x.parse::<Value>().unwrap();
+                let user_values = &user_config["tool"]; //TODO: do we require 'tool' here?
+                if let Some(x) = user_values["name"].as_str() {
+                    config.name = String::from(x);
+                }
+                if let Some(x) = user_values["version"].as_str() {
+                    config.version = String::from(x);
+                }
+                if let Some(x) = user_values["edition"].as_str() {
+                    config.edition = String::from(x);
+                };
+            }
+            Err(_x) => (),
+        };
+        config
+    }
+
     pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Config {
         self.name = name.into();
         self
