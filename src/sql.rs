@@ -158,9 +158,9 @@ impl Select {
         self
     }
 
-    pub fn filter<S: Into<String>>(&mut self, filter: Vec<(S, Operator, String)>) -> &mut Select {
+    pub fn filter<S: Into<String>>(&mut self, filter: Vec<(S, Operator, S)>) -> &mut Select {
         for (s, o, v) in filter {
-            self.filter.push((s.into(), o, v));
+            self.filter.push((s.into(), o, v.into()));
         }
         self
     }
