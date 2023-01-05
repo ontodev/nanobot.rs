@@ -101,25 +101,64 @@ fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
 
 pub async fn init(config: &Config) -> Result<String, String> {
     let database = config.connection.to_owned();
-    match fs::create_dir_all("src/schema") {
-        Err(_x) => return Err(String::from("Couldn't create folder src/schema")),
-        Ok(_x) => {}
-    };
+    // Fail if nanobot.toml or .nanobot.db exist
+    let path = Path::new("nanobot.toml");
+    if path.exists() {
+        return Err(format!(
+            "Cannot init: '{}' file already exists.",
+            path.display()
+        ));
+    }
+    let path = Path::new(&database);
+    if path.exists() {
+        return Err(format!(
+            "Cannot init: '{}' database already exists",
+            path.display()
+        ));
+    }
 
-    match create_table_tsv() {
-        Err(_x) => return Err(String::from("Couldn't write table.tsv")),
-        Ok(_x) => {}
-    };
+    // Create default config nanobot.toml
+    let path = Path::new("nanobot.toml");
+    let toml = include_str!("resources/default_config.toml");
+    fs::write(path, toml).expect("Unable to write file");
+    tracing::info!("Created config file '{}'", path.display());
 
-    match create_column_tsv() {
-        Err(_x) => return Err(String::from("Couldn't write column.tsv")),
-        Ok(_x) => {}
-    };
+    // Create the basic VALVE schema tables, if they don't exist
+    let path = Path::new("src/schema");
+    if !path.exists() {
+        match fs::create_dir_all(path) {
+            Err(_x) => return Err(format!("Could not create '{}'", path.display())),
+            Ok(_x) => {}
+        };
+        tracing::info!("Created '{}' directory", path.display());
+    }
 
-    match create_datatype_tsv() {
-        Err(_x) => return Err(String::from("Couldn't write datatype.tsv")),
-        Ok(_x) => {}
-    };
+    let path = Path::new("src/schema/table.tsv");
+    if !path.exists() {
+        match create_table_tsv() {
+            Err(_x) => return Err(format!("Could not create '{}'", path.display())),
+            Ok(_x) => {}
+        };
+        tracing::info!("Created '{}' file", path.display());
+    }
+
+    let path = Path::new("src/schema/column.tsv");
+    if !path.exists() {
+        match create_column_tsv() {
+            Err(_x) => return Err(format!("Could not create '{}'", path.display())),
+            Ok(_x) => {}
+        };
+        tracing::info!("Created '{}' file", path.display());
+    }
+
+    let path = Path::new("src/schema/datatype.tsv");
+    if !path.exists() {
+        match create_datatype_tsv() {
+            Err(_x) => return Err(format!("Could not create '{}'", path.display())),
+            Ok(_x) => {}
+        };
+        tracing::info!("Created '{}' file", path.display());
+    }
 
     //create database
     match File::create(&database) {
@@ -133,14 +172,13 @@ pub async fn init(config: &Config) -> Result<String, String> {
         Ok(_x) => {}
     }
 
-    //load tables into database
-    let _config = configure_and_or_load("src/schema/table.tsv", &database, true, false).await;
-
-    if Path::new("nanobot.toml").exists() {
-        Err(String::from("nanobot.toml file already exists."))
-    } else {
-        let toml = include_str!("resources/default_config.toml");
-        fs::write("nanobot.toml", toml).expect("Unable to write file");
-        Ok(String::from("Initialized a Nanobot project"))
+    // load tables into database
+    let path = "src/schema/table.tsv";
+    match configure_and_or_load(path, &database, true, false).await {
+        Err(_x) => return Err(format!("Could not load from '{}'", path)),
+        Ok(_x) => {}
     }
+    tracing::info!("Loaded '{}' using '{}'", database, path);
+
+    Ok(String::from("Initialized a Nanobot project"))
 }

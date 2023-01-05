@@ -1,9 +1,10 @@
 use crate::config::Config;
 use crate::sql::{
-    get_count_from_pool, get_table_from_pool, rows_to_map, select_to_url, Operator, Select,
-    LIMIT_DEFAULT, LIMIT_MAX,
+    get_count_from_pool, get_message_counts_from_pool, get_rows_from_pool, get_table_from_pool,
+    get_total_from_pool, rows_to_map, select_to_url, Operator, Select, LIMIT_DEFAULT, LIMIT_MAX,
 };
 use minijinja::Environment;
+use regex::Regex;
 use serde_json::{json, Map, Value};
 use sqlx::sqlite::SqlitePool;
 use std::error::Error;
@@ -87,8 +88,8 @@ pub async fn get_rows(
             .collect(),
         filter: vec![(
             "table".to_string(),
-            Operator::EQUALS,
-            Value::String(base_select.table.clone()),
+            Operator::Equals,
+            base_select.table.clone(),
         )],
         ..Default::default()
     };
@@ -152,8 +153,7 @@ async fn get_page(
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
-    let value_rows = get_table_from_pool(&pool, &select).await?;
-
+    // Annotate columns with filters and sorting
     let mut column_map = Map::new();
     for row in column_rows.iter() {
         let mut r = Map::new();
@@ -178,31 +178,119 @@ async fn get_page(
         if filters.len() > 0 {
             r.insert("filters".to_string(), Value::Array(filters));
         }
+        // TODO: order
         column_map.insert(key, Value::Object(r));
     }
 
-    // TODO: get the nulltypes
-    // TODO: get the messages
+    // get the data and the messages
+    let start = std::time::Instant::now();
+    let mut view_select = Select {
+        table: format!("{}_view", select.table.clone()),
+        ..select.clone()
+    };
+
+    // If we're filtering for rows with messages
+    if select.message != "" {
+        let sql = format!(
+            r#"
+            SELECT json_object('row', row) AS json_result
+            FROM (
+              SELECT DISTINCT row
+              FROM message
+              WHERE "table" = '{}'
+              ORDER BY row
+              LIMIT {}
+              OFFSET {}
+            )
+        "#,
+            select.table, select.limit, select.offset
+        );
+        let result = get_rows_from_pool(&pool, &sql).await?;
+        let row_numbers: Vec<Value> = result
+            .clone()
+            .into_iter()
+            .map(|r| r.get("row").unwrap().clone())
+            .collect();
+        view_select = Select {
+            filter: vec![(
+                "row_number".to_string(),
+                Operator::In,
+                format!(
+                    "({})",
+                    row_numbers
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",")
+                ),
+            )],
+            offset: 0,
+            ..view_select
+        };
+    }
+
+    // Use the view to select the data
+    let value_rows = get_table_from_pool(&pool, &view_select).await?;
+    let row_numbers: Vec<Value> = value_rows
+        .clone()
+        .into_iter()
+        .map(|r| r.get("row_number").unwrap().clone())
+        .collect();
+    let select_messages = Select {
+        table: "message".to_string(),
+        select: vec!["table", "row", "column", "level", "rule", "message"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        filter: vec![
+            ("table".to_string(), Operator::Equals, select.table.clone()),
+            (
+                "row".to_string(),
+                Operator::In,
+                format!(
+                    "({})",
+                    row_numbers
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",")
+                ),
+            ),
+        ],
+        limit: 1000,
+        ..Default::default()
+    };
+    let message_rows = get_table_from_pool(&pool, &select_messages).await?;
+    let message_counts = get_message_counts_from_pool(&pool, &select.table.clone()).await?;
 
     // convert value_rows to cell_rows
     let mut cell_rows: Vec<Map<String, Value>> = vec![];
     for row in &value_rows {
         let mut crow: Map<String, Value> = Map::new();
+        let row_number = row.get("row_number").unwrap();
         for (k, v) in row.iter() {
             let mut cell: Map<String, Value> = Map::new();
+            let mut classes: Vec<String> = vec![];
+
+            // handle the value
             cell.insert("value".to_string(), v.clone());
             if k == "row_number" {
                 cell.insert("datatype".to_string(), Value::String("integer".to_string()));
                 crow.insert(k.to_string(), Value::Object(cell));
                 continue;
             }
+
+            // handle null and nulltype
             if v.is_null() {
+                classes.push("bg-null".to_string());
                 if let Some(nulltype) = column_map.get(k).unwrap().get("nulltype") {
                     if nulltype.is_string() {
                         cell.insert("nulltype".to_string(), nulltype.clone());
                     }
                 }
             }
+
+            // handle datatype
             if !cell.contains_key("nulltype") {
                 let datatype = column_map.get(k).unwrap().get("datatype").unwrap();
                 cell.insert("datatype".to_string(), datatype.clone());
@@ -216,12 +304,61 @@ async fn get_page(
                 let href = format!("/{}", v.as_str().unwrap().to_string());
                 cell.insert("href".to_string(), Value::String(href));
             }
+
+            // collect messages
+            let mut messages: Vec<Map<String, Value>> = vec![];
+            let mut max_level: usize = 0;
+            let mut message_level = "info".to_string();
+            for message in &message_rows {
+                if row_number == message.get("row").unwrap() && k == message.get("column").unwrap()
+                {
+                    let mut m = Map::new();
+                    for (key, value) in message {
+                        if key == "table" || key == "row" || key == "column" {
+                            continue;
+                        }
+                        m.insert(key.clone(), value.clone());
+                    }
+                    messages.push(m);
+                    let level = message.get("level").unwrap().as_str().unwrap().to_string();
+                    let lvl = level_to_int(&level);
+                    if lvl > max_level {
+                        max_level = lvl;
+                        message_level = level;
+                    }
+                }
+            }
+            if messages.len() > 0 {
+                cell.insert("message_level".to_string(), json!(message_level));
+                cell.insert("messages".to_string(), json!(messages));
+            }
+            if classes.len() > 0 {
+                cell.insert("classes".to_string(), json!(classes));
+            }
+
             crow.insert(k.to_string(), Value::Object(cell));
         }
         cell_rows.push(crow);
     }
 
-    let count = get_count_from_pool(&pool, &select).await?;
+    let mut counts = Map::new();
+    let mut count = get_count_from_pool(&pool, &select).await?;
+    if select.message != "" {
+        count = message_counts
+            .get("message_row")
+            .unwrap()
+            .as_u64()
+            .unwrap()
+            .clone() as usize;
+    }
+    counts.insert("count".to_string(), json!(count));
+
+    let total = get_total_from_pool(&pool, &select.table).await?;
+    counts.insert("total".to_string(), json!(total));
+    for (k, v) in message_counts {
+        counts.insert(k, v);
+    }
+
     let end = select.offset + cell_rows.len();
 
     let mut this_table = table_map
@@ -234,7 +371,7 @@ async fn get_page(
     this_table.insert("href".to_string(), json!(format!("/{}", select.table)));
     this_table.insert("start".to_string(), json!(select.offset + 1));
     this_table.insert("end".to_string(), json!(end));
-    this_table.insert("count".to_string(), json!(count));
+    this_table.insert("counts".to_string(), json!(counts));
 
     let mut formats = Map::new();
     let href = select_to_url(&Select {
@@ -296,6 +433,7 @@ async fn get_page(
             "tables": tables,
             "title": select.table,
             "select": select,
+            "elapsed": start.elapsed().as_millis() as usize,
         },
         "table": this_table,
         "column": column_map,
@@ -339,10 +477,35 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
     String::from_utf8(tw.into_inner().unwrap()).unwrap()
 }
 
+fn level_to_int(level: &String) -> usize {
+    match level.to_lowercase().as_str() {
+        "error" => 4,
+        "warn" => 3,
+        "info" => 2,
+        "update" => 1,
+        _ => 0,
+    }
+}
+
+fn level_to_bootstrap(level: String) -> String {
+    match level.to_lowercase().as_str() {
+        "error" => "danger",
+        "warn" => "warning",
+        "update" => "success",
+        x => x,
+    }
+    .to_string()
+}
+
+fn name_to_id(name: String) -> String {
+    let re: Regex = Regex::new(r"\W").unwrap();
+    re.replace_all(&name, "-").to_string()
+}
+
 fn page_to_html(page: &Value) -> String {
     let mut env = Environment::new();
-    // env.add_template("debug.html", include_str!("resources/debug.html"))
-    //     .unwrap();
+    env.add_filter("level_to_bootstrap", level_to_bootstrap);
+    env.add_filter("id", name_to_id);
     env.add_template("page.html", include_str!("resources/page.html"))
         .unwrap();
     env.add_template("table.html", include_str!("resources/table.html"))
