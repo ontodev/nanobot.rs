@@ -17,7 +17,7 @@ pub struct Config {
     pub version: String,
     pub edition: String,
     pub connection: String,
-    pub pool: SqlitePool,
+    pub pool: Option<SqlitePool>,
     pub debug: Debug,
 }
 
@@ -28,12 +28,6 @@ impl Config {
         let default_values = &default_config["tool"];
 
         let default_connection = String::from(".nanobot.db");
-        let connection_string = format!("sqlite://{}?mode=rwc", &default_connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
 
         let mut config = Config {
             //set in default_config.toml
@@ -42,7 +36,7 @@ impl Config {
             edition: String::from(default_values["edition"].as_str().unwrap()),
             //not set in default_config.toml
             connection: default_connection,
-            pool,
+            pool: None,
             debug: Debug::INFO,
         };
 
@@ -66,6 +60,17 @@ impl Config {
             Err(_x) => (),
         };
         config
+    }
+
+    pub async fn start_pool(&mut self) -> &mut Config {
+        let connection_string = format!("sqlite://{}?mode=rwc", &self.connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+        self.pool = Some(pool);
+        self
     }
 
     pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Config {

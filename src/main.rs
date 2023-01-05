@@ -80,13 +80,14 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result = match get::get_table(&config, table, shape, format).await {
+            let result = match get::get_table(config.start_pool().await, table, shape, format).await
+            {
                 Ok(x) => x,
                 Err(x) => format!("ERROR: {:?}", x),
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(&config),
+        Some(("serve", _sub_matches)) => serve::app(config.start_pool().await),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
