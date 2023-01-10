@@ -49,7 +49,7 @@ pub async fn get_table(
 ) -> Result<String, GetError> {
     let mut select = Select::new();
     select.table(table).limit(LIMIT_DEFAULT);
-    get_rows(database, &select, shape, format).await
+    get_rows(config, &select, shape, format).await
 }
 
 pub async fn get_rows(
