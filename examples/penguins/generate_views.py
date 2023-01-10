@@ -62,6 +62,31 @@ FROM "{table}_union"
 """
         print(ddl)
 
+    # text table
+    # ALTERNATE: just one join, makese no difference?
+    for table, rows in tables.items():
+        break
+        selects = ['"row_number"']
+        joins = []
+        for row in rows:
+            column = row["column"]
+            line = f"""COALESCE(
+    CAST("{table}_union"."{column}" AS TEXT),
+    json_extract(m.value, '$."{column} cell"')
+  ) AS "{column}" """
+            selects.append(line.strip())
+        select = ",\n  ".join(selects)
+        ddl = f"""DROP VIEW IF EXISTS "{table}_text";
+CREATE VIEW "{table}_text" AS
+SELECT
+  {select}
+FROM "{table}_union"
+LEFT JOIN message_row AS m
+       ON "{table}_union".row_number = m.row
+      AND m."table" = '{table}';
+"""
+        print(ddl)
+
     # values table
     for table, rows in tables.items():
         selects = ["""'_row_number', "row_number" """.strip()]

@@ -22,7 +22,7 @@ toml = { version = "0.5.9" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 tree-sitter = "0.20.6"
-tree-sitter-sqlrest = { path = "../tree-sitter-sqlrest" }
+tree-sitter-sqlrest = { git = "https://github.com/ontodev/tree-sitter-sqlrest.git", rev = "cd71e864538f2b665b7010eb1dcf435d8083353e" }
 urlencoding = "2.1.2"
 
 [build-dependencies]

@@ -46,7 +46,7 @@ def randdate():
 
 
 def main():
-    count = int(1e3)
+    count = int(1e6)
     error_rate = 0.1
     error_count = math.floor(count * error_rate)
     error_rows = []

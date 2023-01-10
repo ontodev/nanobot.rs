@@ -25,6 +25,12 @@ format:
 build:
 	cargo build --release
 
+# https://github.com/clux/muslrust
+.PHONY: build-musl
+build-musl:
+	# docker pull clux/muslrust:stable
+	docker run -v $PWD:/volume --rm -t clux/muslrust:stable cargo build --release
+
 target/release/nanobot: src/
 	cargo build --release
 
