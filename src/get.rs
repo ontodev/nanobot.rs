@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::sql::{
     get_count_from_pool, get_message_counts_from_pool, get_rows_from_pool, get_table_from_pool,
     get_total_from_pool, rows_to_map, select_to_url, Operator, Select, LIMIT_DEFAULT, LIMIT_MAX,
@@ -5,7 +6,7 @@ use crate::sql::{
 use minijinja::Environment;
 use regex::Regex;
 use serde_json::{json, Map, Value};
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::sqlite::SqlitePool;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -41,34 +42,28 @@ impl From<sqlx::Error> for GetError {
 }
 
 pub async fn get_table(
-    database: &str,
+    config: &Config,
     table: &str,
     shape: &str,
     format: &str,
 ) -> Result<String, GetError> {
     let mut select = Select::new();
     select.table(table).limit(LIMIT_DEFAULT);
-    get_rows(database, &select, shape, format).await
+    get_rows(config, &select, shape, format).await
 }
 
 pub async fn get_rows(
-    database: &str,
+    config: &Config,
     base_select: &Select,
     shape: &str,
     format: &str,
 ) -> Result<String, GetError> {
-    let connection_string = format!("sqlite://{}?mode=rwc", database);
-    let pool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(&connection_string)
-        .await
-        .unwrap();
-
     // Get all the tables
     let mut select = Select::new();
     select
         .table("table")
         .select(vec!["table", "path", "type", "description"]);
+    let pool = config.pool.as_ref().unwrap();
 
     let table_rows = get_table_from_pool(&pool, &select).await?;
     let table_map = rows_to_map(table_rows, "table");

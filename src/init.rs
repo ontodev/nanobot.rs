@@ -1,3 +1,4 @@
+use crate::config::Config;
 use ontodev_valve::configure_and_or_load;
 use std::error;
 use std::fs;
@@ -98,7 +99,8 @@ fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-pub async fn init(database: &str) -> Result<String, String> {
+pub async fn init(config: &Config) -> Result<String, String> {
+    let database = config.connection.to_owned();
     // Fail if nanobot.toml or .nanobot.db exist
     let path = Path::new("nanobot.toml");
     if path.exists() {
@@ -107,7 +109,7 @@ pub async fn init(database: &str) -> Result<String, String> {
             path.display()
         ));
     }
-    let path = Path::new(database);
+    let path = Path::new(&database);
     if path.exists() {
         return Err(format!(
             "Cannot init: '{}' database already exists",
@@ -158,20 +160,21 @@ pub async fn init(database: &str) -> Result<String, String> {
         tracing::info!("Created '{}' file", path.display());
     }
 
-    match File::create(database) {
-        Err(_x) => return Err(format!("Could not create '{}'", database)),
+    //create database
+    match File::create(&database) {
+        Err(_x) => return Err(String::from("Couldn't create database")),
         Ok(_x) => {}
     }
 
-    // add database to .gitignore
-    match add_to_gitignore(format!("{}*", database).as_str()) {
+    //add database to .gitignore
+    match add_to_gitignore(format!("{}*", &database).as_str()) {
         Err(x) => return Err(x),
         Ok(_x) => {}
     }
 
     // load tables into database
     let path = "src/schema/table.tsv";
-    match configure_and_or_load(path, database, true, false).await {
+    match configure_and_or_load(path, &database, true, false).await {
         Err(_x) => return Err(format!("Could not load from '{}'", path)),
         Ok(_x) => {}
     }

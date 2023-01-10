@@ -1,6 +1,103 @@
+use serde::{Deserialize, Serialize};
+use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::fs;
 use toml::map::Map;
 use toml::Value;
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
+pub enum Debug {
+    INFO,
+    WARN,
+    ERROR,
+}
+
+#[derive(Clone, Debug)]
+pub struct Config {
+    pub name: String,
+    pub version: String,
+    pub edition: String,
+    pub connection: String,
+    pub pool: Option<SqlitePool>,
+    pub debug: Debug,
+}
+
+impl Config {
+    pub async fn new() -> Config {
+        let default_config_file = include_str!("resources/default_config.toml");
+        let default_config = default_config_file.parse::<Value>().unwrap();
+        let default_values = &default_config["tool"];
+
+        let default_connection = String::from(".nanobot.db");
+
+        let mut config = Config {
+            //set in default_config.toml
+            name: String::from(default_values["name"].as_str().unwrap()),
+            version: String::from(default_values["version"].as_str().unwrap()),
+            edition: String::from(default_values["edition"].as_str().unwrap()),
+            //not set in default_config.toml
+            connection: default_connection,
+            pool: None,
+            debug: Debug::INFO,
+        };
+
+        //update with user configuration (using nanobot.toml)
+        let user_config_file = fs::read_to_string("nanobot.toml");
+
+        match user_config_file {
+            Ok(x) => {
+                let user_config = x.parse::<Value>().unwrap();
+                let user_values = &user_config["tool"]; //TODO: do we require 'tool' here?
+                if let Some(x) = user_values["name"].as_str() {
+                    config.name = String::from(x);
+                }
+                if let Some(x) = user_values["version"].as_str() {
+                    config.version = String::from(x);
+                }
+                if let Some(x) = user_values["edition"].as_str() {
+                    config.edition = String::from(x);
+                };
+            }
+            Err(_x) => (),
+        };
+        config
+    }
+
+    pub async fn start_pool(&mut self) -> &mut Config {
+        let connection_string = format!("sqlite://{}?mode=rwc", &self.connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+        self.pool = Some(pool);
+        self
+    }
+
+    pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Config {
+        self.name = name.into();
+        self
+    }
+
+    pub fn version<S: Into<String>>(&mut self, version: S) -> &mut Config {
+        self.version = version.into();
+        self
+    }
+
+    pub fn edition<S: Into<String>>(&mut self, edition: S) -> &mut Config {
+        self.edition = edition.into();
+        self
+    }
+
+    pub fn connection<S: Into<String>>(&mut self, connection: S) -> &mut Config {
+        self.connection = connection.into();
+        self
+    }
+
+    pub fn debug(&mut self, debug: Debug) -> &mut Config {
+        self.debug = debug;
+        self
+    }
+}
 
 /// Merge two toml::Values.
 /// The second argument is given priority in case of conflicts.
@@ -14,6 +111,7 @@ use toml::Value;
 ///
 /// ```
 /// use toml::Value;
+/// use nanobot::config::merge;
 ///
 /// let s1 = r#"
 /// [package]
@@ -39,11 +137,11 @@ use toml::Value;
 /// let v2 = s2.parse::<Value>().unwrap();
 /// let expected = s3.parse::<Value>().unwrap();
 ///
-/// let merged = merge(v1,v2);
+/// let merged = merge(&v1,&v2);
 ///
 /// assert_eq!(expected, merged);
 /// ```
-fn merge(v1: &Value, v2: &Value) -> Value {
+pub fn merge(v1: &Value, v2: &Value) -> Value {
     match v1 {
         Value::Table(x) => match v2 {
             Value::Table(y) => {
@@ -98,8 +196,7 @@ fn merge(v1: &Value, v2: &Value) -> Value {
 }
 
 pub fn config(file_path: &str) -> Result<String, String> {
-    let default_config = fs::read_to_string("src/resources/default_config.toml")
-        .expect("Should have been able to read the file");
+    let default_config = include_str!("resources/default_config.toml");
 
     let input_config =
         fs::read_to_string(file_path).expect("Should have been able to read the file");
