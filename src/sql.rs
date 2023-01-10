@@ -82,7 +82,7 @@ impl Direction {
     }
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Select {
     pub table: String,
     pub select: Vec<String>,
@@ -130,6 +130,57 @@ fn filters_to_sql(indent: &str, filters: &Vec<(String, Operator, String)>) -> St
     }
     let joiner = format!("\n{}  AND ", indent);
     format!("{}WHERE {}", indent, parts.join(&joiner))
+}
+
+impl Select {
+    pub fn new() -> Select {
+        Default::default()
+    }
+
+    pub fn clone(select: &Select) -> Select {
+        Select { ..select.clone() }
+    }
+
+    pub fn table<S: Into<String>>(&mut self, table: S) -> &mut Select {
+        self.table = table.into();
+        self
+    }
+
+    pub fn message<S: Into<String>>(&mut self, message: S) -> &mut Select {
+        self.message = message.into();
+        self
+    }
+
+    pub fn select<S: Into<String>>(&mut self, select: Vec<S>) -> &mut Select {
+        for s in select {
+            self.select.push(s.into());
+        }
+        self
+    }
+
+    pub fn filter<S: Into<String>>(&mut self, filter: Vec<(S, Operator, S)>) -> &mut Select {
+        for (s, o, v) in filter {
+            self.filter.push((s.into(), o, v.into()));
+        }
+        self
+    }
+
+    pub fn order<S: Into<String>>(&mut self, order: Vec<(S, Direction)>) -> &mut Select {
+        for (s, d) in order {
+            self.order.push((s.into(), d));
+        }
+        self
+    }
+
+    pub fn limit(&mut self, limit: usize) -> &mut Select {
+        self.limit = limit;
+        self
+    }
+
+    pub fn offset(&mut self, offset: usize) -> &mut Select {
+        self.offset = offset;
+        self
+    }
 }
 
 /// Convert a Select struct to a SQL string.

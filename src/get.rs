@@ -46,11 +46,8 @@ pub async fn get_table(
     shape: &str,
     format: &str,
 ) -> Result<String, GetError> {
-    let select = Select {
-        table: table.to_string(),
-        limit: LIMIT_DEFAULT,
-        ..Default::default()
-    };
+    let mut select = Select::new();
+    select.table(table).limit(LIMIT_DEFAULT);
     get_rows(database, &select, shape, format).await
 }
 
@@ -68,14 +65,11 @@ pub async fn get_rows(
         .unwrap();
 
     // Get all the tables
-    let select = Select {
-        table: "table".to_string(),
-        select: vec!["table", "path", "type", "description"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
-        ..Default::default()
-    };
+    let mut select = Select::new();
+    select
+        .table("table")
+        .select(vec!["table", "path", "type", "description"]);
+
     let table_rows = get_table_from_pool(&pool, &select).await?;
     let table_map = rows_to_map(table_rows, "table");
     if !table_map.contains_key(&base_select.table) {
@@ -86,19 +80,22 @@ pub async fn get_rows(
     }
 
     // Get the columns for the selected table
-    let select = Select {
-        table: "column".to_string(),
-        select: vec!["column", "nulltype", "datatype", "structure", "description"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
-        filter: vec![(
+    let mut select = Select::new();
+    select
+        .table("column")
+        .select(vec![
+            "column",
+            "nulltype",
+            "datatype",
+            "structure",
+            "description",
+        ])
+        .filter(vec![(
             "table".to_string(),
             Operator::Equals,
             base_select.table.clone(),
-        )],
-        ..Default::default()
-    };
+        )]);
+
     let column_rows = get_table_from_pool(&pool, &select).await?;
 
     let mut columns: Vec<String> = vec![];
@@ -118,11 +115,8 @@ pub async fn get_rows(
     } else if limit == 0 {
         limit = LIMIT_DEFAULT;
     }
-    let select = Select {
-        select: columns,
-        limit,
-        ..base_select.clone()
-    };
+    let mut select = Select::clone(base_select);
+    select.select(columns).limit(limit);
 
     match shape {
         "value_rows" => {
@@ -380,40 +374,33 @@ async fn get_page(
     this_table.insert("counts".to_string(), json!(counts));
 
     let mut formats = Map::new();
-    let href = select_to_url(&Select {
-        table: format!("{}.json", select.table),
-        ..select.clone()
-    });
+
+    let mut select_format = Select::clone(select);
+    select_format.table(format!("{}.json", select.table));
+
+    let href = select_to_url(&select_format);
     formats.insert("JSON".to_string(), json!(href));
-    let href = select_to_url(&Select {
-        table: format!("{}.pretty.json", select.table),
-        ..select.clone()
-    });
+
+    select_format.table(format!("{}.pretty.json", select.table));
+    let href = select_to_url(&select_format);
+
     formats.insert("JSON (Pretty)".to_string(), json!(href));
     this_table.insert("formats".to_string(), json!(formats));
 
     // Pagination
+    let mut select_offset = Select::clone(select);
     if select.offset > 0 {
-        let href = select_to_url(&Select {
-            offset: 0,
-            ..select.clone()
-        });
+        let href = select_to_url(&select_offset.offset(0));
         this_table.insert("first".to_string(), json!(href));
         if select.offset > select.limit {
-            let href = select_to_url(&Select {
-                offset: select.offset - select.limit,
-                ..select.clone()
-            });
+            let href = select_to_url(&select_offset.offset(select.offset - select.limit));
             this_table.insert("previous".to_string(), json!(href));
         } else {
             this_table.insert("previous".to_string(), json!(href));
         }
     }
     if end < count {
-        let href = select_to_url(&Select {
-            offset: select.offset + select.limit,
-            ..select.clone()
-        });
+        let href = select_to_url(&select_offset.offset(select.offset + select.limit));
         this_table.insert("next".to_string(), json!(href));
         let remainder = count % select.limit;
         let last = if remainder == 0 {
@@ -421,10 +408,7 @@ async fn get_page(
         } else {
             count - (count % select.limit)
         };
-        let href = select_to_url(&Select {
-            offset: last,
-            ..select.clone()
-        });
+        let href = select_to_url(&select_offset.offset(last));
         this_table.insert("last".to_string(), json!(href));
     }
 
