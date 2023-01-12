@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_str, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
+use std::result::Result;
 use std::str::FromStr;
+use std::{error::Error, fmt};
 use tree_sitter::{Node, Parser};
 use urlencoding::decode;
 
@@ -21,6 +23,28 @@ pub enum Operator {
     ILike,
     Is,
     In,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ParseError {
+    InvalidKeyWordError(String),
+    OutOfBoundsError(String),
+    ParseOperatorError(String),
+    ParseDirectionError(String),
+}
+
+//use default implementation
+impl Error for ParseError {}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self {
+            ParseError::InvalidKeyWordError(x) => write!(f, "{}", x),
+            ParseError::OutOfBoundsError(x) => write!(f, "{}", x),
+            ParseError::ParseOperatorError(x) => write!(f, "{}", x),
+            ParseError::ParseDirectionError(x) => write!(f, "{}", x),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -441,11 +465,12 @@ pub fn parse(input: &str) -> Select {
         message,
     };
 
+    //TODO: error handling
     transduce(&tree.root_node(), &i, &mut query);
     query
 }
 
-pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
+pub fn transduce(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
     match n.kind() {
         "query" => transduce_children(n, raw, query),
         "select" => transduce_select(n, raw, query),
@@ -459,37 +484,53 @@ pub fn transduce(n: &Node, raw: &str, query: &mut Select) {
         "order" => transduce_order(n, raw, query),
         "limit" => transduce_limit(n, raw, query),
         "offset" => transduce_offset(n, raw, query),
-        "STRING" => panic!("Encountered STRING in top level translation"),
         _ => {
-            panic!("Parsing Error: {:?} {} {:?}", n, raw, query);
+            return Err(ParseError::InvalidKeyWordError(format!(
+                "{:?} {} {:?}",
+                n, raw, query
+            )))
         }
     }
 }
 
-pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) {
-    let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
-        .unwrap()
-        .into_owned();
-    let value = transduce_list(&n.named_child(1).unwrap(), raw);
+pub fn transduce_in(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
+    let content = match get_from_raw(&n.named_child(0).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
+    let column = decode(&content).unwrap().into_owned();
+
+    let value = match transduce_list(&n.named_child(1).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
 
     let filter = (column, Operator::In, value);
     query.filter.push(filter);
+    Ok(())
 }
 
-pub fn transduce_list(n: &Node, raw: &str) -> String {
+pub fn transduce_list(n: &Node, raw: &str) -> Result<String, ParseError> {
     let quoted_strings = match n.kind() {
         "list" => false,
         "list_of_strings" => true,
-        _ => panic!("Not a valid list"),
+        _ => {
+            return Err(ParseError::InvalidKeyWordError(String::from(
+                "Not a valid list",
+            )))
+        }
     };
 
     let mut vec = Vec::new();
 
     let child_count = n.named_child_count();
     for i in 0..child_count {
-        let value = decode(&get_from_raw(&n.named_child(i).unwrap(), raw))
-            .unwrap()
-            .into_owned();
+        let content = match get_from_raw(&n.named_child(i).unwrap(), raw) {
+            Ok(x) => x,
+            Err(err) => return Err(err),
+        };
+
+        let value = decode(&content).unwrap().into_owned();
         if quoted_strings {
             let quoted_string = format!("{}", value);
             vec.push(quoted_string);
@@ -497,36 +538,56 @@ pub fn transduce_list(n: &Node, raw: &str) -> String {
             vec.push(value);
         }
     }
-    format!("({})", vec.join(","))
+    Ok(format!("({})", vec.join(",")))
 }
 
-pub fn transduce_table(n: &Node, raw: &str, query: &mut Select) {
-    let table = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
-        .unwrap()
-        .into_owned();
+pub fn transduce_table(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
+    let content = match get_from_raw(&n.named_child(0).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
+
+    let table = decode(&content).unwrap().into_owned();
     query.table = table;
+    Ok(())
 }
 
-pub fn transduce_offset(n: &Node, raw: &str, query: &mut Select) {
-    let offset_string = get_from_raw(&n.named_child(0).unwrap(), raw);
+pub fn transduce_offset(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
+    let offset_string = match get_from_raw(&n.named_child(0).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
     let offset: usize = offset_string.parse().unwrap();
     query.offset = offset;
+    Ok(())
 }
 
-pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) {
-    let limit_string = get_from_raw(&n.named_child(0).unwrap(), raw);
+pub fn transduce_limit(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
+    let limit_string = match get_from_raw(&n.named_child(0).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
     let limit: usize = limit_string.parse().unwrap();
     query.limit = limit;
+    Ok(())
 }
 
-pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
-    let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
-        .unwrap()
-        .into_owned();
-    let operator_string = get_from_raw(&n.named_child(1).unwrap(), raw);
-    let value = decode(&get_from_raw(&n.named_child(2).unwrap(), raw))
-        .unwrap()
-        .into_owned();
+pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
+    let content = match get_from_raw(&n.named_child(0).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
+    let column = decode(&content).unwrap().into_owned();
+
+    let operator_string = match get_from_raw(&n.named_child(1).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
+    let content = match get_from_raw(&n.named_child(2).unwrap(), raw) {
+        Ok(x) => x,
+        Err(err) => return Err(err),
+    };
+    let value = decode(&content).unwrap().into_owned();
 
     let operator = Operator::from_str(&operator_string);
     match operator {
@@ -536,21 +597,32 @@ pub fn transduce_filter(n: &Node, raw: &str, query: &mut Select) {
         }
         Err(_) => {
             tracing::warn!("Unhandled operator '{}'", operator_string);
+            return Err(ParseError::ParseOperatorError(format!(
+                "Unhandled operator '{}'",
+                operator_string
+            )));
         }
     };
+    Ok(())
 }
 
-pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
+pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
     let child_count = n.named_child_count();
     let mut position = 0;
 
     while position < child_count {
-        let column = decode(&get_from_raw(&n.named_child(0).unwrap(), raw))
-            .unwrap()
-            .into_owned();
+        let content = match get_from_raw(&n.named_child(2).unwrap(), raw) {
+            Ok(x) => x,
+            Err(err) => return Err(err),
+        };
+        let column = decode(&content).unwrap().into_owned();
         position = position + 1;
         if position < child_count && n.named_child(position).unwrap().kind().eq("ordering") {
-            let ordering_string = get_from_raw(&n.named_child(position).unwrap(), raw);
+            let ordering_string = match get_from_raw(&n.named_child(position).unwrap(), raw) {
+                Ok(x) => x,
+                Err(err) => return Err(err),
+            };
+
             let ordering = Direction::from_str(&ordering_string);
             match ordering {
                 Ok(o) => {
@@ -568,26 +640,40 @@ pub fn transduce_order(n: &Node, raw: &str, query: &mut Select) {
             query.order.push(order);
         }
     }
+    Ok(())
 }
 
-pub fn transduce_select(n: &Node, raw: &str, query: &mut Select) {
+pub fn transduce_select(n: &Node, raw: &str, query: &mut Select) -> Result<(), ParseError> {
     let child_count = n.named_child_count();
     for position in 0..child_count {
-        let column = get_from_raw(&n.named_child(position).unwrap(), raw);
+        let column = match get_from_raw(&n.named_child(position).unwrap(), raw) {
+            Ok(x) => x,
+            Err(err) => return Err(err),
+        };
         query.select.push(column);
     }
+    Ok(())
 }
 
-pub fn get_from_raw(n: &Node, raw: &str) -> String {
+pub fn get_from_raw(n: &Node, raw: &str) -> Result<String, ParseError> {
     let start = n.start_position().column;
     let end = n.end_position().column;
+
+    if end > raw.len() || start > end {
+        return Err(ParseError::OutOfBoundsError(format!("{}", raw)));
+    }
     let extract = &raw[start..end];
-    String::from(extract)
+    Ok(String::from(extract))
 }
 
-pub fn transduce_children(n: &Node, raw: &str, q: &mut Select) {
+pub fn transduce_children(n: &Node, raw: &str, q: &mut Select) -> Result<(), ParseError> {
     let child_count = n.named_child_count();
+
     for i in 0..child_count {
-        transduce(&n.named_child(i).unwrap(), raw, q);
+        match transduce(&n.named_child(i).unwrap(), raw, q) {
+            Ok(()) => {}
+            Err(err) => return Err(err),
+        };
     }
+    Ok(())
 }
