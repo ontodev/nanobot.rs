@@ -2,132 +2,40 @@ use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
+use wiring_rs::util::signature;
 
-// ################################################
-// ######## wiring utility functions ##############
-// ################################################
-// TODO: put these in wiring_rs
-pub fn get_iris_from_object(ldtab_object: &Map<String, Value>, iris: &mut HashSet<String>) {
-    if ldtab_object.contains_key("datatype") {
-        match ldtab_object.get("datatype") {
-            Some(x) => {
-                //get datatype ...
-                match x {
-                    Value::String(y) => {
-                        //... as a string ...
-                        match y.as_str() {
-                            //... to check its value
-                            "_IRI" => {
-                                let object = ldtab_object.get("object").unwrap();
-                                iris.insert(String::from(object.as_str().unwrap()));
-                            }
-                            "_JSON" => {
-                                let object = ldtab_object.get("object").unwrap();
-                                get_iris(object, iris);
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            _ => panic!(), //TODO: error handling
-        }
-    } else {
-        for v in ldtab_object.values() {
-            get_iris(&v, iris);
-        }
-    }
+#[derive(Debug)] 
+pub enum SerdeError {
+    NotAMap(String),
+    NotAnObject(String), 
+} 
+
+#[derive(Debug)] 
+pub enum Error {
+    SerdeError(SerdeError),
+    SQLError(sqlx::Error), 
 }
 
-pub fn get_iris_from_array(ldtab_array: &Vec<Value>, iris: &mut HashSet<String>) {
-    for a in ldtab_array {
-        get_iris(&a, iris);
-    }
+impl From<sqlx::Error> for Error {
+    fn from(e: sqlx::Error) -> Self {
+        Error::SQLError(e)
+    } 
 }
 
-pub fn get_iris(ldtab_thick_triple_object: &Value, iris: &mut HashSet<String>) {
-    match ldtab_thick_triple_object {
-        Value::Array(a) => get_iris_from_array(&a, iris),
-        Value::Object(o) => get_iris_from_object(&o, iris),
-        _ => {}
+impl From<SerdeError> for Error {
+    fn from(e : SerdeError) -> Self {
+        Error::SerdeError(e)
     }
-}
-
-pub fn ldtab_get_iris(row: &SqliteRow) -> HashSet<String> {
-    let subject: &str = row.get("subject");
-    let predicate: &str = row.get("predicate");
-    let object: &str = row.get("object");
-    let datatype: &str = row.get("datatype");
-
-    //NB: an LDTab thick triple makes use of strings (which are not JSON strings
-    //example: "this is a string" and "\"this is a JSON string\"".).
-    let object_value = match from_str::<Value>(object) {
-        Ok(x) => x,
-        _ => json!(object),
-    };
-
-    //add datatype to object
-    let object_datatype = json!({"object" : object_value, "datatype" : datatype});
-
-    let mut iris = HashSet::new();
-    get_iris(&object_datatype, &mut iris);
-    iris.insert(String::from(subject));
-    iris.insert(String::from(predicate));
-
-    iris
-}
-
-// ################################################
-// ######## putting things toghether ##############
-// ################################################
-pub async fn get_json_map(subject: &str, pool: &SqlitePool) -> Result<Value, sqlx::Error> {
-    let properties = get_subject_map(subject, &pool).await;
-    let labels = get_label_map(subject, &pool).await;
-    let prefixes = get_prefix_map(subject, &pool).await;
-
-    let mut json_map = Map::new();
-    if let Ok(object) = properties {
-        match object {
-            Value::Object(mut map) => json_map.append(&mut map),
-            _ => panic!(),
-        }
-    }
-
-    if let Ok(object) = labels {
-        match object {
-            Value::Object(mut map) => json_map.append(&mut map),
-            _ => panic!(),
-        }
-    }
-
-    if let Ok(object) = prefixes {
-        match object {
-            Value::Object(mut map) => json_map.append(&mut map),
-            _ => panic!(),
-        }
-    }
-
-    Ok(Value::Object(json_map))
 }
 
 // ################################################
 // ######## build prefix map ######################
 // ################################################
-pub async fn get_prefix_map(subject: &str, pool: &SqlitePool) -> Result<Value, sqlx::Error> {
-    //get triples for subject
-    let query = format!("SELECT * FROM statement WHERE subject='{}'", subject);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+//
+pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result<Value, Error> {
+    let mut json_map = Map::new();
 
-    //get all iris
-    let mut all_iris = HashSet::new();
-    for row in rows {
-        let iris = ldtab_get_iris(&row);
-        all_iris.extend(iris);
-    }
-
-    //collect all iris
-    let prefixes: HashSet<&str> = all_iris
+    let prefixes: HashSet<&str> = iris
         .iter()
         .map(|x| {
             let h = x.as_str();
@@ -136,7 +44,6 @@ pub async fn get_prefix_map(subject: &str, pool: &SqlitePool) -> Result<Value, s
         })
         .collect();
 
-    let mut json_map = Map::new();
     for p in prefixes {
         let query = format!("SELECT * FROM prefix WHERE prefix='{}'", p);
         let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
@@ -145,57 +52,39 @@ pub async fn get_prefix_map(subject: &str, pool: &SqlitePool) -> Result<Value, s
             let base: &str = r.get("base");
             json_map.insert(String::from(p), json!(base));
         }
-    }
+    } 
 
     Ok(json!({ "@prefixes": json_map }))
-}
+
+} 
 
 // ################################################
 // ######## build label map ####################
 // ################################################
 
-pub async fn get_label_map(subject: &str, pool: &SqlitePool) -> Result<Value, sqlx::Error> {
-    //get triples for subject
-    let query = format!("SELECT * FROM statement WHERE subject='{}'", subject);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+pub async fn get_label_map(iris : &HashSet<String>, pool: &SqlitePool) -> Result<Value, Error> {
 
     let mut entity_2_label = HashMap::new();
 
     //get labels for all subjects
-    for row in rows {
-        let labels = get_labels(&row, pool).await;
-        entity_2_label.extend(labels);
+    for i in iris {
+        let label = get_label(&i, pool).await;
+        match label {
+            Ok(x) => { entity_2_label.insert(i,x); },
+            Err(_x) => {},//TODO
+        };
     }
 
     //merge label maps
     let mut json_map = Map::new();
     for (k, v) in entity_2_label {
-        json_map.insert(k, json!(v));
+        json_map.insert(k.clone(), json!(v));
     }
 
     Ok(json!({ "@labels": json_map }))
-}
+} 
 
-pub async fn get_labels(
-    ldtab_thick_triple: &SqliteRow,
-    pool: &SqlitePool,
-) -> HashMap<String, String> {
-    let iris = ldtab_get_iris(ldtab_thick_triple);
-    let mut entity_2_label = HashMap::new();
-
-    for iri in iris {
-        match get_label(&iri, pool).await {
-            Ok((entity, label)) => {
-                entity_2_label.insert(entity, label);
-            }
-            _ => {}
-        };
-    }
-
-    entity_2_label
-}
-
-pub async fn get_label(entity: &str, pool: &SqlitePool) -> Result<(String, String), sqlx::Error> {
+pub async fn get_label(entity: &str, pool: &SqlitePool) -> Result<String, Error> {
     let query = format!(
         "SELECT * FROM statement WHERE subject='{}' AND predicate='rdfs:label'",
         entity
@@ -204,18 +93,18 @@ pub async fn get_label(entity: &str, pool: &SqlitePool) -> Result<(String, Strin
 
     //NB: this should be a singleton
     for row in rows {
-        let subject: &str = row.get("subject");
+        //let subject: &str = row.get("subject");
         let label: &str = row.get("object");
-        return Ok((String::from(subject), String::from(label)));
+        return Ok(String::from(label));
     }
 
-    Err(sqlx::Error::RowNotFound)
+    Err(Error::SQLError(sqlx::Error::RowNotFound))
 }
 
 // ################################################
 // ######## build property map ####################
 // ################################################
-pub async fn get_subject_map(subject: &str, pool: &SqlitePool) -> Result<Value, sqlx::Error> {
+pub async fn get_subject_map(subject: &str, pool: &SqlitePool) -> Result<Value, Error> {
     let query = format!("SELECT * FROM statement WHERE subject='{}'", subject);
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -225,13 +114,46 @@ pub async fn get_subject_map(subject: &str, pool: &SqlitePool) -> Result<Value, 
     for p in predicates {
         match p {
             Value::Object(mut x) => predicate_map.append(&mut x),
-            _ => panic!(),
+            //TODO: what's an idiomatic of nesting errors?
+            _ => return Err(Error::SerdeError(SerdeError::NotAnObject(format!("Given Value: {}", p.to_string())))),
+        }
+    } 
+
+    //1. predicate map
+    let subject_map = json!({ subject: predicate_map }); 
+
+    //extract IRIs
+    let mut iris = HashSet::new();
+    signature::get_iris(&subject_map, &mut iris); 
+
+    //2. labels
+    let label_map = get_label_map(&iris, pool).await; 
+
+    //3. prefixes
+    let prefix_map = get_prefix_map(&iris, pool).await;
+
+    //4. putting things together
+    let mut json_map = Map::new(); 
+    match subject_map {
+        Value::Object(mut map) => json_map.append(&mut map),
+        _ => return Err(Error::SerdeError(SerdeError::NotAMap(format!("Given Value: {}", subject_map.to_string())))),
+    }
+
+    if let Ok(object) = label_map {
+        match object {
+            Value::Object(mut map) => json_map.append(&mut map),
+            _ => return Err(Error::SerdeError(SerdeError::NotAMap(format!("Given Value: {}", object.to_string())))),
         }
     }
 
-    let subject_map = json!({ subject: predicate_map });
+    if let Ok(object) = prefix_map {
+        match object {
+            Value::Object(mut map) => json_map.append(&mut map),
+            _ => return Err(Error::SerdeError(SerdeError::NotAMap(format!("Given Value: {}", object.to_string())))),
+        }
+    } 
 
-    Ok(subject_map)
+    Ok(Value::Object(json_map))
 }
 
 pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
