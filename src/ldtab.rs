@@ -104,6 +104,14 @@ pub async fn get_label(entity: &str, pool: &SqlitePool) -> Result<String, Error>
 // ################################################
 // ######## build property map ####################
 // ################################################
+pub async fn get_json_representation(subject: &str, pool: &SqlitePool) -> Result<String, Error> {
+    let json_map = get_subject_map(subject, pool).await;
+    match json_map {
+        Ok(x) => Ok(x.to_string()),
+        Err(x) => Err(x)
+    }
+}
+
 pub async fn get_subject_map(subject: &str, pool: &SqlitePool) -> Result<Value, Error> {
     let query = format!("SELECT * FROM statement WHERE subject='{}'", subject);
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
