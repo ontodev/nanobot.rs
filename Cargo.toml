@@ -24,6 +24,7 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 tree-sitter = "0.20.6"
 tree-sitter-sqlrest = { path = "../tree-sitter-sqlrest" }
 urlencoding = "2.1.2"
+wiring_rs = { git = "https://github.com/ontodev/wiring.rs" }
 
 [build-dependencies]
 cc = "1.0"
