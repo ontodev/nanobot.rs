@@ -4,26 +4,26 @@ use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::util::signature;
 
-#[derive(Debug)] 
+#[derive(Debug)]
 pub enum SerdeError {
     NotAMap(String),
-    NotAnObject(String), 
-} 
+    NotAnObject(String),
+}
 
-#[derive(Debug)] 
+#[derive(Debug)]
 pub enum Error {
     SerdeError(SerdeError),
-    SQLError(sqlx::Error), 
+    SQLError(sqlx::Error),
 }
 
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         Error::SQLError(e)
-    } 
+    }
 }
 
 impl From<SerdeError> for Error {
-    fn from(e : SerdeError) -> Self {
+    fn from(e: SerdeError) -> Self {
         Error::SerdeError(e)
     }
 }
@@ -52,26 +52,30 @@ pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result
             let base: &str = r.get("base");
             json_map.insert(String::from(p), json!(base));
         }
-    } 
+    }
 
     Ok(json!({ "@prefixes": json_map }))
-
-} 
+}
 
 // ################################################
 // ######## build label map ####################
 // ################################################
 
-pub async fn get_label_map(iris : &HashSet<String>, pool: &SqlitePool) -> Result<Value, Error> {
-
+pub async fn get_label_map(
+    iris: &HashSet<String>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, Error> {
     let mut entity_2_label = HashMap::new();
 
     //get labels for all subjects
     for i in iris {
-        let label = get_label(&i, pool).await;
+        let label = get_label(&i, table, pool).await;
         match label {
-            Ok(x) => { entity_2_label.insert(i,x); },
-            Err(_x) => {},//TODO
+            Ok(x) => {
+                entity_2_label.insert(i, x);
+            }
+            Err(_x) => {} //TODO
         };
     }
 
@@ -82,12 +86,12 @@ pub async fn get_label_map(iris : &HashSet<String>, pool: &SqlitePool) -> Result
     }
 
     Ok(json!({ "@labels": json_map }))
-} 
+}
 
-pub async fn get_label(entity: &str, pool: &SqlitePool) -> Result<String, Error> {
+pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
     let query = format!(
-        "SELECT * FROM statement WHERE subject='{}' AND predicate='rdfs:label'",
-        entity
+        "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
+        table, entity
     );
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
@@ -104,16 +108,24 @@ pub async fn get_label(entity: &str, pool: &SqlitePool) -> Result<String, Error>
 // ################################################
 // ######## build property map ####################
 // ################################################
-pub async fn get_json_representation(subject: &str, pool: &SqlitePool) -> Result<String, Error> {
-    let json_map = get_subject_map(subject, pool).await;
+pub async fn get_json_representation(
+    subject: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<String, Error> {
+    let json_map = get_subject_map(subject, table, pool).await;
     match json_map {
         Ok(x) => Ok(x.to_string()),
-        Err(x) => Err(x)
+        Err(x) => Err(x),
     }
 }
 
-pub async fn get_subject_map(subject: &str, pool: &SqlitePool) -> Result<Value, Error> {
-    let query = format!("SELECT * FROM statement WHERE subject='{}'", subject);
+pub async fn get_subject_map(
+    subject: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, Error> {
+    let query = format!("SELECT * FROM {} WHERE subject='{}'", table, subject);
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     let predicates: Vec<Value> = rows.iter().map(|row| ldtab_2_json_shape(row)).collect();
@@ -123,43 +135,63 @@ pub async fn get_subject_map(subject: &str, pool: &SqlitePool) -> Result<Value, 
         match p {
             Value::Object(mut x) => predicate_map.append(&mut x),
             //TODO: what's an idiomatic of nesting errors?
-            _ => return Err(Error::SerdeError(SerdeError::NotAnObject(format!("Given Value: {}", p.to_string())))),
+            _ => {
+                return Err(Error::SerdeError(SerdeError::NotAnObject(format!(
+                    "Given Value: {}",
+                    p.to_string()
+                ))))
+            }
         }
-    } 
+    }
 
     //1. predicate map
-    let subject_map = json!({ subject: predicate_map }); 
+    let subject_map = json!({ subject: predicate_map });
 
     //extract IRIs
     let mut iris = HashSet::new();
-    signature::get_iris(&subject_map, &mut iris); 
+    signature::get_iris(&subject_map, &mut iris);
 
     //2. labels
-    let label_map = get_label_map(&iris, pool).await; 
+    let label_map = get_label_map(&iris, table, pool).await;
 
     //3. prefixes
     let prefix_map = get_prefix_map(&iris, pool).await;
 
     //4. putting things together
-    let mut json_map = Map::new(); 
+    let mut json_map = Map::new();
     match subject_map {
         Value::Object(mut map) => json_map.append(&mut map),
-        _ => return Err(Error::SerdeError(SerdeError::NotAMap(format!("Given Value: {}", subject_map.to_string())))),
+        _ => {
+            return Err(Error::SerdeError(SerdeError::NotAMap(format!(
+                "Given Value: {}",
+                subject_map.to_string()
+            ))))
+        }
     }
 
     if let Ok(object) = label_map {
         match object {
             Value::Object(mut map) => json_map.append(&mut map),
-            _ => return Err(Error::SerdeError(SerdeError::NotAMap(format!("Given Value: {}", object.to_string())))),
+            _ => {
+                return Err(Error::SerdeError(SerdeError::NotAMap(format!(
+                    "Given Value: {}",
+                    object.to_string()
+                ))))
+            }
         }
     }
 
     if let Ok(object) = prefix_map {
         match object {
             Value::Object(mut map) => json_map.append(&mut map),
-            _ => return Err(Error::SerdeError(SerdeError::NotAMap(format!("Given Value: {}", object.to_string())))),
+            _ => {
+                return Err(Error::SerdeError(SerdeError::NotAMap(format!(
+                    "Given Value: {}",
+                    object.to_string()
+                ))))
+            }
         }
-    } 
+    }
 
     Ok(Value::Object(json_map))
 }
