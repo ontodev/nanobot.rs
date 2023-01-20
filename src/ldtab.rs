@@ -200,7 +200,7 @@ pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
     let predicate: &str = row.get("predicate");
     let object: &str = row.get("object");
     let datatype: &str = row.get("datatype");
-    //let  annotation : &str = row.get("annotation");//TODO
+    let annotation: &str = row.get("annotation");
 
     //NB: an LDTab thick triple makes use of strings (which are not JSON strings
     //example: "this is a string" and "\"this is a JSON string\"".).
@@ -209,8 +209,13 @@ pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
         _ => json!(object),
     };
 
-    //add datatype to object
-    let object_datatype = json!({"object" : object_value, "datatype" : datatype});
+    //handle annotations
+    let object_datatype = match from_str::<Value>(annotation) {
+        Ok(annotation_value) => {
+            json!({"object" : object_value, "datatype" : datatype, "annotation" : annotation_value})
+        }
+        _ => json!({"object" : object_value, "datatype" : datatype}),
+    };
 
     //put things into map
     json!({ predicate: vec![object_datatype] })
