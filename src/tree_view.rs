@@ -135,7 +135,10 @@ pub fn get_json_tree(
                 let v = get_json_tree(subs, class_2_subclasses);
                 map.insert(element_string, v);
             }
-            None => return json!(element), //NB: there should only be the 'target' entity at the lowest level
+            None => {
+                let v = json!("owl:Nothing");
+                map.insert(element_string, v);
+            }
         }
     }
 
@@ -153,18 +156,30 @@ pub async fn get_json_tree_view(
     let has_part_subject = has_part_subject.replace("entity", entity);
 
     //recursive query computing the transitive closure of rdfs:subClassOf in an LDTab database
-    let query =
-        format!(
-    "WITH RECURSIVE tc( subject, object )
-  AS ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
+    let query = format!("WITH RECURSIVE
+    superclasses( subject, object ) AS
+    ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
         UNION ALL
        SELECT subject, object FROM {table} WHERE subject='{has_part}' AND predicate='rdfs:subClassOf'
         UNION ALL
-        SELECT {table}.subject, {table}.object FROM {table}, tc WHERE {table}.subject = tc.object AND {table}.predicate='rdfs:subClassOf'
+        SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
+     ),
+    subclasses( subject, object ) AS
+    ( SELECT subject, object FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'
+        UNION ALL
+       SELECT subject, object FROM {table} WHERE object='{has_part}' AND predicate='rdfs:subClassOf'
+        UNION ALL
+        SELECT {table}.subject, {table}.object FROM {table}, subclasses WHERE {table}.object = subclasses.subject AND {table}.predicate='rdfs:subClassOf'
      )
-  SELECT * FROM tc;", table=table, entity=entity, has_part=has_part_subject);
+  SELECT * FROM superclasses
+  UNION ALL 
+  SELECT * FROM subclasses;", table=table, entity=entity, has_part=has_part_subject);
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    get_json_tree_view_by_query(pool, &query).await
+}
+
+pub async fn get_json_tree_view_by_query(pool: &SqlitePool, query: &str) -> Result<Value, Error> {
+    let rows: Vec<SqliteRow> = sqlx::query(query).fetch_all(pool).await?;
 
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
     let mut classes: HashSet<String> = HashSet::new();
