@@ -2,6 +2,7 @@ use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
+use wiring_rs::util::signature;
 
 #[derive(Debug)]
 pub enum SerdeError {
@@ -26,6 +27,76 @@ impl From<SerdeError> for Error {
         Error::SerdeError(e)
     }
 }
+
+// ################################################
+// ######## build label map ######################
+// ################################################
+
+pub async fn get_label_map(
+    iris: &HashSet<String>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, Error> {
+    let mut entity_2_label = HashMap::new();
+
+    //get labels for all subjects
+    for i in iris {
+        let label = get_label(&i, table, pool).await;
+        match label {
+            Ok(x) => {
+                entity_2_label.insert(i, x);
+            }
+            Err(_x) => {} //TODO
+        };
+    }
+
+    //merge label maps
+    let mut json_map = Map::new();
+    for (k, v) in entity_2_label {
+        json_map.insert(k.clone(), json!(v));
+    }
+
+    Ok(json!({ "@labels": json_map }))
+}
+
+pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
+    let query = format!(
+        "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
+        table, entity
+    );
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+    //NB: this should be a singleton
+    for row in rows {
+        //let subject: &str = row.get("subject");
+        let label: &str = row.get("object");
+        return Ok(String::from(label));
+    }
+
+    Err(Error::SQLError(sqlx::Error::RowNotFound))
+}
+
+pub fn get_iris(row: &SqliteRow) -> HashSet<String> {
+    let mut iris: HashSet<String> = HashSet::new();
+
+    let subject: &str = row.get("subject");
+    //predicate is always rdfs:subClassOf
+    let object: &str = row.get("object");
+
+    let object_value = match from_str::<Value>(object) {
+        Ok(x) => x,
+        _ => json!(object),
+    };
+
+    signature::get_iris(&object_value, &mut iris);
+    iris.insert(String::from(subject));
+
+    iris
+}
+
+// ################################################
+// ######## build tree view #######################
+// ################################################
 
 pub fn check_has_part_property(value: &Value) -> bool {
     match value {
@@ -175,10 +246,14 @@ pub async fn get_json_tree_view(
   UNION ALL 
   SELECT * FROM subclasses;", table=table, entity=entity, has_part=has_part_subject);
 
-    get_json_tree_view_by_query(pool, &query).await
+    get_json_tree_view_by_query(table, pool, &query).await
 }
 
-pub async fn get_json_tree_view_by_query(pool: &SqlitePool, query: &str) -> Result<Value, Error> {
+pub async fn get_json_tree_view_by_query(
+    table: &str,
+    pool: &SqlitePool,
+    query: &str,
+) -> Result<Value, Error> {
     let rows: Vec<SqliteRow> = sqlx::query(query).fetch_all(pool).await?;
 
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
@@ -189,6 +264,8 @@ pub async fn get_json_tree_view_by_query(pool: &SqlitePool, query: &str) -> Resu
     //given all non-root classes,
     //root classes can be identified by the set differences of all classes and non-root classes
     let mut roots: HashSet<String> = HashSet::new();
+
+    let mut iris: HashSet<String> = HashSet::new();
 
     for row in rows {
         //axiom structure: subject rdfs:subClassOf object
@@ -215,7 +292,12 @@ pub async fn get_json_tree_view_by_query(pool: &SqlitePool, query: &str) -> Resu
                 class_2_subclasses.insert(object_string, subclasses);
             }
         }
+
+        iris.extend(get_iris(&row));
     }
+
+    //TODO: combine tree view and label map
+    let label_map = get_label_map(&iris, table, pool).await;
 
     //we want to have a tree view that only displays named classes and existential restrictions
     //using hasPart. So, we need to filter out all unwanted class expressions, e.g., intersections,
