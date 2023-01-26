@@ -98,12 +98,12 @@ pub fn get_iris(row: &SqliteRow) -> HashSet<String> {
 // ######## build tree view #######################
 // ################################################
 
-pub fn check_has_part_property(value: &Value) -> bool {
+pub fn check_part_of_property(value: &Value) -> bool {
     match value {
         Value::Object(x) => {
             let property = x.get("object").unwrap();
-            let has_part = json!("obo:BFO_0000051"); //'has part' relation
-            property.eq(&has_part)
+            let part_of = json!("obo:BFO_0000050"); //'part of' relation
+            property.eq(&part_of)
         }
         _ => false,
     }
@@ -131,7 +131,7 @@ pub fn check_has_part_restriction(value: &Map<String, Value>) -> bool {
         let filler = value.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
         //let rdf_type = value.get("rdf:type").unwrap().as_array().unwrap()[0]; //not necessary
 
-        check_has_part_property(&property) & check_filler(&filler)
+        check_part_of_property(&property) & check_filler(&filler)
     } else {
         false
     }
@@ -223,28 +223,38 @@ pub async fn get_json_tree_view(
 ) -> Result<Value, Error> {
     //create existential restriction with hasPart
     //NB: we are relying on LDTab triples being sorted for string comparisons
-    let has_part_subject = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000051"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
-    let has_part_subject = has_part_subject.replace("entity", entity);
+    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
+    let part_of = part_of.replace("entity", entity);
 
-    //recursive query computing the transitive closure of rdfs:subClassOf in an LDTab database
+
     let query = format!("WITH RECURSIVE
     superclasses( subject, object ) AS
     ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
         UNION ALL
-       SELECT subject, object FROM {table} WHERE subject='{has_part}' AND predicate='rdfs:subClassOf'
+       SELECT subject, object FROM {table} WHERE subject='{part_of}' AND predicate='rdfs:subClassOf'
+        UNION ALL
+        SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
+     ) SELECT * FROM superclasses;", table=table, entity=entity, part_of=part_of);
+
+    //recursive query computing the transitive closure of rdfs:subClassOf in an LDTab database
+    let query_combined = format!("WITH RECURSIVE
+    superclasses( subject, object ) AS
+    ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
+        UNION ALL
+       SELECT subject, object FROM {table} WHERE subject='{part_of}' AND predicate='rdfs:subClassOf'
         UNION ALL
         SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
      ),
     subclasses( subject, object ) AS
     ( SELECT subject, object FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'
         UNION ALL
-       SELECT subject, object FROM {table} WHERE object='{has_part}' AND predicate='rdfs:subClassOf'
+       SELECT subject, object FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'
         UNION ALL
         SELECT {table}.subject, {table}.object FROM {table}, subclasses WHERE {table}.object = subclasses.subject AND {table}.predicate='rdfs:subClassOf'
      )
   SELECT * FROM superclasses
   UNION ALL 
-  SELECT * FROM subclasses;", table=table, entity=entity, has_part=has_part_subject);
+  SELECT * FROM subclasses;", table=table, entity=entity, part_of=part_of);
 
     get_json_tree_view_by_query(table, pool, &query).await
 }
