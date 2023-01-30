@@ -1,3 +1,4 @@
+use async_recursion::async_recursion;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
@@ -25,6 +26,13 @@ impl From<sqlx::Error> for Error {
 impl From<SerdeError> for Error {
     fn from(e: SerdeError) -> Self {
         Error::SerdeError(e)
+    }
+}
+
+pub fn ldtab_2_value(input: &str) -> Value {
+    match from_str::<Value>(input) {
+        Ok(x) => x,
+        _ => json!(input),
     }
 }
 
@@ -83,10 +91,7 @@ pub fn get_iris(row: &SqliteRow) -> HashSet<String> {
     //predicate is always rdfs:subClassOf
     let object: &str = row.get("object");
 
-    let object_value = match from_str::<Value>(object) {
-        Ok(x) => x,
-        _ => json!(object),
-    };
+    let object_value = ldtab_2_value(object);
 
     signature::get_iris(&object_value, &mut iris);
     iris.insert(String::from(subject));
@@ -122,7 +127,7 @@ pub fn check_filler(value: &Value) -> bool {
     }
 }
 
-pub fn check_has_part_restriction(value: &Map<String, Value>) -> bool {
+pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
     if value.contains_key("owl:onProperty")
         & value.contains_key("owl:someValuesFrom")
         & value.contains_key("rdf:type")
@@ -135,6 +140,27 @@ pub fn check_has_part_restriction(value: &Map<String, Value>) -> bool {
     } else {
         false
     }
+}
+
+pub fn get_class_2_superclasses(
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+) -> HashMap<String, HashSet<String>> {
+    let mut class_2_superclasses: HashMap<String, HashSet<String>> = HashMap::new();
+    for (key, value) in class_2_subclasses {
+        for v in value {
+            match class_2_superclasses.get_mut(v) {
+                Some(x) => {
+                    x.insert(key.clone());
+                }
+                None => {
+                    let mut superclasses = HashSet::new();
+                    superclasses.insert(key.clone());
+                    class_2_superclasses.insert(v.clone(), superclasses);
+                }
+            }
+        }
+    }
+    class_2_superclasses
 }
 
 pub fn remove_invalid_class(
@@ -161,14 +187,11 @@ pub fn remove_invalid_classes(class_2_subclasses: &mut HashMap<String, HashSet<S
     for k in class_2_subclasses.keys() {
         //NB: an LDTab thick triple makes use of strings (which are not JSON strings
         //example: "this is a string" and "\"this is a JSON string\"".).
-        let key_value = match from_str::<Value>(k) {
-            Ok(x) => x,
-            _ => json!(k),
-        };
+        let key_value = ldtab_2_value(k);
 
         let valid = match key_value {
             Value::String(_x) => true,
-            Value::Object(x) => check_has_part_restriction(&x),
+            Value::Object(x) => check_part_of_restriction(&x),
             _ => false,
         };
 
@@ -182,28 +205,57 @@ pub fn remove_invalid_classes(class_2_subclasses: &mut HashMap<String, HashSet<S
     }
 }
 
+pub fn reachable(
+    start: &str,
+    end: &str,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+) -> bool {
+    if start.eq(end) {
+        return true;
+    }
+    match class_2_subclasses.get(start) {
+        Some(x) => {
+            if x.contains(end) {
+                true
+            } else {
+                let mut reachable_it = false;
+                for next in x {
+                    reachable_it = reachable_it | reachable(next, end, class_2_subclasses);
+                }
+                reachable_it
+            }
+        }
+        None => false,
+    }
+}
+
 //given a set of root-classes and a map from classes to subclasses,
 //return a JSON encoding
 //TODO: example/doc test
 pub fn get_json_tree(
+    entity: &str,
     level: &HashSet<String>,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> Value {
     let mut map = Map::new();
     for element in level {
+        if !reachable(element, entity, class_2_subclasses) {
+            continue;
+        }
+
         let element_string = match from_str::<Value>(element) {
             Ok(x) => {
                 let get_first = x.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
                 let object = get_first.get("object").unwrap();
                 let filler = object.as_str().unwrap();
-                format!("hasPart {}", filler)
+                format!("partOf {}", filler)
             }
             _ => String::from(element),
         };
 
         match class_2_subclasses.get(element) {
             Some(subs) => {
-                let v = get_json_tree(subs, class_2_subclasses);
+                let v = get_json_tree(entity, subs, class_2_subclasses);
                 map.insert(element_string, v);
             }
             None => {
@@ -216,80 +268,52 @@ pub fn get_json_tree(
     Value::Object(map)
 }
 
-pub async fn get_json_tree_view(
+#[async_recursion]
+pub async fn get_class_map(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<Value, Error> {
-    //create existential restriction with hasPart
-    //NB: we are relying on LDTab triples being sorted for string comparisons
-    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
-    let part_of = part_of.replace("entity", entity);
-
+) -> Result<HashMap<String, HashSet<String>>, Error> {
+    let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
     let query = format!("WITH RECURSIVE
     superclasses( subject, object ) AS
     ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
         UNION ALL
-       SELECT subject, object FROM {table} WHERE subject='{part_of}' AND predicate='rdfs:subClassOf'
-        UNION ALL
         SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
-     ) SELECT * FROM superclasses;", table=table, entity=entity, part_of=part_of);
+     ) SELECT * FROM superclasses;", table=table, entity=entity);
 
-    //recursive query computing the transitive closure of rdfs:subClassOf in an LDTab database
-    let query_combined = format!("WITH RECURSIVE
-    superclasses( subject, object ) AS
-    ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
-        UNION ALL
-       SELECT subject, object FROM {table} WHERE subject='{part_of}' AND predicate='rdfs:subClassOf'
-        UNION ALL
-        SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
-     ),
-    subclasses( subject, object ) AS
-    ( SELECT subject, object FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'
-        UNION ALL
-       SELECT subject, object FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'
-        UNION ALL
-        SELECT {table}.subject, {table}.object FROM {table}, subclasses WHERE {table}.object = subclasses.subject AND {table}.predicate='rdfs:subClassOf'
-     )
-  SELECT * FROM superclasses
-  UNION ALL 
-  SELECT * FROM subclasses;", table=table, entity=entity, part_of=part_of);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
-    get_json_tree_view_by_query(table, pool, &query).await
-}
-
-pub async fn get_json_tree_view_by_query(
-    table: &str,
-    pool: &SqlitePool,
-    query: &str,
-) -> Result<Value, Error> {
-    let rows: Vec<SqliteRow> = sqlx::query(query).fetch_all(pool).await?;
-
-    let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut classes: HashSet<String> = HashSet::new();
-    //a class A is not a root in the tree/forest to be constructed,
-    //if there exist an axiom of the form 'A rdfs:subClassOf B',
-    let mut non_roots: HashSet<String> = HashSet::new();
-    //given all non-root classes,
-    //root classes can be identified by the set differences of all classes and non-root classes
-    let mut roots: HashSet<String> = HashSet::new();
-
-    let mut iris: HashSet<String> = HashSet::new();
+    let mut part_of_link: HashSet<String> = HashSet::new();
 
     for row in rows {
         //axiom structure: subject rdfs:subClassOf object
         let subject: &str = row.get("subject");
         let object: &str = row.get("object");
 
+        let object_value = ldtab_2_value(object);
+
+        let part_of_restriction = match object_value.clone() {
+            Value::Object(x) => check_part_of_restriction(&x),
+            _ => false,
+        };
+
+        if part_of_restriction {
+            //NB: these unwraps are safe because we checked them before
+            let part_of_filler = object_value
+                .get("owl:someValuesFrom")
+                .unwrap()
+                .as_array()
+                .unwrap()[0]
+                .clone();
+            let part_of_filler = part_of_filler.get("object").unwrap();
+            let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
+            part_of_link.insert(part_of_filler_string);
+        }
+
         let subject_string = String::from(subject);
         let object_string = String::from(object);
-
-        //collect classes
-        classes.insert(subject_string.clone());
-        classes.insert(object_string.clone());
-        //identify non-root classes
-        non_roots.insert(subject_string.clone());
 
         //add subclass information into class_2_subclasses map
         match class_2_subclasses.get_mut(&object_string) {
@@ -302,29 +326,116 @@ pub async fn get_json_tree_view_by_query(
                 class_2_subclasses.insert(object_string, subclasses);
             }
         }
-
-        iris.extend(get_iris(&row));
     }
 
+    for link in part_of_link {
+        let part_of_class_map = get_class_map(&link, table, pool).await;
+        match part_of_class_map {
+            Ok(x) => {
+                for (key, value) in x {
+                    match class_2_subclasses.get_mut(&key) {
+                        Some(x) => {
+                            x.extend(value.clone());
+                        }
+                        None => {
+                            class_2_subclasses.insert(key.clone(), value.clone());
+                        }
+                    }
+                }
+            }
+            Err(x) => return Err(x),
+        }
+    }
+
+    Ok(class_2_subclasses)
+}
+
+pub async fn get_json_tree_view(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, Error> {
+    //a class A is not a root in the tree/forest to be constructed,
+    //if there exist an axiom of the form 'A rdfs:subClassOf B',
+    let mut non_roots: HashSet<String> = HashSet::new();
+    //given all non-root classes,
+    //root classes can be identified by the set differences of all classes and non-root classes
+    let mut roots: HashSet<String> = HashSet::new();
+
+    let mut iris: HashSet<String> = HashSet::new();
+    let mut part_of_fillers: HashSet<(String, String)> = HashSet::new();
+
+    //get map from classes to their subclasses (including the 'part of' hierarchy)
+    let mut class_2_subclasses = match get_class_map(entity, table, pool).await {
+        Ok(x) => x,
+        Err(x) => return Err(x),
+    };
+
     //TODO: combine tree view and label map
-    let label_map = get_label_map(&iris, table, pool).await;
+    //let label_map = get_label_map(&iris, table, pool).await;
 
     //we want to have a tree view that only displays named classes and existential restrictions
     //using hasPart. So, we need to filter out all unwanted class expressions, e.g., intersections,
     //unions, etc.
     remove_invalid_classes(&mut class_2_subclasses);
 
-    //identify 'valid' roots ('valid' being understood as defined above)
-    let keys: HashSet<String> = class_2_subclasses.clone().into_keys().collect();
-    for c in classes {
-        //check all collected classes
-        if !non_roots.contains(&c) & keys.contains(&c) {
-            //set difference + validity check
-            roots.insert(c.clone());
+    let class_2_superclasses = get_class_2_superclasses(&class_2_subclasses);
+
+    for (key, value) in &class_2_subclasses {
+        //identify non_roots
+        non_roots.extend(value.clone());
+
+        let object_value = ldtab_2_value(key);
+
+        let part_of_restriction = match object_value.clone() {
+            Value::Object(x) => check_part_of_restriction(&x),
+            _ => false,
+        };
+
+        if part_of_restriction {
+            //NB: these unwraps are safe because we checked them before
+            let part_of_filler = object_value
+                .get("owl:someValuesFrom")
+                .unwrap()
+                .as_array()
+                .unwrap()[0]
+                .clone();
+            let part_of_filler = part_of_filler.get("object").unwrap();
+            let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
+            if class_2_superclasses.contains_key(&part_of_filler_string) {
+                //TODO: errror
+                non_roots.insert(key.clone());
+            }
+            //collect information about part-of hierarchy: (filler,restriction)
+            part_of_fillers.insert((part_of_filler_string.clone(), key.clone()));
         }
     }
 
-    let json_view = get_json_tree(&roots, &class_2_subclasses);
+    //add part-of hierarchy to subclass map
+    for (filler, restriction) in part_of_fillers {
+        match class_2_superclasses.get(&filler) {
+            Some(x) => {
+                for superclass in x {
+                    match class_2_subclasses.get_mut(superclass) {
+                        Some(y) => {
+                            y.insert(restriction.clone());
+                        }
+                        None => {}
+                    }
+                }
+            }
+            None => {}
+        }
+    }
+
+    //initialise roots
+    for (key, _value) in &class_2_subclasses {
+        if !non_roots.contains(key) {
+            roots.insert(key.clone());
+        }
+    }
+
+    let json_view = get_json_tree(entity, &roots, &class_2_subclasses);
 
     Ok(json_view)
 }
