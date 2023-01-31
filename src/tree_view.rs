@@ -232,7 +232,7 @@ pub fn reachable(
 //given a set of root-classes and a map from classes to subclasses,
 //return a JSON encoding
 //TODO: example/doc test
-pub fn get_json_tree(
+pub fn get_json_superclass_tree(
     entity: &str,
     level: &HashSet<String>,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -255,7 +255,7 @@ pub fn get_json_tree(
 
         match class_2_subclasses.get(element) {
             Some(subs) => {
-                let v = get_json_tree(entity, subs, class_2_subclasses);
+                let v = get_json_superclass_tree(entity, subs, class_2_subclasses);
                 map.insert(element_string, v);
             }
             None => {
@@ -266,6 +266,26 @@ pub fn get_json_tree(
     }
 
     Value::Object(map)
+}
+
+pub async fn get_subclasses(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, Error> {
+    let mut subclasses = HashSet::new();
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'",
+        table = table,
+        entity = entity
+    );
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+        subclasses.insert(String::from(subject));
+    }
+
+    Ok(subclasses)
 }
 
 #[async_recursion]
@@ -435,7 +455,9 @@ pub async fn get_json_tree_view(
         }
     }
 
-    let json_view = get_json_tree(entity, &roots, &class_2_subclasses);
+    let subclasses = get_subclasses(entity, table, pool).await;
+
+    let json_view = get_json_superclass_tree(entity, &roots, &class_2_subclasses);
 
     Ok(json_view)
 }
