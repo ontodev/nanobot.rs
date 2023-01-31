@@ -84,18 +84,39 @@ pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<S
     Err(Error::SQLError(sqlx::Error::RowNotFound))
 }
 
-pub fn get_iris(row: &SqliteRow) -> HashSet<String> {
+pub fn get_iris_from_string(s: &str) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
 
-    let subject: &str = row.get("subject");
-    //predicate is always rdfs:subClassOf
-    let object: &str = row.get("object");
+    let value = ldtab_2_value(&s);
+    match value {
+        Value::String(x) => {
+            iris.insert(x);
+        }
+        _ => {
+            signature::get_iris(&value, &mut iris);
+        }
+    }
+    iris
+}
 
-    let object_value = ldtab_2_value(object);
+pub fn get_iris_from_subclass_map(
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+) -> HashSet<String> {
+    let mut iris: HashSet<String> = HashSet::new();
+    for (k, v) in class_2_subclasses {
+        iris.extend(get_iris_from_string(&k));
+        for vv in v {
+            iris.extend(get_iris_from_string(&vv));
+        }
+    }
+    iris
+}
 
-    signature::get_iris(&object_value, &mut iris);
-    iris.insert(String::from(subject));
-
+pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
+    let mut iris: HashSet<String> = HashSet::new();
+    for e in set {
+        iris.extend(get_iris_from_string(&e));
+    }
     iris
 }
 
@@ -405,7 +426,6 @@ pub async fn get_json_tree_view(
     //root classes can be identified by the set differences of all classes and non-root classes
     let mut roots: HashSet<String> = HashSet::new();
 
-    let mut iris: HashSet<String> = HashSet::new();
     let mut part_of_fillers: HashSet<(String, String)> = HashSet::new();
 
     //get map from classes to their subclasses (including the 'part of' hierarchy)
@@ -413,9 +433,6 @@ pub async fn get_json_tree_view(
         Ok(x) => x,
         Err(x) => return Err(x),
     };
-
-    //TODO: combine tree view and label map
-    //let label_map = get_label_map(&iris, table, pool).await;
 
     //we want to have a tree view that only displays named classes and existential restrictions
     //using hasPart. So, we need to filter out all unwanted class expressions, e.g., intersections,
@@ -480,8 +497,14 @@ pub async fn get_json_tree_view(
 
     let subclasses = get_subclasses(entity, table, pool).await;
     let sub_parts = get_sub_parts_of(entity, table, pool).await;
+    //TODO: get second level
 
     let json_view = get_json_superclass_tree(entity, &roots, &class_2_subclasses);
+
+    //TODO: combine tree view and label map
+    let iris = get_iris_from_subclass_map(&class_2_subclasses);
+    let iris_2 = get_iris_from_set(&sub_parts.as_ref().unwrap());
+    let label_map = get_label_map(&iris, table, pool).await;
 
     Ok(json_view)
 }
