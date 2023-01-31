@@ -268,6 +268,29 @@ pub fn get_json_superclass_tree(
     Value::Object(map)
 }
 
+pub async fn get_sub_parts_of(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, Error> {
+    let mut sub_parts = HashSet::new();
+    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
+    let part_of = part_of.replace("entity", entity);
+
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'",
+        table = table,
+        part_of = part_of
+    );
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+        sub_parts.insert(String::from(subject));
+    }
+
+    Ok(sub_parts)
+}
+
 pub async fn get_subclasses(
     entity: &str,
     table: &str,
@@ -456,6 +479,7 @@ pub async fn get_json_tree_view(
     }
 
     let subclasses = get_subclasses(entity, table, pool).await;
+    let sub_parts = get_sub_parts_of(entity, table, pool).await;
 
     let json_view = get_json_superclass_tree(entity, &roots, &class_2_subclasses);
 
