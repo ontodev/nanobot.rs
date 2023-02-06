@@ -257,26 +257,33 @@ pub fn get_json_superclass_tree(
     entity: &str,
     level: &HashSet<String>,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
+    part_of: bool, //TODO: introduce enum for different hierarchies
 ) -> Value {
     let mut map = Map::new();
     for element in level {
+        let mut nested_part_of = false;
         if !reachable(element, entity, class_2_subclasses) {
             continue;
         }
 
-        let element_string = match from_str::<Value>(element) {
+        let mut element_string = match from_str::<Value>(element) {
             Ok(x) => {
                 let get_first = x.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
                 let object = get_first.get("object").unwrap();
                 let filler = object.as_str().unwrap();
-                format!("partOf {}", filler)
+                nested_part_of = true;
+                String::from(filler)
             }
             _ => String::from(element),
         };
 
+        if part_of {
+            element_string = format!("partOf {}", element_string);
+        }
+
         match class_2_subclasses.get(element) {
             Some(subs) => {
-                let v = get_json_superclass_tree(entity, subs, class_2_subclasses);
+                let v = get_json_superclass_tree(entity, subs, class_2_subclasses, nested_part_of);
                 map.insert(element_string, v);
             }
             None => {
@@ -499,7 +506,7 @@ pub async fn get_json_tree_view(
     let sub_parts = get_sub_parts_of(entity, table, pool).await;
     //TODO: get second level
 
-    let json_view = get_json_superclass_tree(entity, &roots, &class_2_subclasses);
+    let json_view = get_json_superclass_tree(entity, &roots, &class_2_subclasses, false);
 
     //TODO: combine tree view and label map
     let iris = get_iris_from_subclass_map(&class_2_subclasses);
