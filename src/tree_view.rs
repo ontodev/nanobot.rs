@@ -400,21 +400,25 @@ pub async fn get_class_map(
     }
 
     for link in part_of_link {
-        let part_of_class_map = get_class_map(&link, table, pool).await;
-        match part_of_class_map {
-            Ok(x) => {
-                for (key, value) in x {
-                    match class_2_subclasses.get_mut(&key) {
-                        Some(x) => {
-                            x.extend(value.clone());
-                        }
-                        None => {
-                            class_2_subclasses.insert(key.clone(), value.clone());
+        if !class_2_subclasses.contains_key(&link){
+            //only query for new information if 
+            //a class was not involved in a previous recursive query
+            let part_of_class_map = get_class_map(&link, table, pool).await;
+            match part_of_class_map {
+                Ok(x) => {
+                    for (key, value) in x {
+                        match class_2_subclasses.get_mut(&key) {
+                            Some(x) => {
+                                x.extend(value.clone());
+                            }
+                            None => {
+                                class_2_subclasses.insert(key.clone(), value.clone());
+                            }
                         }
                     }
                 }
+                Err(x) => return Err(x),
             }
-            Err(x) => return Err(x),
         }
     }
 
