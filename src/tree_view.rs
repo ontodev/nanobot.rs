@@ -556,3 +556,59 @@ pub async fn get_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) ->
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
     build_tree(&roots, &class_2_subclasses, &class_2_parts)
 }
+
+pub fn build_labelled_tree(tree: &Value, label_map: &HashMap<String, String>) -> Value {
+    let mut json_map = Map::new();
+
+    match tree {
+        Value::Object(x) => {
+            for (k, v) in x {
+                if k.starts_with("partOf ") {
+                    let curie = k.strip_prefix("partOf ").unwrap();
+                    match label_map.get(curie) {
+                        Some(label) => {
+                            json_map.insert(
+                                format!("partOf {}", label),
+                                build_labelled_tree(v, label_map),
+                            );
+                        }
+                        None => {
+                            json_map.insert(k.clone(), build_labelled_tree(v, label_map));
+                        }
+                    }
+                } else {
+                    match label_map.get(k) {
+                        Some(label) => {
+                            json_map.insert(label.clone(), build_labelled_tree(v, label_map));
+                        }
+                        None => {
+                            json_map.insert(k.clone(), build_labelled_tree(v, label_map));
+                        }
+                    }
+                }
+            }
+        }
+        Value::String(x) => {
+            return Value::String(x.clone());
+        }
+        _ => {
+            json!("ERROR");
+        }
+    }
+    Value::Object(json_map)
+}
+
+pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    let (class_2_subclasses, class_2_parts) =
+        get_hierarchy_maps(entity, table, &pool).await.unwrap();
+    let roots = identify_roots(&class_2_subclasses, &class_2_parts);
+
+    let mut iris = HashSet::new();
+    iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
+    iris.extend(get_iris_from_subclass_map(&class_2_parts));
+
+    let label_hash_map = get_label_hash_map(&iris, table, pool).await;
+    let tree = build_tree(&roots, &class_2_subclasses, &class_2_parts);
+
+    build_labelled_tree(&tree, &label_hash_map)
+}
