@@ -1,4 +1,3 @@
-use async_recursion::async_recursion;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
@@ -65,6 +64,27 @@ pub async fn get_label_map(
     }
 
     Ok(json!({ "@labels": json_map }))
+}
+
+pub async fn get_label_hash_map(
+    iris: &HashSet<String>,
+    table: &str,
+    pool: &SqlitePool,
+) -> HashMap<String, String> {
+    let mut entity_2_label = HashMap::new();
+
+    //get labels for all subjects
+    for i in iris {
+        let label = get_label(&i, table, pool).await;
+        match label {
+            Ok(x) => {
+                entity_2_label.insert(i.clone(), x);
+            }
+            Err(_x) => {} //TODO
+        };
+    }
+
+    entity_2_label
 }
 
 pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
@@ -163,27 +183,6 @@ pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
     }
 }
 
-pub fn get_class_2_superclasses(
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-) -> HashMap<String, HashSet<String>> {
-    let mut class_2_superclasses: HashMap<String, HashSet<String>> = HashMap::new();
-    for (key, value) in class_2_subclasses {
-        for v in value {
-            match class_2_superclasses.get_mut(v) {
-                Some(x) => {
-                    x.insert(key.clone());
-                }
-                None => {
-                    let mut superclasses = HashSet::new();
-                    superclasses.insert(key.clone());
-                    class_2_superclasses.insert(v.clone(), superclasses);
-                }
-            }
-        }
-    }
-    class_2_superclasses
-}
-
 pub fn remove_invalid_class(
     target: &str,
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
@@ -199,154 +198,160 @@ pub fn remove_invalid_class(
     }
 }
 
+pub fn remove_invalid_classes(
+    class_2_subclasses: &mut HashMap<String, HashSet<String>>,
+    invalid: &HashSet<String>,
+) {
+    //remove invalid keys
+    for i in invalid {
+        class_2_subclasses.remove(i);
+    }
+    //remove invalid parts in values
+    for (_k, v) in class_2_subclasses.iter_mut() {
+        for i in invalid {
+            v.remove(i);
+        }
+    }
+}
+
 //TODO: doc string + doc test
 //we want to have a tree view that only displays named classes and existential restrictions
 //using hasPart. So, we need to filter out all unwanted class expressions, e.g., intersections,
 //unions, etc.
-pub fn remove_invalid_classes(class_2_subclasses: &mut HashMap<String, HashSet<String>>) {
+pub fn identify_invalid_classes(
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+) -> HashSet<String> {
     let mut invalid: HashSet<String> = HashSet::new();
-    for k in class_2_subclasses.keys() {
-        //NB: an LDTab thick triple makes use of strings (which are not JSON strings
-        //example: "this is a string" and "\"this is a JSON string\"".).
+    for (k, v) in class_2_subclasses {
         let key_value = ldtab_2_value(k);
 
         let valid = match key_value {
             Value::String(_x) => true,
-            Value::Object(x) => check_part_of_restriction(&x),
             _ => false,
         };
 
         if !valid {
+            //collect keys to remove
             invalid.insert(k.clone());
-        }
-    }
-
-    for k in invalid {
-        remove_invalid_class(&k, class_2_subclasses);
-    }
-}
-
-pub fn reachable(
-    start: &str,
-    end: &str,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-) -> bool {
-    if start.eq(end) {
-        return true;
-    }
-    match class_2_subclasses.get(start) {
-        Some(x) => {
-            if x.contains(end) {
-                true
-            } else {
-                let mut reachable_it = false;
-                for next in x {
-                    reachable_it = reachable_it | reachable(next, end, class_2_subclasses);
+        } else {
+            for sub in v.clone() {
+                //TODO: is it necessary to clone the set here?
+                let sub_value = ldtab_2_value(&sub);
+                let valid = match sub_value {
+                    Value::String(_x) => true,
+                    _ => false,
+                };
+                if !valid {
+                    invalid.insert(String::from(sub));
                 }
-                reachable_it
             }
         }
-        None => false,
     }
+    invalid
 }
 
-//given a set of root-classes and a map from classes to subclasses,
-//return a JSON encoding
-//TODO: example/doc test
-pub fn get_json_superclass_tree(
-    entity: &str,
-    level: &HashSet<String>,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    part_of: bool, //TODO: introduce enum for different hierarchies
-) -> Value {
-    let mut map = Map::new();
-    for element in level {
-        let mut nested_part_of = false;
-        if !reachable(element, entity, class_2_subclasses) {
-            continue;
-        }
-
-        let mut element_string = match from_str::<Value>(element) {
-            Ok(x) => {
-                let get_first = x.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
-                let object = get_first.get("object").unwrap();
-                let filler = object.as_str().unwrap();
-                nested_part_of = true;
-                String::from(filler)
-            }
-            _ => String::from(element),
-        };
-
-        if part_of {
-            element_string = format!("partOf {}", element_string);
-        }
-
-        match class_2_subclasses.get(element) {
-            Some(subs) => {
-                let v = get_json_superclass_tree(entity, subs, class_2_subclasses, nested_part_of);
-                map.insert(element_string, v);
+pub fn update_hierarchy_map(
+    to_update: &mut HashMap<String, HashSet<String>>,
+    updates: &HashMap<String, HashSet<String>>,
+) {
+    for (class, subclasses) in updates {
+        match to_update.get_mut(class) {
+            Some(x) => {
+                for sub in subclasses {
+                    if !x.contains(sub) {
+                        x.insert(sub.clone());
+                    }
+                }
             }
             None => {
-                let v = json!("owl:Nothing");
-                map.insert(element_string, v);
+                to_update.insert(class.clone(), subclasses.clone());
             }
         }
     }
-
-    Value::Object(map)
 }
 
-pub async fn get_sub_parts_of(
+pub fn identify_roots(
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+) -> HashSet<String> {
+    let mut roots = HashSet::new();
+
+    let mut keys = HashSet::new();
+    let mut values = HashSet::new();
+
+    for (k, v) in class_2_subclasses {
+        keys.insert(k);
+        values.extend(v);
+    }
+    for (k, v) in class_2_parts {
+        keys.insert(k);
+        values.extend(v);
+    }
+
+    for k in keys {
+        if !values.contains(k) {
+            roots.insert(k.clone());
+        }
+    }
+    roots
+}
+
+pub async fn get_hierarchy_maps(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, Error> {
-    let mut sub_parts = HashSet::new();
-    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
-    let part_of = part_of.replace("entity", entity);
+) -> Result<
+    (
+        HashMap<String, HashSet<String>>,
+        HashMap<String, HashSet<String>>,
+    ),
+    Error,
+> {
+    let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
+    let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
 
-    let query = format!(
-        "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'",
-        table = table,
-        part_of = part_of
-    );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-    for row in rows {
-        let subject: &str = row.get("subject");
-        sub_parts.insert(String::from(subject));
+    let mut updates = HashSet::new();
+    updates.insert(String::from(entity));
+
+    while !updates.is_empty() {
+        let mut new_parts: HashSet<String> = HashSet::new();
+
+        for update in &updates {
+            let subclasses_updates = get_class_2_subclass_map(&update, table, pool)
+                .await
+                .unwrap();
+            update_hierarchy_map(&mut class_2_subclasses, &subclasses_updates);
+
+            let parts_updates = get_part_of_information(&subclasses_updates).unwrap();
+            update_hierarchy_map(&mut class_2_parts, &parts_updates);
+
+            for part in parts_updates.keys() {
+                if !class_2_subclasses.contains_key(part) {
+                    new_parts.insert(part.clone());
+                }
+            }
+        }
+
+        updates.clear();
+        for new in new_parts {
+            updates.insert(new.clone());
+        }
     }
 
-    Ok(sub_parts)
+    let invalid = identify_invalid_classes(&class_2_subclasses);
+    remove_invalid_classes(&mut class_2_subclasses, &invalid);
+
+    Ok((class_2_subclasses, class_2_parts))
 }
 
-pub async fn get_subclasses(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<HashSet<String>, Error> {
-    let mut subclasses = HashSet::new();
-    let query = format!(
-        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'",
-        table = table,
-        entity = entity
-    );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-    for row in rows {
-        let subject: &str = row.get("subject");
-        subclasses.insert(String::from(subject));
-    }
-
-    Ok(subclasses)
-}
-
-#[async_recursion]
-pub async fn get_class_map(
+pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<HashMap<String, HashSet<String>>, Error> {
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
+    //recursive query handles 'is-a' hierarchy
     let query = format!("WITH RECURSIVE
     superclasses( subject, object ) AS
     ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
@@ -356,37 +361,14 @@ pub async fn get_class_map(
 
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
-    let mut part_of_link: HashSet<String> = HashSet::new();
-
     for row in rows {
         //axiom structure: subject rdfs:subClassOf object
-        let subject: &str = row.get("subject");
-        let object: &str = row.get("object");
-
-        let object_value = ldtab_2_value(object);
-
-        let part_of_restriction = match object_value.clone() {
-            Value::Object(x) => check_part_of_restriction(&x),
-            _ => false,
-        };
-
-        if part_of_restriction {
-            //NB: these unwraps are safe because we checked them before
-            let part_of_filler = object_value
-                .get("owl:someValuesFrom")
-                .unwrap()
-                .as_array()
-                .unwrap()[0]
-                .clone();
-            let part_of_filler = part_of_filler.get("object").unwrap();
-            let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
-            part_of_link.insert(part_of_filler_string);
-        }
+        let subject: &str = row.get("subject"); //subclass
+        let object: &str = row.get("object"); //superclass
 
         let subject_string = String::from(subject);
         let object_string = String::from(object);
 
-        //add subclass information into class_2_subclasses map
         match class_2_subclasses.get_mut(&object_string) {
             Some(x) => {
                 x.insert(subject_string);
@@ -398,124 +380,179 @@ pub async fn get_class_map(
             }
         }
     }
-
-    for link in part_of_link {
-        if !class_2_subclasses.contains_key(&link){
-            //only query for new information if 
-            //a class was not involved in a previous recursive query
-            let part_of_class_map = get_class_map(&link, table, pool).await;
-            match part_of_class_map {
-                Ok(x) => {
-                    for (key, value) in x {
-                        match class_2_subclasses.get_mut(&key) {
-                            Some(x) => {
-                                x.extend(value.clone());
-                            }
-                            None => {
-                                class_2_subclasses.insert(key.clone(), value.clone());
-                            }
-                        }
-                    }
-                }
-                Err(x) => return Err(x),
-            }
-        }
-    }
-
     Ok(class_2_subclasses)
 }
 
-pub async fn get_json_tree_view(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<Value, Error> {
-    //a class A is not a root in the tree/forest to be constructed,
-    //if there exist an axiom of the form 'A rdfs:subClassOf B',
-    let mut non_roots: HashSet<String> = HashSet::new();
-    //given all non-root classes,
-    //root classes can be identified by the set differences of all classes and non-root classes
-    let mut roots: HashSet<String> = HashSet::new();
+pub fn get_part_of_information(
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+) -> Result<HashMap<String, HashSet<String>>, Error> {
+    let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
 
-    let mut part_of_fillers: HashSet<(String, String)> = HashSet::new();
+    //S subclassof part-of some filler
+    //map will hold: filler -> S  (read: filler has-part S)
+    for (class, subclasses) in class_2_subclasses {
+        let class_value = ldtab_2_value(class);
 
-    //get map from classes to their subclasses (including the 'part of' hierarchy)
-    let mut class_2_subclasses = match get_class_map(entity, table, pool).await {
-        Ok(x) => x,
-        Err(x) => return Err(x),
-    };
-
-    //we want to have a tree view that only displays named classes and existential restrictions
-    //using hasPart. So, we need to filter out all unwanted class expressions, e.g., intersections,
-    //unions, etc.
-    remove_invalid_classes(&mut class_2_subclasses);
-
-    let class_2_superclasses = get_class_2_superclasses(&class_2_subclasses);
-
-    for (key, value) in &class_2_subclasses {
-        //identify non_roots
-        non_roots.extend(value.clone());
-
-        let object_value = ldtab_2_value(key);
-
-        let part_of_restriction = match object_value.clone() {
+        let part_of_restriction = match class_value.clone() {
             Value::Object(x) => check_part_of_restriction(&x),
             _ => false,
         };
 
         if part_of_restriction {
-            //NB: these unwraps are safe because we checked them before
-            let part_of_filler = object_value
+            let part_of_filler = class_value
                 .get("owl:someValuesFrom")
                 .unwrap()
                 .as_array()
                 .unwrap()[0]
                 .clone();
+
             let part_of_filler = part_of_filler.get("object").unwrap();
             let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
-            if class_2_superclasses.contains_key(&part_of_filler_string) {
-                //TODO: errror
-                non_roots.insert(key.clone());
-            }
-            //collect information about part-of hierarchy: (filler,restriction)
-            part_of_fillers.insert((part_of_filler_string.clone(), key.clone()));
-        }
-    }
 
-    //add part-of hierarchy to subclass map
-    for (filler, restriction) in part_of_fillers {
-        match class_2_superclasses.get(&filler) {
-            Some(x) => {
-                for superclass in x {
-                    match class_2_subclasses.get_mut(superclass) {
-                        Some(y) => {
-                            y.insert(restriction.clone());
-                        }
-                        None => {}
+            for subclass in subclasses {
+                match class_2_parts.get_mut(part_of_filler.as_str().unwrap()) {
+                    Some(x) => {
+                        x.insert(subclass.clone());
+                    }
+                    None => {
+                        let mut subclasses = HashSet::new();
+                        subclasses.insert(subclass.clone());
+                        class_2_parts.insert(part_of_filler_string.clone(), subclasses);
                     }
                 }
             }
-            None => {}
         }
     }
+    Ok(class_2_parts)
+}
 
-    //initialise roots
-    for (key, _value) in &class_2_subclasses {
-        if !non_roots.contains(key) {
-            roots.insert(key.clone());
+pub fn build_is_a_branch(
+    to_insert: &str,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+) -> Value {
+    let mut json_map = Map::new();
+
+    match class_2_subclasses.get(to_insert) {
+        Some(is_a_children) => {
+            for c in is_a_children {
+                match build_is_a_branch(c, class_2_subclasses, class_2_parts) {
+                    Value::Object(x) => {
+                        json_map.extend(x);
+                    }
+                    _ => {}
+                }
+            }
         }
+        None => {}
+    }
+    match class_2_parts.get(to_insert) {
+        Some(part_of_children) => {
+            for c in part_of_children {
+                match build_part_of_branch(c, class_2_subclasses, class_2_parts) {
+                    Value::Object(x) => {
+                        json_map.extend(x);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
     }
 
-    let subclasses = get_subclasses(entity, table, pool).await;
-    let sub_parts = get_sub_parts_of(entity, table, pool).await;
-    //TODO: get second level
+    //leaf case
+    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
+        json_map.insert(
+            String::from(to_insert),
+            Value::String(String::from("owl:Nothing")),
+        );
+        Value::Object(json_map)
+    } else {
+        json!({ to_insert: json_map })
+    }
+}
 
-    let json_view = get_json_superclass_tree(entity, &roots, &class_2_subclasses, false);
+pub fn build_part_of_branch(
+    to_insert: &str,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+) -> Value {
+    let mut json_map = Map::new();
 
-    //TODO: combine tree view and label map
-    let iris = get_iris_from_subclass_map(&class_2_subclasses);
-    let iris_2 = get_iris_from_set(&sub_parts.as_ref().unwrap());
-    let label_map = get_label_map(&iris, table, pool).await;
+    match class_2_subclasses.get(to_insert) {
+        Some(is_a_children) => {
+            for c in is_a_children {
+                match build_is_a_branch(c, class_2_subclasses, class_2_parts) {
+                    Value::Object(x) => {
+                        json_map.extend(x);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
+    }
+    match class_2_parts.get(to_insert) {
+        Some(part_of_children) => {
+            for c in part_of_children {
+                match build_part_of_branch(c, class_2_subclasses, class_2_parts) {
+                    Value::Object(x) => {
+                        json_map.extend(x);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
+    }
 
-    Ok(json_view)
+    //leaf case
+    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
+        json_map.insert(
+            format!("partOf {}", to_insert),
+            Value::String(String::from("owl:Nothing")),
+        );
+        Value::Object(json_map)
+    } else {
+        json!({ format!("partOf {}", to_insert): json_map })
+    }
+}
+
+pub fn build_tree(
+    to_insert: &HashSet<String>,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+) -> Value {
+    let mut json_map = Map::new();
+    for i in to_insert {
+        if class_2_subclasses.contains_key(i) {
+            match build_is_a_branch(i, class_2_subclasses, class_2_parts) {
+                Value::Object(x) => {
+                    json_map.extend(x);
+                }
+                _ => {}
+            }
+        }
+        if class_2_parts.contains_key(i) {
+            match build_part_of_branch(i, class_2_subclasses, class_2_parts) {
+                Value::Object(x) => {
+                    json_map.extend(x);
+                }
+                _ => {}
+            }
+        }
+
+        //leaf case
+        if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
+            json_map.insert(String::from(i), Value::String(String::from("owl:Nothing")));
+        }
+    }
+    Value::Object(json_map)
+}
+
+pub async fn get_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    let (class_2_subclasses, class_2_parts) =
+        get_hierarchy_maps(entity, table, &pool).await.unwrap();
+    let roots = identify_roots(&class_2_subclasses, &class_2_parts);
+    build_tree(&roots, &class_2_subclasses, &class_2_parts)
 }
