@@ -612,3 +612,156 @@ pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &Sqlit
 
     build_labelled_tree(&tree, &label_hash_map)
 }
+
+//
+// Rich JSON format
+//
+pub fn build_rich_is_a_branch(
+    to_insert: &str,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+    curie_2_label: &HashMap<String, String>,
+) -> Value {
+    let mut children_vec: Vec<Value> = Vec::new();
+
+    match class_2_subclasses.get(to_insert) {
+        Some(is_a_children) => {
+            for c in is_a_children {
+                match build_rich_is_a_branch(c, class_2_subclasses, class_2_parts, curie_2_label) {
+                    Value::Object(x) => {
+                        //json_map.extend(x);
+                        children_vec.push(Value::Object(x));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
+    }
+    match class_2_parts.get(to_insert) {
+        Some(part_of_children) => {
+            for c in part_of_children {
+                match build_rich_part_of_branch(c, class_2_subclasses, class_2_parts, curie_2_label)
+                {
+                    Value::Object(x) => {
+                        //json_map.extend(x);
+                        children_vec.push(Value::Object(x));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
+    }
+
+    //leaf case
+    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
+        children_vec.push(json!("owl:Nothing"));
+        //json_map.insert(
+        //    String::from(to_insert),
+        //    Value::String(String::from("owl:Nothing")),
+        //);
+        //Value::Object(json_map)
+    }
+
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "hierarchy" : "is-a", "children" : children_vec})
+}
+
+pub fn build_rich_part_of_branch(
+    to_insert: &str,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+    curie_2_label: &HashMap<String, String>,
+) -> Value {
+    let mut children_vec: Vec<Value> = Vec::new();
+
+    match class_2_subclasses.get(to_insert) {
+        Some(is_a_children) => {
+            for c in is_a_children {
+                match build_rich_is_a_branch(c, class_2_subclasses, class_2_parts, curie_2_label) {
+                    Value::Object(x) => {
+                        //json_map.extend(x);
+                        children_vec.push(Value::Object(x));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
+    }
+    match class_2_parts.get(to_insert) {
+        Some(part_of_children) => {
+            for c in part_of_children {
+                match build_rich_part_of_branch(c, class_2_subclasses, class_2_parts, curie_2_label)
+                {
+                    Value::Object(x) => {
+                        //json_map.extend(x);
+                        children_vec.push(Value::Object(x));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        None => {}
+    }
+
+    //leaf case
+    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
+        children_vec.push(json!("owl:Nothing"));
+        //json_map.insert(
+        //    format!("partOf {}", to_insert),
+        //    Value::String(String::from("owl:Nothing")),
+        //);
+        //Value::Object(json_map);
+    }
+
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "hierarchy" : "part-of", "children" : children_vec})
+}
+
+pub fn build_rich_tree(
+    to_insert: &HashSet<String>,
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_parts: &HashMap<String, HashSet<String>>,
+    curie_2_label: &HashMap<String, String>,
+) -> Value {
+    let mut json_vec: Vec<Value> = Vec::new();
+
+    for i in to_insert {
+        if class_2_subclasses.contains_key(i) {
+            match build_rich_is_a_branch(i, class_2_subclasses, class_2_parts, curie_2_label) {
+                Value::Object(x) => {
+                    json_vec.push(Value::Object(x));
+                }
+                _ => {}
+            }
+        }
+        if class_2_parts.contains_key(i) {
+            match build_rich_part_of_branch(i, class_2_subclasses, class_2_parts, curie_2_label) {
+                Value::Object(x) => {
+                    json_vec.push(Value::Object(x));
+                }
+                _ => {}
+            }
+        }
+
+        //leaf case
+        if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
+            json_vec.push(json!({String::from(i) : Value::String(String::from("owl:Nothing"))}));
+        }
+    }
+    Value::Array(json_vec)
+}
+
+pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    let (class_2_subclasses, class_2_parts) =
+        get_hierarchy_maps(entity, table, &pool).await.unwrap();
+    let roots = identify_roots(&class_2_subclasses, &class_2_parts);
+
+    let mut iris = HashSet::new();
+    iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
+    iris.extend(get_iris_from_subclass_map(&class_2_parts));
+
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await;
+
+    build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label)
+}
