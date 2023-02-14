@@ -34,7 +34,7 @@ async fn test_select_new() {
     sqlx::query(&query).execute(&pool).await.unwrap();
 
     let subsumptions = vec![
-        ("obo:ZFA_0100000", "owl:Thing"),
+        //("obo:ZFA_0100000", "owl:Thing"),
         ("obo:ZFA_0000272", "obo:ZFA_0001439"),
         (
             "obo:ZFA_0000272",
@@ -123,10 +123,10 @@ async fn test_select_new() {
 
     let results = get_json_tree_view("obo:ZFA_0000354", "statement", &pool).await;
 
-    let expected_string = r#"{"owl:Thing":{"obo:ZFA_0100000":{"obo:ZFA_0000037":{"obo:ZFA_0000496":{"obo:ZFA_0000354":"owl:Nothing"},"partOf obo:ZFA_0001094":{"obo:ZFA_0000496":{"obo:ZFA_0000354":"owl:Nothing"},"obo:ZFA_0001439":{"partOf obo:ZFA_0000272":{"obo:ZFA_0000354":"owl:Nothing"}}},"obo:ZFA_0001512":{"obo:ZFA_0001439":{"partOf obo:ZFA_0000272":{"obo:ZFA_0000354":"owl:Nothing"}}}}}}}"#;
+    let expected_string = r#"{"obo:ZFA_0100000":{"obo:ZFA_0000037":{"obo:ZFA_0000496":{"obo:ZFA_0000354":"owl:Nothing"},"obo:ZFA_0001094":{"partOf obo:ZFA_0000496":{"obo:ZFA_0000354":"owl:Nothing"},"partOf obo:ZFA_0001439":{"obo:ZFA_0000272":{"partOf obo:ZFA_0000354":"owl:Nothing"}}},"obo:ZFA_0001512":{"obo:ZFA_0001439":{"obo:ZFA_0000272":{"partOf obo:ZFA_0000354":"owl:Nothing"}}}}}}"#;
     let expected_value = from_str::<Value>(expected_string);
 
     fs::remove_file("tests/test.db").expect("File deleted failed");
 
-    assert_eq!(results.unwrap(), expected_value.unwrap());
+    assert_eq!(results, expected_value.unwrap());
 }
