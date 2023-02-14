@@ -613,9 +613,9 @@ pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &Sqlit
     build_labelled_tree(&tree, &label_hash_map)
 }
 
-//
-// Rich JSON format
-//
+//#######################                   #######################
+//#######################  Rich JSON format #######################
+//#######################                   #######################
 pub fn build_rich_is_a_branch(
     to_insert: &str,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -764,4 +764,38 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
     build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label)
+}
+
+//#################################################################
+//####################### Human readable Text format (Markdown) ###
+//#################################################################
+pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
+    let indentation = "\t".repeat(indent);
+    let mut res = Vec::new();
+    match json_tree {
+        Value::Object(map) => {
+            for (k, v) in map {
+                res.push(format!(
+                    "{}- {}{}",
+                    indentation,
+                    k,
+                    json_tree_2_text(v, indent + 1)
+                ));
+            }
+
+            let mut result = String::from("");
+            for e in res {
+                result = format!("{}\n{}", result, e);
+            }
+            result
+        }
+        Value::String(s) => format!("\n{}- {}", indentation, s),
+        _ => String::from("error"),
+    }
+}
+
+pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> String {
+    let labelled_json_tree = get_labelled_json_tree_view(entity, table, pool).await;
+
+    json_tree_2_text(&labelled_json_tree, 0)
 }
