@@ -664,7 +664,7 @@ pub fn build_rich_is_a_branch(
         //Value::Object(json_map)
     }
 
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "hierarchy" : "is-a", "children" : children_vec})
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : "is-a", "children" : children_vec})
 }
 
 pub fn build_rich_part_of_branch(
@@ -799,3 +799,5 @@ pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> Stri
 
     json_tree_2_text(&labelled_json_tree, 0)
 }
+
+
