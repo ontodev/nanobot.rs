@@ -753,8 +753,16 @@ pub fn build_rich_tree(
 }
 
 pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-    let (class_2_subclasses, class_2_parts) =
+
+    let (mut class_2_subclasses, mut class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
+
+    let direct_subclasses =  get_direct_sub_hierarchy_maps(entity, table, pool).await.unwrap();
+    let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await.unwrap();
+
+    class_2_subclasses.insert(String::from(entity), direct_subclasses);
+    class_2_parts.insert(String::from(entity), direct_part_ofs);
+
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
 
     let mut iris = HashSet::new();
@@ -764,6 +772,78 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
     build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label)
+}
+
+pub async fn get_direct_sub_hierarchy_maps(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, Error> {
+
+    let subclasses = get_direct_subclasses(entity, table, pool).await.unwrap();
+
+    let mut is_a : HashSet<String> = HashSet::new();
+
+    for s in subclasses {
+
+        //filter for named classes
+        match ldtab_2_value(&s) {
+            Value::String(_x) => {is_a.insert(s.clone());},
+            _ => {},
+        }; 
+    } 
+    Ok(is_a) 
+}
+
+pub async fn get_direct_subclasses(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, Error> {
+    let mut subclasses = HashSet::new();
+
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'", 
+        table = table,
+        entity = entity,
+    );
+
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+        subclasses.insert(String::from(subject));
+    }
+
+    Ok(subclasses)
+}
+
+pub async fn get_direct_sub_parts(
+    entity : &str,
+    table : &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, Error> {
+    let mut sub_parts = HashSet::new();
+
+    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
+    let part_of = part_of.replace("entity", entity);
+
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'", 
+        table = table,
+        part_of = part_of,
+    );
+
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+
+        //filter for named classes
+        match ldtab_2_value(&subject) {
+            Value::String(_x) => {sub_parts.insert(String::from(subject));},
+            _ => {},
+        }; 
+    } 
+    Ok(sub_parts) 
 }
 
 //#################################################################
