@@ -715,7 +715,7 @@ pub fn build_rich_part_of_branch(
         //Value::Object(json_map);
     }
 
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "hierarchy" : "part-of", "children" : children_vec})
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : "part-of", "children" : children_vec})
 }
 
 pub fn build_rich_tree(
@@ -753,11 +753,12 @@ pub fn build_rich_tree(
 }
 
 pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-
     let (mut class_2_subclasses, mut class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
 
-    let direct_subclasses =  get_direct_sub_hierarchy_maps(entity, table, pool).await.unwrap();
+    let direct_subclasses = get_direct_sub_hierarchy_maps(entity, table, pool)
+        .await
+        .unwrap();
     let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await.unwrap();
 
     class_2_subclasses.insert(String::from(entity), direct_subclasses);
@@ -779,20 +780,20 @@ pub async fn get_direct_sub_hierarchy_maps(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<HashSet<String>, Error> {
-
     let subclasses = get_direct_subclasses(entity, table, pool).await.unwrap();
 
-    let mut is_a : HashSet<String> = HashSet::new();
+    let mut is_a: HashSet<String> = HashSet::new();
 
     for s in subclasses {
-
         //filter for named classes
         match ldtab_2_value(&s) {
-            Value::String(_x) => {is_a.insert(s.clone());},
-            _ => {},
-        }; 
-    } 
-    Ok(is_a) 
+            Value::String(_x) => {
+                is_a.insert(s.clone());
+            }
+            _ => {}
+        };
+    }
+    Ok(is_a)
 }
 
 pub async fn get_direct_subclasses(
@@ -803,7 +804,7 @@ pub async fn get_direct_subclasses(
     let mut subclasses = HashSet::new();
 
     let query = format!(
-        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'", 
+        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'",
         table = table,
         entity = entity,
     );
@@ -818,8 +819,8 @@ pub async fn get_direct_subclasses(
 }
 
 pub async fn get_direct_sub_parts(
-    entity : &str,
-    table : &str,
+    entity: &str,
+    table: &str,
     pool: &SqlitePool,
 ) -> Result<HashSet<String>, Error> {
     let mut sub_parts = HashSet::new();
@@ -828,7 +829,7 @@ pub async fn get_direct_sub_parts(
     let part_of = part_of.replace("entity", entity);
 
     let query = format!(
-        "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'", 
+        "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'",
         table = table,
         part_of = part_of,
     );
@@ -839,11 +840,13 @@ pub async fn get_direct_sub_parts(
 
         //filter for named classes
         match ldtab_2_value(&subject) {
-            Value::String(_x) => {sub_parts.insert(String::from(subject));},
-            _ => {},
-        }; 
-    } 
-    Ok(sub_parts) 
+            Value::String(_x) => {
+                sub_parts.insert(String::from(subject));
+            }
+            _ => {}
+        };
+    }
+    Ok(sub_parts)
 }
 
 //#################################################################
@@ -880,4 +883,108 @@ pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> Stri
     json_tree_2_text(&labelled_json_tree, 0)
 }
 
+//#################################################################
+//####################### HTML view (JSON hiccup) #################
+//#################################################################
 
+pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
+    let mut res = Vec::new();
+    res.push(json!("ul"));
+    res.push(json!({"id" : "children"}));
+
+    match value {
+        Value::Array(children) => {
+            for child in children {
+                let mut res_element = Vec::new();
+                res_element.push(json!("li"));
+
+                res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+
+                res.push(Value::Array(res_element));
+            }
+            Value::Array(res)
+        }
+        _ => json!("ERROR"), //TODO: encode error
+    }
+}
+
+pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value) -> Value {
+    //create new list for all children
+    let mut res = Vec::new();
+    res.push(json!("ul"));
+
+    match value {
+        Value::Array(children) => {
+            for child in children {
+                let mut res_element = Vec::new();
+                res_element.push(json!("li"));
+
+                res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+
+                if child["curie"].as_str().unwrap().eq(entity) {
+                    res_element.push(tree_2_html_hiccup_children(
+                        child["curie"].as_str().unwrap(),
+                        &child["children"],
+                    ));
+                } else {
+                    //there exist children
+                    res_element.push(tree_2_html_hiccup_descendants(
+                        entity,
+                        child["curie"].as_str().unwrap(),
+                        &child["children"],
+                    ));
+                }
+
+                res.push(Value::Array(res_element));
+            }
+            Value::Array(res)
+        }
+        _ => json!("ERROR"), //TODO: encode error
+    }
+}
+
+pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
+    //TODO: ontology
+    //TODO: class
+
+    //NB: Value is an array of the form [t_1, .., t_n]
+    //each of the trees in the array need to be displayed in a list
+    //
+    //list for all roots
+    let mut res = Vec::new();
+    res.push(json!("ul"));
+
+    match value {
+        Value::Array(roots) => {
+            for root in roots {
+                let mut res_element = Vec::new();
+                //list element for given root
+                res_element.push(json!("li"));
+
+                res_element.push(json!(["a", {"resource" : root["curie"] }, root["label"] ]));
+
+                if root["curie"].as_str().unwrap().eq(entity) {
+                    res_element.push(tree_2_html_hiccup_children(
+                        root["curie"].as_str().unwrap(),
+                        &root["children"],
+                    ));
+                } else {
+                    //there exist children
+                    res_element.push(tree_2_html_hiccup_descendants(
+                        entity,
+                        root["curie"].as_str().unwrap(),
+                        &root["children"],
+                    ));
+                }
+                res.push(Value::Array(res_element));
+            }
+            Value::Array(res)
+        }
+        _ => json!("ERROR"), //TODO: encode error
+    }
+}
+
+pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    let tree = get_rich_json_tree_view(entity, table, pool).await;
+    tree_2_html_hiccup_roots(entity, &tree)
+}
