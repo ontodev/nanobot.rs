@@ -944,9 +944,6 @@ pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value)
 }
 
 pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
-    //TODO: ontology
-    //TODO: class
-
     //NB: Value is an array of the form [t_1, .., t_n]
     //each of the trees in the array need to be displayed in a list
     //
@@ -986,5 +983,14 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
 
 pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> Value {
     let tree = get_rich_json_tree_view(entity, table, pool).await;
-    tree_2_html_hiccup_roots(entity, &tree)
+
+    let roots = tree_2_html_hiccup_roots(entity, &tree);
+
+    let mut res = Vec::new();
+    res.push(json!("ul"));
+    res.push(json!(["li", "Ontology"]));
+    let class = json!(["a", {"resource" : "owl:Class"}, "owl:Class"]);
+    res.push(json!(["li", class, roots]));
+
+    Value::Array(res)
 }
