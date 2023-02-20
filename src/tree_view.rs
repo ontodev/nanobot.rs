@@ -852,6 +852,7 @@ pub async fn get_direct_sub_parts(
 //#################################################################
 //####################### Human readable Text format (Markdown) ###
 //#################################################################
+//TODO: Return Result
 pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
     let indentation = "\t".repeat(indent);
     let mut res = Vec::new();
@@ -887,6 +888,7 @@ pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> Stri
 //####################### HTML view (JSON hiccup) #################
 //#################################################################
 
+//TODO: Return Result
 pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
     let mut res = Vec::new();
     res.push(json!("ul"));
@@ -908,34 +910,22 @@ pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
     }
 }
 
+//TODO: Return Result
 pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value) -> Value {
-    //create new list for all children
     let mut res = Vec::new();
     res.push(json!("ul"));
 
     match value {
         Value::Array(children) => {
             for child in children {
-                let mut res_element = Vec::new();
-                res_element.push(json!("li"));
+                let mut res_elements = Vec::new();
+                res_elements.push(json!("li"));
 
-                res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+                res_elements.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
 
-                if child["curie"].as_str().unwrap().eq(entity) {
-                    res_element.push(tree_2_html_hiccup_children(
-                        child["curie"].as_str().unwrap(),
-                        &child["children"],
-                    ));
-                } else {
-                    //there exist children
-                    res_element.push(tree_2_html_hiccup_descendants(
-                        entity,
-                        child["curie"].as_str().unwrap(),
-                        &child["children"],
-                    ));
-                }
+                encode_element(entity, &child, &mut res_elements);
 
-                res.push(Value::Array(res_element));
+                res.push(Value::Array(res_elements));
             }
             Value::Array(res)
         }
@@ -943,37 +933,40 @@ pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value)
     }
 }
 
+pub fn encode_element(entity: &str, value: &Value, res: &mut Vec<Value>) {
+    if value["curie"].as_str().unwrap().eq(entity) {
+        //base case
+        res.push(tree_2_html_hiccup_children(
+            value["curie"].as_str().unwrap(),
+            &value["children"],
+        ));
+    } else {
+        //recurse
+        res.push(tree_2_html_hiccup_descendants(
+            entity,
+            value["curie"].as_str().unwrap(),
+            &value["children"],
+        ));
+    }
+}
+
+//TODO: Return Result
 pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
-    //NB: Value is an array of the form [t_1, .., t_n]
-    //each of the trees in the array need to be displayed in a list
-    //
-    //list for all roots
     let mut res = Vec::new();
     res.push(json!("ul"));
 
     match value {
         Value::Array(roots) => {
             for root in roots {
-                let mut res_element = Vec::new();
-                //list element for given root
-                res_element.push(json!("li"));
+                let mut res_elements = Vec::new();
 
-                res_element.push(json!(["a", {"resource" : root["curie"] }, root["label"] ]));
+                res_elements.push(json!("li"));
 
-                if root["curie"].as_str().unwrap().eq(entity) {
-                    res_element.push(tree_2_html_hiccup_children(
-                        root["curie"].as_str().unwrap(),
-                        &root["children"],
-                    ));
-                } else {
-                    //there exist children
-                    res_element.push(tree_2_html_hiccup_descendants(
-                        entity,
-                        root["curie"].as_str().unwrap(),
-                        &root["children"],
-                    ));
-                }
-                res.push(Value::Array(res_element));
+                res_elements.push(json!(["a", {"resource" : root["curie"] }, root["label"] ]));
+
+                encode_element(entity, &root, &mut res_elements);
+
+                res.push(Value::Array(res_elements));
             }
             Value::Array(res)
         }
@@ -981,6 +974,7 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
     }
 }
 
+//TODO: Return Result
 pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> Value {
     let tree = get_rich_json_tree_view(entity, table, pool).await;
 
