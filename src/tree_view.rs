@@ -296,6 +296,15 @@ pub fn identify_roots(
     roots
 }
 
+///Given a CURIE for an entity and a connection to an LDTab database,
+///return maps capturing information about the relationships 'is-a' and 'part-of'.
+///The mappings are structured in a hierarchical descending manner in which
+///a key-value pair consists of an entity (the key) and a set (the value) of all
+///its immediate subclasses ('is-a' relationship) or its parthoods ('part-of' relationship).
+///
+///
+///TODO: text example
+///TODO: code example
 pub async fn get_hierarchy_maps(
     entity: &str,
     table: &str,
@@ -307,24 +316,39 @@ pub async fn get_hierarchy_maps(
     ),
     Error,
 > {
+    //both maps are build by iteratively querying for combinations of 'is-a'
+    //and 'part-of' relationships.
+    //TODO: explain the way these two relations are combined
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
     let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
 
     let mut updates = HashSet::new();
     updates.insert(String::from(entity));
 
+    //We assume the 'is-a' and 'part-of' relations to be acyclic.
+    //Since both relations can be interpreted in terms of a partial order,
+    //we can collect information about both relationships via a
+    //breadth-first traversal according to the partial order.
+    //Note that this removes the necessity for recursive function calls.
     while !updates.is_empty() {
         let mut new_parts: HashSet<String> = HashSet::new();
 
         for update in &updates {
+            //recursive SQL query to get all 'is-a' ancestors
             let subclasses_updates = get_class_2_subclass_map(&update, table, pool)
                 .await
                 .unwrap();
             update_hierarchy_map(&mut class_2_subclasses, &subclasses_updates);
 
+            //extract information about 'part-of' relationships
             let parts_updates = get_part_of_information(&subclasses_updates).unwrap();
             update_hierarchy_map(&mut class_2_parts, &parts_updates);
 
+            //collect fillers of 'part-of' restrictions
+            //on which we will 'recurse' in the next iteration, i.e.,
+            //querying for all 'is-a' relationships,
+            //extracting 'part-of' relations,
+            //and recurse until no 'part-of' relations are found.
             for part in parts_updates.keys() {
                 if !class_2_subclasses.contains_key(part) {
                     new_parts.insert(part.clone());
@@ -332,18 +356,29 @@ pub async fn get_hierarchy_maps(
             }
         }
 
+        //prepare filler of part-of relations for next iteration/recursion
         updates.clear();
         for new in new_parts {
             updates.insert(new.clone());
         }
     }
 
+    //We only want to return information about named entities.
+    //So, we filter out 'invalid' entities, e.g., anonymous class expressions
     let invalid = identify_invalid_classes(&class_2_subclasses);
     remove_invalid_classes(&mut class_2_subclasses, &invalid);
 
     Ok((class_2_subclasses, class_2_parts))
 }
 
+///Given a CURIE for an entity and a connection to an LDTab database,
+///return a map capturing (transitive) information about the 'is-a' relationship.
+///The mapping is structured in a hierarchical descending manner in which
+///a key-value pair consists of an entity (the key) and a set (the value) of all
+///its immediate subclasses ('is-a' relationship).
+///
+///TODO: text example
+///TODO: code example
 pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
@@ -351,7 +386,7 @@ pub async fn get_class_2_subclass_map(
 ) -> Result<HashMap<String, HashSet<String>>, Error> {
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
-    //recursive query handles 'is-a' hierarchy
+    //recursive SQL query for transitive 'is-a' relationships
     let query = format!("WITH RECURSIVE
     superclasses( subject, object ) AS
     ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subClassOf'
@@ -383,6 +418,18 @@ pub async fn get_class_2_subclass_map(
     Ok(class_2_subclasses)
 }
 
+///Given a mapping from classes to sets of their subclasses,
+///extract and return a mapping from classes to sets of their parthoods.
+///In particular, whenever there is an subclass mapping of the form
+///
+///entity -> part-of some filler
+///
+///then add a 'part-of' map of the form
+///
+///filler -> entity
+///
+///TODO: text example
+///TODO: code example
 pub fn get_part_of_information(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> Result<HashMap<String, HashSet<String>>, Error> {
@@ -550,9 +597,18 @@ pub fn build_tree(
     Value::Object(json_map)
 }
 
+///Given a CURIE for an entity and a connection to an LDTab database,
+///return a tree (encoded in JSON) for the entity that displays information about
+///the relationships 'is-a' as well as 'part-of'
+///
+///TODO: text example
+///TODO: code example
 pub async fn get_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    //extract information about an entities 'is-a' and 'part-of' relationships
     let (class_2_subclasses, class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
+
+    //organise the information in a (rooted) tree (or forest)
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
     build_tree(&roots, &class_2_subclasses, &class_2_parts)
 }
