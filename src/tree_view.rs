@@ -39,6 +39,10 @@ pub fn ldtab_2_value(input: &str) -> Value {
 // ######## build label map ######################
 // ################################################
 
+///Given a set of CURIEs and an LDTab database,
+///return a JSON object that maps CURIEs to their labels
+///
+///TODO: code example
 pub async fn get_label_map(
     iris: &HashSet<String>,
     table: &str,
@@ -46,7 +50,6 @@ pub async fn get_label_map(
 ) -> Result<Value, Error> {
     let mut entity_2_label = HashMap::new();
 
-    //get labels for all subjects
     for i in iris {
         let label = get_label(&i, table, pool).await;
         match label {
@@ -57,7 +60,8 @@ pub async fn get_label_map(
         };
     }
 
-    //merge label maps
+    //convert HashMap to Map
+    //TODO: just create the Map in the first place
     let mut json_map = Map::new();
     for (k, v) in entity_2_label {
         json_map.insert(k.clone(), json!(v));
@@ -66,6 +70,10 @@ pub async fn get_label_map(
     Ok(json!({ "@labels": json_map }))
 }
 
+///Given a set of CURIEs and an LDTab database,
+///return a map from CURIEs to their respective labels
+///
+///TODO: code example
 pub async fn get_label_hash_map(
     iris: &HashSet<String>,
     table: &str,
@@ -73,7 +81,6 @@ pub async fn get_label_hash_map(
 ) -> HashMap<String, String> {
     let mut entity_2_label = HashMap::new();
 
-    //get labels for all subjects
     for i in iris {
         let label = get_label(&i, table, pool).await;
         match label {
@@ -87,6 +94,10 @@ pub async fn get_label_hash_map(
     entity_2_label
 }
 
+///Given an entity's CURIE and an LDTab database,
+///return the entity's label
+///
+///TODO: code example
 pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
     let query = format!(
         "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
@@ -104,34 +115,47 @@ pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<S
     Err(Error::SQLError(sqlx::Error::RowNotFound))
 }
 
+///Given an LDTab JSON string,
+///return IRIs and CURIEs that occur in the string
+///
+///TODO: code example
 pub fn get_iris_from_string(s: &str) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
 
     let value = ldtab_2_value(&s);
     match value {
         Value::String(x) => {
+            //TODO: why is a string necessarily an IRI?
             iris.insert(x);
         }
         _ => {
+            //use wiring_rs to extract IRIs recursively
             signature::get_iris(&value, &mut iris);
         }
     }
     iris
 }
 
+///Given a map from entities to their respective subclasses,
+///return all IRIs that occur in the map.
+///
+///TODO: code example
 pub fn get_iris_from_subclass_map(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
     for (k, v) in class_2_subclasses {
         iris.extend(get_iris_from_string(&k));
-        for vv in v {
-            iris.extend(get_iris_from_string(&vv));
+        for subclass in v {
+            iris.extend(get_iris_from_string(&subclass));
         }
     }
     iris
 }
 
+///Given a set of strings, return all IRIs that occur in the set.
+///
+///TODO: code example
 pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
     for e in set {
@@ -144,6 +168,10 @@ pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
 // ######## build tree view #######################
 // ################################################
 
+///Given an LDTab predicate map encoded as a Serde Value, return true
+///if the Value represents the 'part-of' relation (obo:BFO_0000050).
+///
+///TODO: code example
 pub fn check_part_of_property(value: &Value) -> bool {
     match value {
         Value::Object(x) => {
@@ -155,6 +183,11 @@ pub fn check_part_of_property(value: &Value) -> bool {
     }
 }
 
+///Given an LDTab predicate map encoded as a Serde Value, return true
+///if the Value represents an atomic entity (as opposed to another nested
+///Serde Value representing, e.g., an anonymous class expression.
+///
+///TODO: code example
 pub fn check_filler(value: &Value) -> bool {
     match value {
         Value::Object(x) => {
@@ -168,6 +201,10 @@ pub fn check_filler(value: &Value) -> bool {
     }
 }
 
+///Given an LDTab predicate map encoded, return true
+///if the Map encodes an existential restriction using the 'part-of' property
+///
+///TODO: code example
 pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
     if value.contains_key("owl:onProperty")
         & value.contains_key("owl:someValuesFrom")
@@ -183,13 +220,21 @@ pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
     }
 }
 
+///Given a map from class expression (in LDTab format) to their subclasses
+///and a target class expression,
+///remove any occurrence of the target class epxression from the map
+///while maintaining transitive subclass relationships.
+///
+///TODO: example
 pub fn remove_invalid_class(
     target: &str,
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
 ) {
+    //remove mapping [target : {subclass_1, subclass_2, ..., subclass_n}]
     let values = class_2_subclasses.remove(target).unwrap();
     for (_key, value) in class_2_subclasses {
         if value.contains(target) {
+            //replace 'target' with {subclass_1, subclass_2, ..., subclass_n}
             value.remove(target);
             for v in &values {
                 value.insert(v.clone());
@@ -198,6 +243,12 @@ pub fn remove_invalid_class(
     }
 }
 
+///Given a map from class expression (in LDTab format) to their subclasses
+///and a set of target class expressions,
+///remove any occurrence of the target class epxressions from the map
+///while maintaining transitive subclass relationships.
+///
+///TODO: example
 pub fn remove_invalid_classes(
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
     invalid: &HashSet<String>,
@@ -214,10 +265,11 @@ pub fn remove_invalid_classes(
     }
 }
 
-//TODO: doc string + doc test
-//we want to have a tree view that only displays named classes and existential restrictions
-//using hasPart. So, we need to filter out all unwanted class expressions, e.g., intersections,
-//unions, etc.
+///Given a map from classes to (direct) subclasses in LDTab format,
+///identify anonymous class expressions. These anonymous class expressions
+///are unwanted for the HTML view.
+///
+///TODO: doc string + doc test
 pub fn identify_invalid_classes(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> HashSet<String> {
@@ -250,6 +302,9 @@ pub fn identify_invalid_classes(
     invalid
 }
 
+///Given two maps from classes to subclasses,
+///insert the information from the second map ('updates') to the first ('to_update').
+///TODO: code example
 pub fn update_hierarchy_map(
     to_update: &mut HashMap<String, HashSet<String>>,
     updates: &HashMap<String, HashSet<String>>,
@@ -257,25 +312,33 @@ pub fn update_hierarchy_map(
     for (class, subclasses) in updates {
         match to_update.get_mut(class) {
             Some(x) => {
+                //key exists
                 for sub in subclasses {
                     if !x.contains(sub) {
-                        x.insert(sub.clone());
+                        x.insert(sub.clone()); //so add all elements to value
                     }
                 }
             }
             None => {
+                //key does not exist
+                //so clone the whole entry
                 to_update.insert(class.clone(), subclasses.clone());
             }
         }
     }
 }
 
+///Given two maps for subclass and parthood relations,
+///identify root classes, i.e., classes without parents.
+///
+///TODO: code example
 pub fn identify_roots(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
     class_2_parts: &HashMap<String, HashSet<String>>,
 ) -> HashSet<String> {
     let mut roots = HashSet::new();
 
+    //collect all keys and values from both maps
     let mut keys = HashSet::new();
     let mut values = HashSet::new();
 
@@ -288,6 +351,7 @@ pub fn identify_roots(
         values.extend(v);
     }
 
+    //check which keys do not occur in any value of any map
     for k in keys {
         if !values.contains(k) {
             roots.insert(k.clone());
@@ -473,6 +537,7 @@ pub fn get_part_of_information(
     Ok(class_2_parts)
 }
 
+///TODO:
 pub fn build_is_a_branch(
     to_insert: &str,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -565,6 +630,11 @@ pub fn build_part_of_branch(
     }
 }
 
+///Given a set of entities, and maps for subclass and parthood relations,
+///return an encoding of the term tree via JSON objects.
+///
+///TODO: example
+///TODO: code example
 pub fn build_tree(
     to_insert: &HashSet<String>,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -572,6 +642,7 @@ pub fn build_tree(
 ) -> Value {
     let mut json_map = Map::new();
     for i in to_insert {
+        //handle 'is-a' case
         if class_2_subclasses.contains_key(i) {
             match build_is_a_branch(i, class_2_subclasses, class_2_parts) {
                 Value::Object(x) => {
@@ -580,6 +651,7 @@ pub fn build_tree(
                 _ => {}
             }
         }
+        //handle 'part-of' case
         if class_2_parts.contains_key(i) {
             match build_part_of_branch(i, class_2_subclasses, class_2_parts) {
                 Value::Object(x) => {
@@ -590,6 +662,7 @@ pub fn build_tree(
         }
 
         //leaf case
+        //TODO: remove use of owl:Nothing?
         if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
             json_map.insert(String::from(i), Value::String(String::from("owl:Nothing")));
         }
@@ -613,6 +686,13 @@ pub async fn get_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) ->
     build_tree(&roots, &class_2_subclasses, &class_2_parts)
 }
 
+///Given a tree (encoded in JSON) representing information about
+///the relationships 'is-a' as well as 'part-of' as well as
+///a mapo from CURIEs to their labels,
+///return the tree with CURIEs replaced with labels.
+///
+///TODO: text example
+///TODO: code example
 pub fn build_labelled_tree(tree: &Value, label_map: &HashMap<String, String>) -> Value {
     let mut json_map = Map::new();
 
@@ -620,6 +700,7 @@ pub fn build_labelled_tree(tree: &Value, label_map: &HashMap<String, String>) ->
         Value::Object(x) => {
             for (k, v) in x {
                 if k.starts_with("partOf ") {
+                    //TODO rethink encoding of part-of relation
                     let curie = k.strip_prefix("partOf ").unwrap();
                     match label_map.get(curie) {
                         Some(label) => {
@@ -654,18 +735,32 @@ pub fn build_labelled_tree(tree: &Value, label_map: &HashMap<String, String>) ->
     Value::Object(json_map)
 }
 
+///Given a CURIE for an entity and a connection to an LDTab database,
+///return a tree (encoded in JSON) for the entity that displays information about
+///the relationships 'is-a' as well as 'part-of'. The returned tree uses labels instead of CURIEs.
+///
+///TODO: text example
+///TODO: code example
 pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    //get information about subsumption and parthood relations
     let (class_2_subclasses, class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
+
+    //root entities for subsumption and parthood relations
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
 
+    //extract CURIEs/IRIs
     let mut iris = HashSet::new();
     iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
     iris.extend(get_iris_from_subclass_map(&class_2_parts));
 
+    //get map from CURIEs/IRIs to labels
     let label_hash_map = get_label_hash_map(&iris, table, pool).await;
+
+    //build term tree
     let tree = build_tree(&roots, &class_2_subclasses, &class_2_parts);
 
+    //replace CURIEs with labels
     build_labelled_tree(&tree, &label_hash_map)
 }
 
@@ -808,29 +903,42 @@ pub fn build_rich_tree(
     Value::Array(json_vec)
 }
 
+///Given a CURIE of an entity and a connection to an LDTab database,
+///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
+///
+///TODO: example
 pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    //get the entity's ancestor information w.r.t. subsumption and parthood relations
     let (mut class_2_subclasses, mut class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
 
+    //get the entity's immediate descendents w.r.t. subsumption and parthood relations
     let direct_subclasses = get_direct_sub_hierarchy_maps(entity, table, pool)
         .await
         .unwrap();
     let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await.unwrap();
 
+    //add immediate descendents to ancestor map
     class_2_subclasses.insert(String::from(entity), direct_subclasses);
     class_2_parts.insert(String::from(entity), direct_part_ofs);
 
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
 
+    //extract CURIEs/IRIs
     let mut iris = HashSet::new();
     iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
     iris.extend(get_iris_from_subclass_map(&class_2_parts));
 
+    //get labels for curies
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
     build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label)
 }
 
+///Given a CURIE of an entity and a connection to an LDTab database,
+///return the set of immediate (named) descendants w.r.t. its subsumption and parthood relations
+///
+///TODO: example
 pub async fn get_direct_sub_hierarchy_maps(
     entity: &str,
     table: &str,
@@ -852,6 +960,10 @@ pub async fn get_direct_sub_hierarchy_maps(
     Ok(is_a)
 }
 
+///Given a CURIE of an entity and a connection to an LDTab database,
+///return the set of immediate descendants w.r.t. the subsumption relation
+///
+///TODO: example
 pub async fn get_direct_subclasses(
     entity: &str,
     table: &str,
@@ -874,6 +986,10 @@ pub async fn get_direct_subclasses(
     Ok(subclasses)
 }
 
+///Given a CURIE of an entity and a connection to an LDTab database,
+///return the set of immediate descendants w.r.t. the parthood relation
+///
+///TODO: example
 pub async fn get_direct_sub_parts(
     entity: &str,
     table: &str,
@@ -881,6 +997,8 @@ pub async fn get_direct_sub_parts(
 ) -> Result<HashSet<String>, Error> {
     let mut sub_parts = HashSet::new();
 
+    //RDF representation of an OWL existential restriction
+    //using the property part-of (obo:BFO_0000050)
     let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
     let part_of = part_of.replace("entity", entity);
 
@@ -908,6 +1026,9 @@ pub async fn get_direct_sub_parts(
 //#################################################################
 //####################### Human readable Text format (Markdown) ###
 //#################################################################
+
+///Given a simple term tree, return a human-readable representation
+///in Markdown.
 //TODO: Return Result
 pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
     let indentation = "\t".repeat(indent);
@@ -934,9 +1055,12 @@ pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
     }
 }
 
+///Given a CURIE of an entity and an LDTab database,
+///return a human-readable representation in Markdown.
 pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> String {
+    //get term tree (encoded in JSON)
     let labelled_json_tree = get_labelled_json_tree_view(entity, table, pool).await;
-
+    //transform JSON to Markdown
     json_tree_2_text(&labelled_json_tree, 0)
 }
 
@@ -1031,6 +1155,8 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
 }
 
 //TODO: Return Result
+///Given a CURIE of an entity and an LDTab database,
+///return an HTML view of a term tree.
 pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> Value {
     let tree = get_rich_json_tree_view(entity, table, pool).await;
 
