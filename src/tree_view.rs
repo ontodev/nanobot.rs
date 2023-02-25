@@ -869,6 +869,58 @@ pub fn build_rich_part_of_branch(
     json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : "part-of", "children" : children_vec})
 }
 
+pub fn extract_label(v: &Value) -> String {
+    match v {
+        Value::Object(_x) => String::from(v["label"].as_str().unwrap()),
+        Value::String(x) => String::from(x), //use IRI instead of label
+        _ => String::from("error"),
+    }
+}
+
+pub fn sort_array(array: &Vec<Value>) -> Value {
+    let mut labels = Vec::new();
+    let mut label_2_element = HashMap::new();
+    for element in array {
+        //let label  = element["label"].as_str().unwrap();
+        let label = extract_label(element);
+        labels.push(label.clone());
+        let sorted_element = sort_rich_tree_by_label(element);
+        label_2_element.insert(label.clone(), sorted_element);
+    }
+
+    labels.sort();
+
+    let mut res = Vec::new();
+    for label in labels {
+        let element = label_2_element.get(&label).unwrap();
+        res.push(element.clone());
+    }
+
+    Value::Array(res)
+}
+
+pub fn sort_object(v: &Map<String, Value>) -> Value {
+    //serde objects are sorted by keys:
+    //"By default the map is backed by a BTreeMap."
+    //TODO: think about this
+    let mut map = Map::new();
+
+    //sort nested values
+    for (key, value) in v.iter() {
+        let sorted_value = sort_rich_tree_by_label(value);
+        map.insert(key.clone(), sorted_value);
+    }
+    Value::Object(map)
+}
+
+pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
+    match tree {
+        Value::Array(a) => sort_array(a),
+        Value::Object(o) => sort_object(o),
+        _ => tree.clone(),
+    }
+}
+
 pub fn build_rich_tree(
     to_insert: &HashSet<String>,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -932,7 +984,8 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     //get labels for curies
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
-    build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label)
+    let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
+    sort_rich_tree_by_label(&tree)
 }
 
 ///Given a CURIE of an entity and a connection to an LDTab database,
