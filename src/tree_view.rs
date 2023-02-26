@@ -981,24 +981,43 @@ pub fn add_children(tree: &mut Value, children: &Value) {
     }
 }
 
-///Given a CURIE of an entity and a connection to an LDTab database,
-///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
-///
-///TODO: example
-pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-    //get the entity's ancestor information w.r.t. subsumption and parthood relations
-    let (mut class_2_subclasses, mut class_2_parts) =
-        get_hierarchy_maps(entity, table, &pool).await.unwrap();
-
+pub async fn get_immediate_children_tree(entity: &str, table: &str, pool: &SqlitePool) -> Value {
     //get the entity's immediate descendents w.r.t. subsumption and parthood relations
     let direct_subclasses = get_direct_sub_hierarchy_maps(entity, table, pool)
         .await
         .unwrap();
     let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await.unwrap();
 
-    //add immediate descendents to ancestor map
-    //class_2_subclasses.insert(String::from(entity), direct_subclasses);
-    //class_2_parts.insert(String::from(entity), direct_part_ofs);
+    //get labels
+    let mut iris = HashSet::new();
+    iris.extend(get_iris_from_set(&direct_subclasses));
+    iris.extend(get_iris_from_set(&direct_part_ofs));
+
+    //get labels for curies
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await;
+
+    let mut children = Vec::new();
+    for sub in direct_subclasses {
+        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : "is-a", "children" : []});
+        children.push(element);
+    }
+
+    for sub in direct_part_ofs {
+        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : "part-of", "children" : []});
+        children.push(element);
+    }
+
+    Value::Array(children)
+}
+
+///Given a CURIE of an entity and a connection to an LDTab database,
+///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
+///
+///TODO: example
+pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+    //get the entity's ancestor information w.r.t. subsumption and parthood relations
+    let (class_2_subclasses, class_2_parts) =
+        get_hierarchy_maps(entity, table, &pool).await.unwrap();
 
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
 
@@ -1010,12 +1029,16 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     //get labels for curies
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
+    //build tree
     let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
+
+    //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree);
 
     //TODO: encode children
-    let test_children = json!("test"); 
-    add_children(&mut sorted, &test_children);
+    let children = get_immediate_children_tree(entity, table, pool).await;
+
+    add_children(&mut sorted, &children);
     sorted
 }
 
