@@ -110,7 +110,7 @@ pub async fn get_label(
 ///return IRIs and CURIEs that occur in the string
 ///
 ///TODO: code example
-pub fn get_iris_from_string(s: &str) -> HashSet<String> {
+pub fn get_iris_from_ldtab_string(s: &str) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
 
     let value = ldtab_2_value(&s);
@@ -136,9 +136,9 @@ pub fn get_iris_from_subclass_map(
 ) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
     for (k, v) in class_2_subclasses {
-        iris.extend(get_iris_from_string(&k));
+        iris.extend(get_iris_from_ldtab_string(&k));
         for subclass in v {
-            iris.extend(get_iris_from_string(&subclass));
+            iris.extend(get_iris_from_ldtab_string(&subclass));
         }
     }
     iris
@@ -150,7 +150,7 @@ pub fn get_iris_from_subclass_map(
 pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
     for e in set {
-        iris.extend(get_iris_from_string(&e));
+        iris.extend(get_iris_from_ldtab_string(&e));
     }
     iris
 }
