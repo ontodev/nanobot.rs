@@ -19,6 +19,9 @@ pub enum Error {
     SQLError(sqlx::Error),
 }
 
+#[derive(Debug)]
+pub struct LabelNotFound;
+
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Self {
         Error::SQLError(e)
@@ -59,7 +62,7 @@ pub async fn get_label_map(
             Ok(x) => {
                 entity_2_label.insert(i, x);
             }
-            Err(_x) => {} //TODO
+            Err(_x) => {} //TODO: how should missing labels be treated? 
         };
     }
 
@@ -90,7 +93,7 @@ pub async fn get_label_hash_map(
             Ok(x) => {
                 entity_2_label.insert(i.clone(), x);
             }
-            Err(_x) => {} //TODO
+            Err(_x) => {} //TODO how should missing labels be treated?
         };
     }
 
@@ -101,13 +104,12 @@ pub async fn get_label_hash_map(
 ///return the entity's label
 ///
 ///TODO: code example
-pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
+pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, LabelNotFound> {
     let query = format!(
         "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
         table, entity
     );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await.map_err(|_| LabelNotFound)?; 
     //NB: this should be a singleton
     for row in rows {
         //let subject: &str = row.get("subject");
@@ -115,7 +117,7 @@ pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<S
         return Ok(String::from(label));
     }
 
-    Err(Error::SQLError(sqlx::Error::RowNotFound))
+    Err(LabelNotFound)
 }
 
 ///Given an LDTab JSON string,
