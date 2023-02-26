@@ -807,7 +807,9 @@ pub fn build_rich_is_a_branch(
 
     //leaf case
     if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        children_vec.push(json!("owl:Nothing"));
+
+        //children_vec.push(json!("owl:Nothing"));
+        //
         //json_map.insert(
         //    String::from(to_insert),
         //    Value::String(String::from("owl:Nothing")),
@@ -858,7 +860,7 @@ pub fn build_rich_part_of_branch(
 
     //leaf case
     if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        children_vec.push(json!("owl:Nothing"));
+        //children_vec.push(json!("owl:Nothing"));
         //json_map.insert(
         //    format!("partOf {}", to_insert),
         //    Value::String(String::from("owl:Nothing")),
@@ -949,7 +951,7 @@ pub fn build_rich_tree(
 
         //leaf case
         if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
-            json_vec.push(json!({String::from(i) : Value::String(String::from("owl:Nothing"))}));
+            json_vec.push(json!(String::from(i)));
         }
     }
     Value::Array(json_vec)
@@ -971,8 +973,8 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await.unwrap();
 
     //add immediate descendents to ancestor map
-    class_2_subclasses.insert(String::from(entity), direct_subclasses);
-    class_2_parts.insert(String::from(entity), direct_part_ofs);
+    //class_2_subclasses.insert(String::from(entity), direct_subclasses);
+    //class_2_parts.insert(String::from(entity), direct_part_ofs);
 
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
 
