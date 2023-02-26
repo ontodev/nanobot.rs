@@ -1032,16 +1032,15 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     //get labels for curies
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
-    //build tree
-    let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
+    //build ancestor tree
+    let mut tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
+
+    //add branch of immediate children to first occurrence of entity in the ancestor tree
+    let children = get_immediate_children_tree(entity, table, pool).await;
+    add_children(&mut tree, &children);
 
     //sort tree by label
-    let mut sorted = sort_rich_tree_by_label(&tree);
-
-    //TODO: encode children
-    let children = get_immediate_children_tree(entity, table, pool).await;
-
-    add_children(&mut sorted, &children);
+    let sorted = sort_rich_tree_by_label(&tree);
     sorted
 }
 
