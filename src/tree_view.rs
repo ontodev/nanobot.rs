@@ -975,7 +975,9 @@ pub async fn get_immediate_children_tree(entity: &str, table: &str, pool: &Sqlit
         children.push(element);
     }
 
-    Value::Array(children)
+    let children_tree = Value::Array(children);
+
+    sort_rich_tree_by_label(&children_tree)
 }
 
 ///Given a CURIE of an entity and a connection to an LDTab database,
@@ -998,18 +1000,16 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
     //build ancestor tree
-    let mut tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
-
-    //TODO: you first need to sort .. then add children (which also need to be sorted)
-    //otherwise, children might not get added to the lexicographically first occurence
-    //(which makes the output not deterministic)
-
-    //add branch of immediate children to first occurrence of entity in the ancestor tree
-    let children = get_immediate_children_tree(entity, table, pool).await;
-    add_children(&mut tree, &children);
+    let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
 
     //sort tree by label
-    let sorted = sort_rich_tree_by_label(&tree);
+    let mut sorted = sort_rich_tree_by_label(&tree);
+
+    //add branch of immediate children to first occurrence of entity in the ancestor tree
+    //NB: sorting the tree first ensures that the tree with added children is deterministic
+    let children = get_immediate_children_tree(entity, table, pool).await;
+    add_children(&mut sorted, &children);
+
     sorted
 }
 
