@@ -8,31 +8,7 @@ static PART_OF: &'static str = "obo:BFO_0000050";
 static IS_A: &'static str = "rdfs:subClassOf";
 
 #[derive(Debug)]
-pub enum SerdeError {
-    NotAMap(String),
-    NotAnObject(String),
-}
-
-#[derive(Debug)]
-pub enum Error {
-    SerdeError(SerdeError),
-    SQLError(sqlx::Error),
-}
-
-#[derive(Debug)]
 pub struct LabelNotFound;
-
-impl From<sqlx::Error> for Error {
-    fn from(e: sqlx::Error) -> Self {
-        Error::SQLError(e)
-    }
-}
-
-impl From<SerdeError> for Error {
-    fn from(e: SerdeError) -> Self {
-        Error::SerdeError(e)
-    }
-}
 
 //An LDTab string is either a JSON string or a string.
 //In the case of a JSON string, the input string can be parsed as a Value.
@@ -40,8 +16,8 @@ impl From<SerdeError> for Error {
 //
 pub fn ldtab_2_value(input: &str) -> Value {
     match from_str::<Value>(input) {
-        Ok(x) => x,//JSON string was parsed to a serde Value
-        _ => json!(input),//normal string is converted to a serde Value
+        Ok(x) => x,        //JSON string was parsed to a serde Value
+        _ => json!(input), //normal string is converted to a serde Value
     }
 }
 
@@ -372,7 +348,7 @@ pub async fn get_hierarchy_maps(
         HashMap<String, HashSet<String>>,
         HashMap<String, HashSet<String>>,
     ),
-    Error,
+    sqlx::Error,
 > {
     //both maps are build by iteratively querying for combinations of 'is-a'
     //and 'part-of' relationships.
@@ -393,13 +369,11 @@ pub async fn get_hierarchy_maps(
 
         for update in &updates {
             //recursive SQL query to get all 'is-a' ancestors
-            let subclasses_updates = get_class_2_subclass_map(&update, table, pool)
-                .await
-                .unwrap();
+            let subclasses_updates = get_class_2_subclass_map(&update, table, pool).await?;
             update_hierarchy_map(&mut class_2_subclasses, &subclasses_updates);
 
             //extract information about 'part-of' relationships
-            let parts_updates = get_part_of_information(&subclasses_updates).unwrap();
+            let parts_updates = get_part_of_information(&subclasses_updates);
             update_hierarchy_map(&mut class_2_parts, &parts_updates);
 
             //collect fillers of 'part-of' restrictions
@@ -441,7 +415,7 @@ pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashMap<String, HashSet<String>>, Error> {
+) -> Result<HashMap<String, HashSet<String>>, sqlx::Error> {
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
     //recursive SQL query for transitive 'is-a' relationships
@@ -490,7 +464,7 @@ pub async fn get_class_2_subclass_map(
 ///TODO: code example
 pub fn get_part_of_information(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
-) -> Result<HashMap<String, HashSet<String>>, Error> {
+) -> HashMap<String, HashSet<String>> {
     let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
 
     //S subclassof part-of some filler
@@ -528,7 +502,7 @@ pub fn get_part_of_information(
             }
         }
     }
-    Ok(class_2_parts)
+    class_2_parts
 }
 
 ///TODO:
@@ -1026,6 +1000,10 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     //build ancestor tree
     let mut tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
 
+    //TODO: you first need to sort .. then add children (which also need to be sorted)
+    //otherwise, children might not get added to the lexicographically first occurence
+    //(which makes the output not deterministic)
+
     //add branch of immediate children to first occurrence of entity in the ancestor tree
     let children = get_immediate_children_tree(entity, table, pool).await;
     add_children(&mut tree, &children);
@@ -1043,8 +1021,8 @@ pub async fn get_direct_sub_hierarchy_maps(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, Error> {
-    let subclasses = get_direct_subclasses(entity, table, pool).await.unwrap();
+) -> Result<HashSet<String>, sqlx::Error> {
+    let subclasses = get_direct_subclasses(entity, table, pool).await?;
 
     let mut is_a: HashSet<String> = HashSet::new();
 
@@ -1068,7 +1046,7 @@ pub async fn get_direct_subclasses(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, Error> {
+) -> Result<HashSet<String>, sqlx::Error> {
     let mut subclasses = HashSet::new();
 
     let query = format!(
@@ -1094,7 +1072,7 @@ pub async fn get_direct_sub_parts(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, Error> {
+) -> Result<HashSet<String>, sqlx::Error> {
     let mut sub_parts = HashSet::new();
 
     //RDF representation of an OWL existential restriction
