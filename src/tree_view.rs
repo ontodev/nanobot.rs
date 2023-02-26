@@ -34,10 +34,14 @@ impl From<SerdeError> for Error {
     }
 }
 
+//An LDTab string is either a JSON string or a string.
+//In the case of a JSON string, the input string can be parsed as a Value.
+//In the case of a string, the input string needs to be converted to a Serde Value
+//
 pub fn ldtab_2_value(input: &str) -> Value {
     match from_str::<Value>(input) {
-        Ok(x) => x,
-        _ => json!(input),
+        Ok(x) => x,//JSON string was parsed to a serde Value
+        _ => json!(input),//normal string is converted to a serde Value
     }
 }
 
@@ -116,7 +120,6 @@ pub fn get_iris_from_ldtab_string(s: &str) -> HashSet<String> {
     let value = ldtab_2_value(&s);
     match value {
         Value::String(x) => {
-            //TODO: why is a string necessarily an IRI?
             iris.insert(x);
         }
         _ => {
