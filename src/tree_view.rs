@@ -957,6 +957,30 @@ pub fn build_rich_tree(
     Value::Array(json_vec)
 }
 
+pub fn add_children(tree: &mut Value, children: &Value) {
+    match tree {
+        Value::Object(_x) => {
+            let tree_children = tree["children"].as_array_mut().unwrap();
+
+            if tree_children.is_empty() {
+                tree["children"] = children.clone();
+            } else {
+                //descend into first child
+                add_children(&mut tree_children[0], children);
+            }
+        }
+        Value::Array(x) => {
+            if x.is_empty() {
+                //do nothing
+            } else {
+                //descend
+                add_children(&mut x[0], children);
+            }
+        }
+        _ => {} //TODO: ERROR
+    }
+}
+
 ///Given a CURIE of an entity and a connection to an LDTab database,
 ///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
 ///
@@ -987,7 +1011,12 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
     let curie_2_label = get_label_hash_map(&iris, table, pool).await;
 
     let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
-    sort_rich_tree_by_label(&tree)
+    let mut sorted = sort_rich_tree_by_label(&tree);
+
+    //TODO: encode children
+    let test_children = json!("test"); 
+    add_children(&mut sorted, &test_children);
+    sorted
 }
 
 ///Given a CURIE of an entity and a connection to an LDTab database,
