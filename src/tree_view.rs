@@ -49,31 +49,10 @@ pub fn ldtab_2_value(input: &str) -> Value {
 ///return a JSON object that maps CURIEs to their labels
 ///
 ///TODO: code example
-pub async fn get_label_map(
-    iris: &HashSet<String>,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<Value, Error> {
-    let mut entity_2_label = HashMap::new();
+pub async fn get_label_map(iris: &HashSet<String>, table: &str, pool: &SqlitePool) -> Value {
+    let entity_2_label = get_label_hash_map(iris, table, pool).await;
 
-    for i in iris {
-        let label = get_label(&i, table, pool).await;
-        match label {
-            Ok(x) => {
-                entity_2_label.insert(i, x);
-            }
-            Err(_x) => {} //TODO: how should missing labels be treated? 
-        };
-    }
-
-    //convert HashMap to Map
-    //TODO: just create the Map in the first place
-    let mut json_map = Map::new();
-    for (k, v) in entity_2_label {
-        json_map.insert(k.clone(), json!(v));
-    }
-
-    Ok(json!({ "@labels": json_map }))
+    json!({ "@labels": entity_2_label })
 }
 
 ///Given a set of CURIEs and an LDTab database,
@@ -104,12 +83,19 @@ pub async fn get_label_hash_map(
 ///return the entity's label
 ///
 ///TODO: code example
-pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, LabelNotFound> {
+pub async fn get_label(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<String, LabelNotFound> {
     let query = format!(
         "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
         table, entity
     );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await.map_err(|_| LabelNotFound)?; 
+    let rows: Vec<SqliteRow> = sqlx::query(&query)
+        .fetch_all(pool)
+        .await
+        .map_err(|_| LabelNotFound)?;
     //NB: this should be a singleton
     for row in rows {
         //let subject: &str = row.get("subject");
