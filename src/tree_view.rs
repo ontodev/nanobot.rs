@@ -4,6 +4,9 @@ use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::util::signature;
 
+static PART_OF: &'static str = "obo:BFO_0000050";
+static IS_A: &'static str = "rdfs:subClassOf";
+
 #[derive(Debug)]
 pub enum SerdeError {
     NotAMap(String),
@@ -176,7 +179,7 @@ pub fn check_part_of_property(value: &Value) -> bool {
     match value {
         Value::Object(x) => {
             let property = x.get("object").unwrap();
-            let part_of = json!("obo:BFO_0000050"); //'part of' relation
+            let part_of = json!(PART_OF); //'part of' relation
             property.eq(&part_of)
         }
         _ => false,
@@ -817,7 +820,7 @@ pub fn build_rich_is_a_branch(
         //Value::Object(json_map)
     }
 
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : "is-a", "children" : children_vec})
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : IS_A, "children" : children_vec})
 }
 
 pub fn build_rich_part_of_branch(
@@ -868,7 +871,7 @@ pub fn build_rich_part_of_branch(
         //Value::Object(json_map);
     }
 
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : "part-of", "children" : children_vec})
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : PART_OF, "children" : children_vec})
 }
 
 pub fn extract_label(v: &Value) -> String {
@@ -998,12 +1001,12 @@ pub async fn get_immediate_children_tree(entity: &str, table: &str, pool: &Sqlit
 
     let mut children = Vec::new();
     for sub in direct_subclasses {
-        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : "is-a", "children" : []});
+        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : IS_A, "children" : []});
         children.push(element);
     }
 
     for sub in direct_part_ofs {
-        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : "part-of", "children" : []});
+        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : PART_OF, "children" : []});
         children.push(element);
     }
 
