@@ -905,7 +905,7 @@ pub fn build_rich_tree(
                 Value::Object(x) => {
                     json_vec.push(Value::Object(x));
                 }
-                _ => {}
+                _ => {} //TODO: should be an error
             }
         }
         if class_2_parts.contains_key(i) {
@@ -913,7 +913,7 @@ pub fn build_rich_tree(
                 Value::Object(x) => {
                     json_vec.push(Value::Object(x));
                 }
-                _ => {}
+                _ => {} //TODO: should be an error
             }
         }
 
@@ -949,12 +949,14 @@ pub fn add_children(tree: &mut Value, children: &Value) {
     }
 }
 
-pub async fn get_immediate_children_tree(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+pub async fn get_immediate_children_tree(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
     //get the entity's immediate descendents w.r.t. subsumption and parthood relations
-    let direct_subclasses = get_direct_sub_hierarchy_maps(entity, table, pool)
-        .await
-        .unwrap();
-    let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await.unwrap();
+    let direct_subclasses = get_direct_sub_hierarchy_maps(entity, table, pool).await?;
+    let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await?;
 
     //get labels
     let mut iris = HashSet::new();
@@ -977,18 +979,23 @@ pub async fn get_immediate_children_tree(entity: &str, table: &str, pool: &Sqlit
 
     let children_tree = Value::Array(children);
 
-    sort_rich_tree_by_label(&children_tree)
+    let sorted: Value = sort_rich_tree_by_label(&children_tree);
+    Ok(sorted)
 }
 
 ///Given a CURIE of an entity and a connection to an LDTab database,
 ///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
 ///
 ///TODO: example
-pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+pub async fn get_rich_json_tree_view(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
     //get the entity's ancestor information w.r.t. subsumption and parthood relations
-    let (class_2_subclasses, class_2_parts) =
-        get_hierarchy_maps(entity, table, &pool).await.unwrap();
+    let (class_2_subclasses, class_2_parts) = get_hierarchy_maps(entity, table, &pool).await?;
 
+    //get elements with no ancestors (i.e., roots)
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
 
     //extract CURIEs/IRIs
@@ -1007,10 +1014,10 @@ pub async fn get_rich_json_tree_view(entity: &str, table: &str, pool: &SqlitePoo
 
     //add branch of immediate children to first occurrence of entity in the ancestor tree
     //NB: sorting the tree first ensures that the tree with added children is deterministic
-    let children = get_immediate_children_tree(entity, table, pool).await;
+    let children = get_immediate_children_tree(entity, table, pool).await?;
     add_children(&mut sorted, &children);
 
-    sorted
+    Ok(sorted)
 }
 
 ///Given a CURIE of an entity and a connection to an LDTab database,
@@ -1236,7 +1243,7 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
 ///Given a CURIE of an entity and an LDTab database,
 ///return an HTML view of a term tree.
 pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-    let tree = get_rich_json_tree_view(entity, table, pool).await;
+    let tree = get_rich_json_tree_view(entity, table, pool).await.unwrap();
 
     let roots = tree_2_html_hiccup_roots(entity, &tree);
 
