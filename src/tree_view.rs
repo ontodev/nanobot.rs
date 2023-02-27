@@ -1018,7 +1018,15 @@ pub async fn get_rich_json_tree_view(
 
     //add branch of immediate children to first occurrence of entity in the ancestor tree
     //NB: sorting the tree first ensures that the tree with added children is deterministic
-    let children = get_immediate_children_tree(entity, table, pool).await?;
+    let mut children = get_immediate_children_tree(entity, table, pool).await?;
+
+    //get grand children
+    for child in children.as_array_mut().unwrap() {
+        let child_iri = child["curie"].as_str().unwrap();
+        let grand_children = get_immediate_children_tree(child_iri, table, pool).await?;
+        child["children"] = grand_children;
+    }
+
     add_children(&mut sorted, &children);
 
     Ok(sorted)
@@ -1170,6 +1178,13 @@ pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
                 res_element.push(json!("li"));
 
                 res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+
+                //encode grand children
+                let grand_children_html = tree_2_html_hiccup_children(
+                    child["curie"].as_str().unwrap(),
+                    &child["children"],
+                );
+                res_element.push(grand_children_html);
 
                 res.push(Value::Array(res_element));
             }
