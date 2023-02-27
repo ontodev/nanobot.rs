@@ -1242,8 +1242,12 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
 //TODO: Return Result
 ///Given a CURIE of an entity and an LDTab database,
 ///return an HTML view of a term tree.
-pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-    let tree = get_rich_json_tree_view(entity, table, pool).await.unwrap();
+pub async fn build_html_hiccup(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
+    let tree = get_rich_json_tree_view(entity, table, pool).await?;
 
     let roots = tree_2_html_hiccup_roots(entity, &tree);
 
@@ -1253,5 +1257,5 @@ pub async fn build_html_hiccup(entity: &str, table: &str, pool: &SqlitePool) -> 
     let class = json!(["a", {"resource" : "owl:Class"}, "owl:Class"]);
     res.push(json!(["li", class, roots]));
 
-    Value::Array(res)
+    Ok(Value::Array(res))
 }
