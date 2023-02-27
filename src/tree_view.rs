@@ -201,7 +201,11 @@ pub fn remove_invalid_class(
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
 ) {
     //remove mapping [target : {subclass_1, subclass_2, ..., subclass_n}]
-    let values = class_2_subclasses.remove(target).unwrap();
+    let values = match class_2_subclasses.remove(target) {
+        Some(x) => x,
+        None => HashSet::new(), //return empty set
+    };
+
     for (_key, value) in class_2_subclasses {
         if value.contains(target) {
             //replace 'target' with {subclass_1, subclass_2, ..., subclass_n}
