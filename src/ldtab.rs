@@ -60,6 +60,26 @@ pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result
 // ################################################
 // ######## build label map ####################
 // ################################################
+pub async fn get_label_hash_map(
+    iris: &HashSet<String>,
+    table: &str,
+    pool: &SqlitePool,
+) -> HashMap<String, String> {
+    let mut entity_2_label = HashMap::new();
+
+    //get labels for all subjects
+    for i in iris {
+        let label = get_label(&i, table, pool).await;
+        match label {
+            Ok(x) => {
+                entity_2_label.insert(i.clone(), x);
+            }
+            Err(_x) => {} //TODO
+        };
+    }
+
+    entity_2_label
+}
 
 pub async fn get_label_map(
     iris: &HashSet<String>,
@@ -134,6 +154,31 @@ pub async fn get_property_map(
     Ok(Value::Object(predicate_map))
 }
 
+pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
+    let predicate: &str = row.get("predicate");
+    let object: &str = row.get("object");
+    let datatype: &str = row.get("datatype");
+    let annotation: &str = row.get("annotation");
+
+    //NB: an LDTab thick triple makes use of strings (which are not JSON strings
+    //example: "this is a string" and "\"this is a JSON string\"".).
+    let object_value = match from_str::<Value>(object) {
+        Ok(x) => x,
+        _ => json!(object),
+    };
+
+    //handle annotations
+    let object_datatype = match from_str::<Value>(annotation) {
+        Ok(annotation_value) => {
+            json!({"object" : object_value, "datatype" : datatype, "annotation" : annotation_value})
+        }
+        _ => json!({"object" : object_value, "datatype" : datatype}),
+    };
+
+    //put things into map
+    json!({ predicate: vec![object_datatype] })
+}
+
 pub async fn get_json_representation(
     subject: &str,
     table: &str,
@@ -144,6 +189,99 @@ pub async fn get_json_representation(
         Ok(x) => Ok(x.to_string()),
         Err(x) => Err(x),
     }
+}
+// ################################################
+// ######## HTML view #############################
+// ################################################
+pub fn ldtab_value_to_html(value: &Value, iri_2_label: &HashMap<String, String>) -> Value {
+    let datatype = &value["datatype"];
+
+    let mut list_element = Vec::new();
+    list_element.push(json!("li"));
+
+    match datatype {
+        Value::String(x) => {
+            match x.as_str() {
+                "_IRI" => {
+                    //get label (or use IRI if no label exists)
+                    let entity = value["object"].as_str().unwrap();
+                    let label = match iri_2_label.get(entity) {
+                        Some(y) => y.clone(),
+                        None => String::from(entity),
+                    };
+                    list_element.push(json!(["a", {"resource" : value["object"]}, label ]));
+                }
+                "_JSON" => {
+                    list_element.push(json!("JSON"));
+                } //TODO: encode Manchester
+                _ => {
+                    list_element.push(value["object"].clone());
+                    list_element.push(json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": x.as_str()}, x.as_str()]]));
+                }
+            }
+        }
+        _ => {
+            json!("ERROR");
+        } //TODO
+    };
+    Value::Array(list_element)
+}
+
+pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqlitePool) -> Value {
+    let predicate_map = get_property_map(subject, table, pool).await.unwrap();
+
+    //extract IRIs
+    let mut iris = HashSet::new();
+    signature::get_iris(&predicate_map, &mut iris);
+
+    //2. labels
+    let label_map = get_label_hash_map(&iris, table, pool).await;
+    println!("LABELS: {:?}", label_map);
+
+    let mut outer_list = Vec::new();
+    outer_list.push(json!("ul"));
+
+    //each key gets a li
+    for (key, value) in predicate_map.as_object().unwrap() {
+        let mut outer_list_element = Vec::new();
+        outer_list_element.push(json!("li"));
+        //encode key as a
+        // res_elements.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+
+        outer_list_element.push(json!(["a", { "resource": key }, key])); //TODO: use key label
+
+        let mut inner_list = Vec::new();
+        inner_list.push(json!("ul"));
+        for v in value.as_array().unwrap() {
+            //TODO
+            let v_encoding = ldtab_value_to_html(v, &label_map);
+            inner_list.push(json!(v_encoding));
+        }
+        outer_list_element.push(json!(inner_list));
+        outer_list.push(json!(outer_list_element));
+    }
+    json!(outer_list)
+}
+
+// ################################################
+// ######## putting things together ###############
+// ################################################
+//
+pub async fn get_things(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
+    let predicate_map = get_property_map(subject, table, pool).await.unwrap();
+    let subject_map = json!({ subject: predicate_map });
+
+    //extract IRIs
+    let mut iris = HashSet::new();
+    signature::get_iris(&subject_map, &mut iris);
+
+    //2. labels
+    let label_map = get_label_map(&iris, table, pool).await;
+
+    //3. prefixes
+    let prefix_map = get_prefix_map(&iris, pool).await;
+
+    (subject_map, label_map.unwrap(), prefix_map.unwrap())
 }
 
 pub async fn get_subject_map(
@@ -202,29 +340,4 @@ pub async fn get_subject_map(
     }
 
     Ok(Value::Object(json_map))
-}
-
-pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
-    let predicate: &str = row.get("predicate");
-    let object: &str = row.get("object");
-    let datatype: &str = row.get("datatype");
-    let annotation: &str = row.get("annotation");
-
-    //NB: an LDTab thick triple makes use of strings (which are not JSON strings
-    //example: "this is a string" and "\"this is a JSON string\"".).
-    let object_value = match from_str::<Value>(object) {
-        Ok(x) => x,
-        _ => json!(object),
-    };
-
-    //handle annotations
-    let object_datatype = match from_str::<Value>(annotation) {
-        Ok(annotation_value) => {
-            json!({"object" : object_value, "datatype" : datatype, "annotation" : annotation_value})
-        }
-        _ => json!({"object" : object_value, "datatype" : datatype}),
-    };
-
-    //put things into map
-    json!({ predicate: vec![object_datatype] })
 }
