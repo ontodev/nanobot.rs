@@ -108,6 +108,32 @@ pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<S
 // ################################################
 // ######## build property map ####################
 // ################################################
+pub async fn get_property_map(
+    subject: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, Error> {
+    let query = format!("SELECT * FROM {} WHERE subject='{}'", table, subject);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+    let predicates: Vec<Value> = rows.iter().map(|row| ldtab_2_json_shape(row)).collect();
+
+    let mut predicate_map = Map::new();
+    for p in predicates {
+        match p {
+            Value::Object(mut x) => predicate_map.append(&mut x),
+            _ => {
+                return Err(Error::SerdeError(SerdeError::NotAnObject(format!(
+                    "Given Value: {}",
+                    p.to_string()
+                ))))
+            }
+        }
+    }
+
+    Ok(Value::Object(predicate_map))
+}
+
 pub async fn get_json_representation(
     subject: &str,
     table: &str,
@@ -125,26 +151,8 @@ pub async fn get_subject_map(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, Error> {
-    let query = format!("SELECT * FROM {} WHERE subject='{}'", table, subject);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-
-    let predicates: Vec<Value> = rows.iter().map(|row| ldtab_2_json_shape(row)).collect();
-
-    let mut predicate_map = Map::new();
-    for p in predicates {
-        match p {
-            Value::Object(mut x) => predicate_map.append(&mut x),
-            //TODO: what's an idiomatic of nesting errors?
-            _ => {
-                return Err(Error::SerdeError(SerdeError::NotAnObject(format!(
-                    "Given Value: {}",
-                    p.to_string()
-                ))))
-            }
-        }
-    }
-
     //1. predicate map
+    let predicate_map = get_property_map(subject, table, pool).await?;
     let subject_map = json!({ subject: predicate_map });
 
     //extract IRIs
