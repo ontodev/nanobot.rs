@@ -193,7 +193,11 @@ pub async fn get_json_representation(
 // ################################################
 // ######## HTML view #############################
 // ################################################
-pub fn ldtab_value_to_html(property: &str, value: &Value, iri_2_label: &HashMap<String, String>) -> Value {
+pub fn ldtab_value_to_html(
+    property: &str,
+    value: &Value,
+    iri_2_label: &HashMap<String, String>,
+) -> Value {
     let datatype = &value["datatype"];
 
     let mut list_element = Vec::new();
@@ -209,7 +213,9 @@ pub fn ldtab_value_to_html(property: &str, value: &Value, iri_2_label: &HashMap<
                         Some(y) => y.clone(),
                         None => String::from(entity),
                     };
-                    list_element.push(json!(["a", {"property" : property, "resource" : value["object"]}, label ]));
+                    list_element.push(
+                        json!(["a", {"property" : property, "resource" : value["object"]}, label ]),
+                    );
                 }
                 "_JSON" => {
                     list_element.push(json!("JSON"));
@@ -244,13 +250,17 @@ pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqliteP
     for (key, value) in predicate_map.as_object().unwrap() {
         let mut outer_list_element = Vec::new();
 
-        outer_list_element.push(json!("li")); 
-        outer_list_element.push(json!(["a", { "resource": key }, key])); //TODO: use key label
+        let key_label = match label_map.get(key) {
+            Some(x) => x,
+            None => key,
+        };
+
+        outer_list_element.push(json!("li"));
+        outer_list_element.push(json!(["a", { "resource": key }, key_label]));
 
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
         for v in value.as_array().unwrap() {
-            //TODO
             let v_encoding = ldtab_value_to_html(key, v, &label_map);
             inner_list.push(json!(v_encoding));
         }
