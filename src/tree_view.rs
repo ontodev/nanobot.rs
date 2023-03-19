@@ -1278,3 +1278,91 @@ pub async fn build_html_hiccup(
 
     Ok(Value::Array(res))
 }
+
+pub async fn get_html_top_hierarchy(
+    case: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
+    let mut top = "";
+    let mut relation = "";
+    let mut rdf_type = "";
+
+    match case {
+        "Class" => {
+            top = "owl:Thing";
+            relation = "rdfs:subClassOf";
+            rdf_type = "owl:Class"
+        }
+        "Object Property" => {
+            top = "owl:topObjectProperty";
+            relation = "rdfs:subPropertyOf";
+            rdf_type = "owl:ObjectProperty";
+        }
+        "Data Property" => {
+            top = "owl:topDataProperty";
+            relation = "rdfs:subPropertyOf";
+            rdf_type = "owl:DatatypeProperty";
+        }
+        _ => {}
+    }
+
+    //query for top level nodes
+    let query = format!(
+        "SELECT s1.subject
+            FROM {table} s1
+            WHERE s1.predicate = 'rdf:type'
+              AND s1.object = '{rdf_type}'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM {table} s2
+                WHERE s2.subject = s1.subject
+                  AND s2.predicate = '{relation}'
+              )
+            UNION
+            SELECT subject
+            FROM {table}
+            WHERE predicate = '{relation}'
+            AND object = '{top}'",
+        top = top,
+        table = table,
+        relation = relation,
+        rdf_type = rdf_type,
+    );
+
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+    //build HTML view
+    let mut res = Vec::new();
+    res.push(json!("ul"));
+    res.push(json!(["li", "Ontology"]));
+
+    let mut children_list = Vec::new();
+    children_list.push(json!("ul"));
+    children_list.push(json!({"id" : "children"}));
+
+    for row in rows {
+        let subject: &str = row.get("subject");
+
+        let subject_label = get_label(subject, table, pool).await;
+
+        match subject_label {
+            Ok(x) => {
+                children_list.push(
+                    json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"}, x  ]]),
+                );
+            }
+            _ => {
+                children_list.push(
+                    json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"},subject ]]),
+                );
+            }
+        }
+        //TODO: handle children
+        //let children = get_immediate_children_tree(subject, table, pool).await.unwrap();
+        //TODO: children for object properties
+        //TODO: children for data properties
+    }
+    res.push(json!(["li", case, children_list]));
+    Ok(Value::Array(res))
+}
