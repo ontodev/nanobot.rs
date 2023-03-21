@@ -987,17 +987,80 @@ pub async fn get_immediate_children_tree(
     Ok(sorted)
 }
 
+pub async fn get_preferred_roots(
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, sqlx::Error> {
+    let mut preferred_roots = HashSet::new();
+    let query = format!(
+        "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
+        table = table,
+    );
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let object: &str = row.get("object");
+        preferred_roots.insert(String::from(object));
+    }
+
+    Ok(preferred_roots)
+}
+
 ///Given a CURIE of an entity and a connection to an LDTab database,
 ///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
 ///
 ///TODO: example
 pub async fn get_rich_json_tree_view(
     entity: &str,
+    preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, sqlx::Error> {
     //get the entity's ancestor information w.r.t. subsumption and parthood relations
-    let (class_2_subclasses, class_2_parts) = get_hierarchy_maps(entity, table, &pool).await?;
+    let (mut class_2_subclasses, mut class_2_parts) =
+        get_hierarchy_maps(entity, table, &pool).await?;
+
+    if preferred_roots {
+        //query for preferred roots
+        let preferred_roots = get_preferred_roots(table, pool).await?;
+
+        //collect all transitive ancestors
+        let mut preferred_root_ancestor = HashSet::new();
+        let mut current = HashSet::new();
+        current.extend(preferred_roots);
+        let mut next = HashSet::new();
+        while !current.is_empty() {
+            for preferred in &current {
+                if class_2_subclasses.contains_key(preferred) {
+                    for (key, value) in &class_2_subclasses {
+                        if value.contains(preferred) {
+                            preferred_root_ancestor.insert(key.clone());
+                            next.insert(key.clone());
+                        }
+                    }
+                }
+
+                if class_2_parts.contains_key(preferred) {
+                    for (key, value) in &class_2_parts {
+                        if value.contains(preferred) {
+                            preferred_root_ancestor.insert(key.clone());
+                            next.insert(key.clone());
+                        }
+                    }
+                }
+            }
+            current.clear();
+            for n in &next {
+                current.insert(n.clone());
+            }
+            next.clear();
+        }
+
+        //remove ancestors for preferred root terms
+        for ancestor in preferred_root_ancestor {
+            class_2_subclasses.remove(&ancestor);
+            class_2_parts.remove(&ancestor);
+        }
+    }
 
     //get elements with no ancestors (i.e., roots)
     let roots = identify_roots(&class_2_subclasses, &class_2_parts);
@@ -1263,10 +1326,11 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
 ///return an HTML view of a term tree.
 pub async fn build_html_hiccup(
     entity: &str,
+    preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, sqlx::Error> {
-    let tree = get_rich_json_tree_view(entity, table, pool).await?;
+    let tree = get_rich_json_tree_view(entity, preferred_roots, table, pool).await?;
 
     let roots = tree_2_html_hiccup_roots(entity, &tree);
 
