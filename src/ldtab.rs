@@ -168,17 +168,6 @@ pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
     json!({ predicate: vec![object_datatype] })
 }
 
-pub async fn get_json_representation(
-    subject: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<String, Error> {
-    let json_map = get_subject_map(subject, table, pool).await;
-    match json_map {
-        Ok(x) => Ok(x.to_string()),
-        Err(x) => Err(x),
-    }
-}
 // ################################################
 // ######## HTML view #############################
 // ################################################
