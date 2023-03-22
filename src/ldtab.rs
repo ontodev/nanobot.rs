@@ -294,7 +294,9 @@ pub async fn get_predicate_map_hiccup(
     outer_list.push(json!("ul"));
     outer_list.push(json!({"id":"annotations", "style" : "margin-left: -1rem;"}));
 
-    //Give precedence to labels, definitions, and synonyms (TODO)
+    //Give precedence to labels, definitions 
+    //TODO: synonyms
+    //TODO: the ordering of predicates needs to be passed as a parameter
     let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
     //Put comments last
     let ending_order = vec![String::from("rdfs:comment")];
@@ -302,20 +304,22 @@ pub async fn get_predicate_map_hiccup(
     let (order, key_2_value) =
         sort_predicate_map_by_label(&predicate_map, &label_map, &starting_order, &ending_order);
 
-    for key in order {
+    for key in order {//build list elements according to the specified order
         if !key_2_value.contains_key(&key) {
+            //skip properties that have been specified in the desired ordering
+            //but that are not found in the database
             continue;
         }
 
-        let value = key_2_value.get(&key).unwrap();
-
-        let mut outer_list_element = Vec::new();
-
+        //get property values and labels
+        let value = key_2_value.get(&key).unwrap(); 
         let key_label = match label_map.get(&key) {
             Some(x) => x.clone(),
             None => key.clone(),
         };
 
+        //build HTML (encoded via JSON hiccup)
+        let mut outer_list_element = Vec::new(); 
         outer_list_element.push(json!("li"));
         outer_list_element.push(json!(["a", { "resource": key.clone() }, key_label]));
 
@@ -334,23 +338,6 @@ pub async fn get_predicate_map_hiccup(
 // ################################################
 // ######## putting things together ###############
 // ################################################
-//
-pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
-    //build term property JSON shape
-    let predicate_map = get_property_map(subject, table, pool).await.unwrap();
-    let subject_map = json!({ subject: predicate_map });
-
-    //extract IRIs in JSON shape
-    let mut iris = HashSet::new();
-    signature::get_iris(&subject_map, &mut iris);
-
-    //build label & prefix maps
-    let label_map = get_label_map(&iris, table, pool).await.unwrap();
-    let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
-
-    (subject_map, label_map, prefix_map)
-}
-
 pub async fn get_subject_map(
     subject: &str,
     table: &str,
@@ -407,4 +394,26 @@ pub async fn get_subject_map(
     }
 
     Ok(Value::Object(json_map))
+}
+
+// ################################################
+// ######## Demo for constituent parts ############
+// ################################################
+//
+pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value, Value) {
+    //build term property JSON shape
+    let predicate_map = get_property_map(subject, table, pool).await.unwrap();
+    let subject_map = json!({ subject: predicate_map });
+
+    //extract IRIs in JSON shape
+    let mut iris = HashSet::new();
+    signature::get_iris(&subject_map, &mut iris);
+
+    //build label & prefix maps
+    let label_map = get_label_map(&iris, table, pool).await.unwrap();
+    let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
+
+    let html_hiccup = get_predicate_map_hiccup(subject, table, pool).await.unwrap();
+
+    (subject_map, label_map, prefix_map, html_hiccup)
 }
