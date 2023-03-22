@@ -28,9 +28,12 @@ impl From<SerdeError> for Error {
     }
 }
 
-// ################################################
-// ######## build prefix map ######################
-// ################################################
+/// Given a set of IRIs and a connection to an LDTab database,
+/// return a map from prefixes to their IRIs
+/// (encoded as a JSON Object).
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result<Value, Error> {
     let mut json_map = Map::new();
 
@@ -57,8 +60,14 @@ pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result
 }
 
 // ################################################
-// ######## build label map ####################
+// ############### label map ######################
 // ################################################
+
+/// Given a set of IRIs, a database connection and a target table,
+/// return a map from prefixes to their IRIs.
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_label_hash_map(
     iris: &HashSet<String>,
     table: &str,
@@ -80,6 +89,12 @@ pub async fn get_label_hash_map(
     entity_2_label
 }
 
+/// Given a set of IRIs, a database connection, and a target table,
+/// return a map from prefixes to their IRIs
+/// (encoded as a JSON Object).
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_label_map(
     iris: &HashSet<String>,
     table: &str,
@@ -97,6 +112,11 @@ pub async fn get_label_map(
     Ok(json!({ "@labels": json_map }))
 }
 
+/// Given a set of IRIs, a database connection, and a target table,
+/// return the label for the IRI.
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
     let query = format!(
         "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
@@ -115,8 +135,15 @@ pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<S
 }
 
 // ################################################
-// ######## build property map ####################
+// ############ property map ######################
 // ################################################
+
+/// Given an IRI, a database connection, and a target table,
+/// return a map from the subject's properties to their values
+/// (encoded as a JSON Object).
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_property_map(
     subject: &str,
     table: &str,
@@ -143,6 +170,11 @@ pub async fn get_property_map(
     Ok(Value::Object(predicate_map))
 }
 
+/// Given a row in from an LDTab database,
+/// return a JSON Object mapping the predicate value to the object value.
+///
+/// TODO: example
+/// TODO: doc test
 pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
     let predicate: &str = row.get("predicate");
     let object: &str = row.get("object");
@@ -171,6 +203,12 @@ pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
 // ################################################
 // ######## HTML view #############################
 // ################################################
+//
+/// Given a property, its corresponding value, and a map from IRIs to labels
+/// return an HTML (JSON Hiccup) encoding for the term property shape.
+///
+/// TODO: example
+/// TODO: doc test
 pub fn ldtab_value_to_html(
     property: &str,
     value: &Value,
@@ -213,11 +251,9 @@ pub fn ldtab_value_to_html(
 
 //Given a predicate map, a label map, a starting and ending list of CURIEs,
 //return the tuple: (order_vector, curie_2_value_map) where
-//the order_vector contains an order of CURIEs by labels (see
-//https://github.com/ontodev/gizmos#predicates for details)
-//the curie_2_value map is a HashMap from property CURIEs to values
-//(this is the same information given by the input predicate map, but encoded in a HashMap rather
-//than a JSON object)
+// - the order_vector contains an order of CURIEs by labels
+//   (see https://github.com/ontodev/gizmos#predicates for details)
+// - the curie_2_value map is a HashMap from property CURIEs to values
 pub fn sort_predicate_map_by_label(
     predicate_map: &Value,
     label_map: &HashMap<String, String>,
@@ -276,6 +312,11 @@ pub fn sort_predicate_map_by_label(
     (order, key_2_value)
 }
 
+/// Given a subject, an LDTab database, and a target table,
+/// return an HTML (JSON Hiccup) encoding of the term property shape.
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_predicate_map_hiccup(
     subject: &str,
     table: &str,
@@ -294,7 +335,7 @@ pub async fn get_predicate_map_hiccup(
     outer_list.push(json!("ul"));
     outer_list.push(json!({"id":"annotations", "style" : "margin-left: -1rem;"}));
 
-    //Give precedence to labels, definitions 
+    //Give precedence to labels, definitions
     //TODO: synonyms
     //TODO: the ordering of predicates needs to be passed as a parameter
     let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
@@ -304,7 +345,8 @@ pub async fn get_predicate_map_hiccup(
     let (order, key_2_value) =
         sort_predicate_map_by_label(&predicate_map, &label_map, &starting_order, &ending_order);
 
-    for key in order {//build list elements according to the specified order
+    for key in order {
+        //build list elements according to the specified order
         if !key_2_value.contains_key(&key) {
             //skip properties that have been specified in the desired ordering
             //but that are not found in the database
@@ -312,14 +354,14 @@ pub async fn get_predicate_map_hiccup(
         }
 
         //get property values and labels
-        let value = key_2_value.get(&key).unwrap(); 
+        let value = key_2_value.get(&key).unwrap();
         let key_label = match label_map.get(&key) {
             Some(x) => x.clone(),
             None => key.clone(),
         };
 
         //build HTML (encoded via JSON hiccup)
-        let mut outer_list_element = Vec::new(); 
+        let mut outer_list_element = Vec::new();
         outer_list_element.push(json!("li"));
         outer_list_element.push(json!(["a", { "resource": key.clone() }, key_label]));
 
@@ -338,6 +380,16 @@ pub async fn get_predicate_map_hiccup(
 // ################################################
 // ######## putting things together ###############
 // ################################################
+//
+/// Given a subject, an LDTab database, and a target table,
+/// return an HTML (JSON Hiccup) encoding of
+/// - the term property shape
+/// - the prefix map
+/// - the label map
+/// as a JSON object
+///
+/// TODO: example
+/// TODO: doc test
 pub async fn get_subject_map(
     subject: &str,
     table: &str,
@@ -399,7 +451,6 @@ pub async fn get_subject_map(
 // ################################################
 // ######## Demo for constituent parts ############
 // ################################################
-//
 pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value, Value) {
     //build term property JSON shape
     let predicate_map = get_property_map(subject, table, pool).await.unwrap();
@@ -413,7 +464,9 @@ pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Valu
     let label_map = get_label_map(&iris, table, pool).await.unwrap();
     let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
 
-    let html_hiccup = get_predicate_map_hiccup(subject, table, pool).await.unwrap();
+    let html_hiccup = get_predicate_map_hiccup(subject, table, pool)
+        .await
+        .unwrap();
 
     (subject_map, label_map, prefix_map, html_hiccup)
 }
