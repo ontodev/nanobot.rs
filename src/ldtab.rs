@@ -354,18 +354,18 @@ pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqliteP
 // ######## putting things together ###############
 // ################################################
 //
-pub async fn get_things(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
+pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
+
+    //build term property JSON shape
     let predicate_map = get_property_map(subject, table, pool).await.unwrap();
     let subject_map = json!({ subject: predicate_map });
 
-    //extract IRIs
+    //extract IRIs in JSON shape
     let mut iris = HashSet::new();
     signature::get_iris(&subject_map, &mut iris);
 
-    //2. labels
-    let label_map = get_label_map(&iris, table, pool).await.unwrap();
-
-    //3. prefixes
+    //build label & prefix maps
+    let label_map = get_label_map(&iris, table, pool).await.unwrap(); 
     let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
 
     (subject_map, label_map, prefix_map)
