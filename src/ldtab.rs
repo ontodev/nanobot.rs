@@ -298,8 +298,9 @@ pub fn sort_predicate_map_by_label(
     (order, key_2_value)
 }
 
-pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqlitePool) -> Value {
-    let predicate_map = get_property_map(subject, table, pool).await.unwrap();
+pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqlitePool) -> Result<Value,Error> {
+
+    let predicate_map = get_property_map(subject, table, pool).await?;
 
     //extract IRIs
     let mut iris = HashSet::new();
@@ -346,7 +347,7 @@ pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqliteP
         outer_list_element.push(json!(inner_list));
         outer_list.push(json!(outer_list_element));
     }
-    json!(outer_list)
+    Ok(json!(outer_list))
 }
 
 // ################################################
@@ -362,12 +363,12 @@ pub async fn get_things(subject: &str, table: &str, pool: &SqlitePool) -> (Value
     signature::get_iris(&subject_map, &mut iris);
 
     //2. labels
-    let label_map = get_label_map(&iris, table, pool).await;
+    let label_map = get_label_map(&iris, table, pool).await.unwrap();
 
     //3. prefixes
-    let prefix_map = get_prefix_map(&iris, pool).await;
+    let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
 
-    (subject_map, label_map.unwrap(), prefix_map.unwrap())
+    (subject_map, label_map, prefix_map)
 }
 
 pub async fn get_subject_map(
