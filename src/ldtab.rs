@@ -31,7 +31,6 @@ impl From<SerdeError> for Error {
 // ################################################
 // ######## build prefix map ######################
 // ################################################
-//
 pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result<Value, Error> {
     let mut json_map = Map::new();
 
@@ -86,25 +85,15 @@ pub async fn get_label_map(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, Error> {
-    let mut entity_2_label = HashMap::new();
+    let entity_2_label = get_label_hash_map(iris, table, pool).await;
 
-    //get labels for all subjects
-    for i in iris {
-        let label = get_label(&i, table, pool).await;
-        match label {
-            Ok(x) => {
-                entity_2_label.insert(i, x);
-            }
-            Err(_x) => {} //TODO
-        };
-    }
-
-    //merge label maps
+    //encode HashMap as JSON object
     let mut json_map = Map::new();
     for (k, v) in entity_2_label {
         json_map.insert(k.clone(), json!(v));
     }
 
+    //return label map
     Ok(json!({ "@labels": json_map }))
 }
 
@@ -298,8 +287,11 @@ pub fn sort_predicate_map_by_label(
     (order, key_2_value)
 }
 
-pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqlitePool) -> Result<Value,Error> {
-
+pub async fn get_predicate_map_hiccup(
+    subject: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, Error> {
     let predicate_map = get_property_map(subject, table, pool).await?;
 
     //extract IRIs
@@ -355,7 +347,6 @@ pub async fn get_predicate_map_hiccup(subject: &str, table: &str, pool: &SqliteP
 // ################################################
 //
 pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
-
     //build term property JSON shape
     let predicate_map = get_property_map(subject, table, pool).await.unwrap();
     let subject_map = json!({ subject: predicate_map });
@@ -365,7 +356,7 @@ pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Valu
     signature::get_iris(&subject_map, &mut iris);
 
     //build label & prefix maps
-    let label_map = get_label_map(&iris, table, pool).await.unwrap(); 
+    let label_map = get_label_map(&iris, table, pool).await.unwrap();
     let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
 
     (subject_map, label_map, prefix_map)
