@@ -26,6 +26,7 @@ tree-sitter = "0.20.6"
 tree-sitter-sqlrest = { path = "../tree-sitter-sqlrest" }
 urlencoding = "2.1.2"
 wiring_rs = { git = "https://github.com/ontodev/wiring.rs" }
+itertools = "0.10.5"
 
 [build-dependencies]
 cc = "1.0"
