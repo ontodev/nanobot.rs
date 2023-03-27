@@ -585,29 +585,6 @@ pub async fn get_subject_map(
     Ok(Value::Object(json_map))
 }
 
-// ################################################
-// ######## Demo for constituent parts ############
-// ################################################
-pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
-    //build term property JSON shape
-    let predicate_map = get_property_map(subject, table, pool).await.unwrap();
-    let subject_map = json!({ subject: predicate_map });
-
-    //extract IRIs in JSON shape
-    let mut iris = HashSet::new();
-    signature::get_iris(&subject_map, &mut iris);
-
-    //build label & prefix maps
-    let label_map = get_label_map(&iris, table, pool).await.unwrap();
-    let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
-
-    //let html_hiccup = get_predicate_map_hiccup(subject, table, pool)
-    //    .await
-    //    .unwrap();
-
-    (subject_map, label_map, prefix_map)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
