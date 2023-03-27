@@ -302,10 +302,14 @@ fn object_2_json_shape(object: &str, datatype: &str, annotation: &str) -> Value 
 
 /// Given a property, a value, and a map from CURIEs/IRIs to labels,
 /// return a hiccup-style list encoding an hyperlink.
-/// 
+///
 /// Example
 /// TODO
-fn ldtab_iri_2_hiccup(property: &str, value: &Value, iri_2_label: &HashMap<String, String>) -> Value {
+fn ldtab_iri_2_hiccup(
+    property: &str,
+    value: &Value,
+    iri_2_label: &HashMap<String, String>,
+) -> Value {
     let entity = value["object"].as_str().unwrap();
     let label = match iri_2_label.get(entity) {
         Some(y) => y.clone(),
@@ -369,7 +373,7 @@ fn ldtab_value_2_hiccup(
 ///  - the order_vector contains an order of predicates by labels
 ///    (see https://github.com/ontodev/gizmos#predicates for details)
 ///  - the predicate_2_value map is a HashMap from predicates to values
-/// 
+///
 /// Examples
 /// TODO
 pub fn sort_predicate_map_by_label(
