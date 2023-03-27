@@ -300,8 +300,12 @@ fn object_2_json_shape(object: &str, datatype: &str, annotation: &str) -> Value 
 // ################################################
 //
 
-//TODO
-fn ldtab_iri_2_html(property: &str, value: &Value, iri_2_label: &HashMap<String, String>) -> Value {
+/// Given a property, a value, and a map from CURIEs/IRIs to labels,
+/// return a hiccup-style list encoding an hyperlink.
+/// 
+/// Example
+/// TODO
+fn ldtab_iri_2_hiccup(property: &str, value: &Value, iri_2_label: &HashMap<String, String>) -> Value {
     let entity = value["object"].as_str().unwrap();
     let label = match iri_2_label.get(entity) {
         Some(y) => y.clone(),
@@ -310,8 +314,12 @@ fn ldtab_iri_2_html(property: &str, value: &Value, iri_2_label: &HashMap<String,
     json!(["a", {"property" : property, "resource" : value["object"]}, label ])
 }
 
-//TODO
-fn ldtab_json_2_html(
+/// Given a property, a value, and a map from CURIEs/IRIs to labels,
+/// return a hiccup-style list encoding a nested LDTab expression.
+///
+/// Example
+/// TODO
+fn ldtab_json_2_hiccup(
     property: &str,
     value: &Value,
     iri_2_label: &HashMap<String, String>,
@@ -321,11 +329,11 @@ fn ldtab_json_2_html(
 }
 
 /// Given a property, a value, and a map from CURIEs to labels
-/// return an HTML (JSON Hiccup) encoding for the term property shape.
+/// return a hiccup-style list encoding of the term property shape.
 ///
 /// TODO: example
 /// TODO: doc test
-fn ldtab_value_2_html(
+fn ldtab_value_2_hiccup(
     property: &str,
     value: &Value,
     iri_2_label: &HashMap<String, String>,
@@ -339,10 +347,10 @@ fn ldtab_value_2_html(
     match datatype {
         Value::String(x) => match x.as_str() {
             "_IRI" => {
-                list_element.push(ldtab_iri_2_html(property, value, iri_2_label));
+                list_element.push(ldtab_iri_2_hiccup(property, value, iri_2_label));
             }
             "_JSON" => {
-                list_element.push(ldtab_json_2_html(property, value, iri_2_label));
+                list_element.push(ldtab_json_2_hiccup(property, value, iri_2_label));
             }
             _ => {
                 list_element.push(value["object"].clone());
@@ -356,11 +364,14 @@ fn ldtab_value_2_html(
     Value::Array(list_element)
 }
 
-//Given a predicate map, a label map, a starting and ending list of predicates,
-//return the tuple: (order_vector, predicate_2_value_map) where
-// - the order_vector contains an order of predicates by labels
-//   (see https://github.com/ontodev/gizmos#predicates for details)
-// - the predicate_2_value map is a HashMap from predicates to values
+/// Given a predicate map, a label map, a starting and ending list of predicates,
+/// return the tuple: (order_vector, predicate_2_value_map) where
+///  - the order_vector contains an order of predicates by labels
+///    (see https://github.com/ontodev/gizmos#predicates for details)
+///  - the predicate_2_value map is a HashMap from predicates to values
+/// 
+/// Examples
+/// TODO
 pub fn sort_predicate_map_by_label(
     predicate_map: &Value,
     label_map: &HashMap<String, String>,
@@ -493,7 +504,7 @@ pub async fn get_predicate_map_hiccup(
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
         for v in value.as_array().unwrap() {
-            let v_encoding = ldtab_value_2_html(&key, v, &label_map);
+            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map);
             inner_list.push(json!(v_encoding));
         }
         outer_list_element.push(json!(inner_list));
