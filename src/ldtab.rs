@@ -4,6 +4,8 @@ use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::util::signature;
+use wiring_rs::util::parser::parse_thick_triple_object;
+use wiring_rs::ldtab_2_ofn::class_translation::translate;
 
 #[derive(Debug)]
 pub enum SerdeError {
@@ -121,8 +123,8 @@ pub async fn get_prefix_map(
 // ############### label map ######################
 // ################################################
 
-/// Given a set of CURIEs, return a query string for an LDTab database
-/// that yields a map from CURIEs to their respective rdfs:labels.
+/// Given a set of CURIEs/IRIs, return a query string for an LDTab database
+/// that yields a map from CURIEs/IRIs to their respective rdfs:labels.
 ///
 /// # Examples
 ///
@@ -140,8 +142,8 @@ fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
     query
 }
 
-/// Given a set of CURIEs, and an LDTab database,
-/// return a map from CURIEs to their respective rdfs:labels.
+/// Given a set of CURIEs/IRIs, and an LDTab database,
+/// return a map from CURIEs/IRIs to their respective rdfs:labels.
 ///
 /// # Example
 ///
@@ -167,8 +169,8 @@ async fn get_label_hash_map(
     Ok(entity_2_label)
 }
 
-/// Given a set of CURIEs and an LDTab database,
-/// return a mapping of CURIEs to their labels in a JSON object.
+/// Given a set of CURIEs/IRIs and an LDTab database,
+/// return a mapping of CURIEs/IRIs to their labels in a JSON object.
 ///
 /// # Examples
 ///
@@ -179,8 +181,7 @@ async fn get_label_hash_map(
 /// {"@labels":
 ///     {"obo:ZFA_0000354":"gill",
 ///      "obo:ZFA_0000272":"respiratory system"}
-/// }
-
+/// } 
 pub async fn get_label_map(
     iris: &HashSet<String>,
     table: &str,
@@ -194,7 +195,7 @@ pub async fn get_label_map(
 // ############ property map ######################
 // ################################################
 
-/// Given a CURIE for an entity, an LDTAb database, and a target table,
+/// Given a CURIE/IRI for an entity, an LDTAb database, and a target table,
 /// return a map from the entity's properties to their LDTab values.
 ///
 /// # Examples
@@ -336,6 +337,9 @@ fn ldtab_json_2_hiccup(
     iri_2_label: &HashMap<String, String>,
 ) -> Value {
     //TODO: encode Manchester (wiring_rs currently only provides translations for triples - not objects)
+    //let object = parse_thick_triple_object(&value.to_string()); 
+    //let v = translate(&object);
+    //v
     value.clone()
 }
 
