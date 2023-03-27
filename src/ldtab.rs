@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
@@ -28,131 +29,201 @@ impl From<SerdeError> for Error {
     }
 }
 
-/// Given a set of IRIs and a connection to an LDTab database,
-/// return a map from prefixes to their IRIs
-/// (encoded as a JSON Object).
+/// Given a set of CURIEs, return the set of all used prefixes.
 ///
-/// TODO: example
-/// TODO: doc test
-pub async fn get_prefix_map(iris: &HashSet<String>, pool: &SqlitePool) -> Result<Value, Error> {
-    let mut json_map = Map::new();
-
-    let prefixes: HashSet<&str> = iris
+/// # Example
+///
+/// Let s = {obo:example1, owl:example2, rdfs:example3} be a set of CURIEs.
+/// Then get_prefixes(s) returns the set {obo, owl, rdfs}.
+fn get_prefixes(curies: &HashSet<String>) -> HashSet<String> {
+    //LDTab does not distinguish between CURIEs and IRIs -- both are typed with "_IRI".
+    //This may lead to unexpected behavior if IRIs are passed instead of a CURIEs.
+    let prefixes: HashSet<String> = curies
         .iter()
         .map(|x| {
-            let h = x.as_str();
-            let split: Vec<&str> = h.split(":").collect();
-            split[0]
+            let split: Vec<&str> = x.split(":").collect();
+            String::from(split[0])
         })
         .collect();
 
-    for p in prefixes {
-        let query = format!("SELECT * FROM prefix WHERE prefix='{}'", p);
-        let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-        for r in rows {
-            //NB: there is only one row (becase 'prefix' is a primary key)
-            let base: &str = r.get("base");
-            json_map.insert(String::from(p), json!(base));
-        }
-    }
+    return prefixes;
+}
 
-    Ok(json!({ "@prefixes": json_map }))
+/// Given a set of prefixes, return a query string for an LDTab database
+/// that yields a map from prefixes to their respective bases.
+///
+/// # Examples
+///
+/// Let S = {obo, owl, rdf} be a set of prefixes.
+/// Then build_prefix_query_for(S) returns the query
+/// "SELECT prefix, base FROM prefix WHERE prefix IN ('obo','owl','rdf')".
+/// Note that the set of prefixes is not ordered.
+/// So, the prefixes are listed in an arbitrary order in the SQLite IN operator.  
+fn build_prefix_query_for(prefixes: &HashSet<String>) -> String {
+    let quoted_prefixes: HashSet<String> = prefixes.iter().map(|x| format!("'{}'", x)).collect();
+    let joined_quoted_prefixes = itertools::join(&quoted_prefixes, ",");
+    let query = format!(
+        "SELECT prefix, base FROM prefix WHERE prefix IN ({prefixes})",
+        prefixes = joined_quoted_prefixes
+    );
+    query
+}
+
+/// Given a set of CURIEs, and an LDTab database,
+/// return a map from prefixes to their respective IRI bases.
+///
+/// # Examples
+///
+/// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
+/// and Ldb an LDTab database.
+/// Then get_prefix_hash_map(S, Ldb) returns the map
+/// {"obo": "http://purl.obolibrary.org/obo/",
+///  "rdfs": "http://www.w3.org/2000/01/rdf-schema#"}.  
+async fn get_prefix_hash_map(
+    curies: &HashSet<String>,
+    pool: &SqlitePool,
+) -> Result<HashMap<String, String>, sqlx::Error> {
+    let prefixes = get_prefixes(&curies);
+    let query = build_prefix_query_for(&prefixes);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let mut prefix_2_base = HashMap::new();
+    for r in rows {
+        //NB: there is only one row (becase 'prefix' is a primary key)
+        let prefix: &str = r.get("prefix");
+        let base: &str = r.get("base");
+        prefix_2_base.insert(String::from(prefix), String::from(base));
+    }
+    Ok(prefix_2_base)
+}
+
+/// Given a set of CURIEs and an LDTab database,
+/// return a mapping of prefixes to their IRI bases in a JSON object.
+///
+/// # Examples
+///
+/// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
+/// and Ldb an LDTab database.
+/// Then get_prefix_map(S) returns the JSON object
+///
+/// {"@prefixes":
+///     {"obo":"http://purl.obolibrary.org/obo/",
+///      "rdfs":"http://www.w3.org/2000/01/rdf-schema#"}
+/// }
+pub async fn get_prefix_map(
+    curies: &HashSet<String>,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
+    let prefix_2_base = get_prefix_hash_map(curies, pool).await?;
+    Ok(json!({ "@prefixes": prefix_2_base }))
 }
 
 // ################################################
 // ############### label map ######################
 // ################################################
 
-/// Given a set of IRIs, a database connection and a target table,
-/// return a map from prefixes to their IRIs.
+/// Given a set of CURIEs, return a query string for an LDTab database
+/// that yields a map from CURIEs to their respective rdfs:labels.
 ///
-/// TODO: example
-/// TODO: doc test
-pub async fn get_label_hash_map(
-    iris: &HashSet<String>,
-    table: &str,
-    pool: &SqlitePool,
-) -> HashMap<String, String> {
-    let mut entity_2_label = HashMap::new();
-
-    //get labels for all subjects
-    for i in iris {
-        let label = get_label(&i, table, pool).await;
-        match label {
-            Ok(x) => {
-                entity_2_label.insert(i.clone(), x);
-            }
-            Err(_x) => {} //TODO
-        };
-    }
-
-    entity_2_label
+/// # Examples
+///
+/// Let S = {obo:ZFA_0000354, obo:ZFA_0000272} be a set of CURIEs.
+/// Then build_label_query_for(S,table) returns the query
+/// SELECT subject, predicate, object FROM table WHERE subject IN ('obo:ZFA_0000354',obo:ZFA_0000272) AND predicate='rdfs:label'
+fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
+    let quoted_curies: HashSet<String> = curies.iter().map(|x| format!("'{}'", x)).collect();
+    let joined_quoted_curies = itertools::join(&quoted_curies, ",");
+    let query = format!(
+        "SELECT subject, predicate, object FROM {table} WHERE subject IN ({curies}) AND predicate='rdfs:label'",
+        table=table,
+        curies=joined_quoted_curies
+    );
+    query
 }
 
-/// Given a set of IRIs, a database connection, and a target table,
-/// return a map from prefixes to their IRIs
-/// (encoded as a JSON Object).
+/// Given a set of CURIEs, and an LDTab database,
+/// return a map from CURIEs to their respective rdfs:labels.
 ///
-/// TODO: example
-/// TODO: doc test
+/// # Example
+///
+/// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
+/// and Ldb an LDTab database.
+/// Then get_label_hash_map(S, table, Ldb) returns the map
+/// {"obo:ZFA_0000354": "gill",
+///  "rdfs:label": "label"}
+/// extracted from a given table in Ldb.  
+async fn get_label_hash_map(
+    curies: &HashSet<String>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashMap<String, String>, sqlx::Error> {
+    let mut entity_2_label = HashMap::new();
+    let query = build_label_query_for(&curies, table);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let entity: &str = row.get("subject");
+        let label: &str = row.get("object");
+        entity_2_label.insert(String::from(entity), String::from(label));
+    }
+    Ok(entity_2_label)
+}
+
+/// Given a set of CURIEs and an LDTab database,
+/// return a mapping of CURIEs to their labels in a JSON object.
+///
+/// # Examples
+///
+/// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
+/// and Ldb an LDTab database.
+/// Then get_prefix_map(S) returns the JSON object
+///
+/// {"@labels":
+///     {"obo:ZFA_0000354":"gill",
+///      "obo:ZFA_0000272":"respiratory system"}
+/// }
+
 pub async fn get_label_map(
     iris: &HashSet<String>,
     table: &str,
     pool: &SqlitePool,
-) -> Result<Value, Error> {
-    let entity_2_label = get_label_hash_map(iris, table, pool).await;
-
-    //encode HashMap as JSON object
-    let mut json_map = Map::new();
-    for (k, v) in entity_2_label {
-        json_map.insert(k.clone(), json!(v));
-    }
-
-    //return label map
-    Ok(json!({ "@labels": json_map }))
-}
-
-/// Given a set of IRIs, a database connection, and a target table,
-/// return the label for the IRI.
-///
-/// TODO: example
-/// TODO: doc test
-pub async fn get_label(entity: &str, table: &str, pool: &SqlitePool) -> Result<String, Error> {
-    let query = format!(
-        "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
-        table, entity
-    );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-
-    //NB: this should be a singleton
-    for row in rows {
-        //let subject: &str = row.get("subject");
-        let label: &str = row.get("object");
-        return Ok(String::from(label));
-    }
-
-    Err(Error::SQLError(sqlx::Error::RowNotFound))
+) -> Result<Value, sqlx::Error> {
+    let entity_2_label = get_label_hash_map(iris, table, pool).await?;
+    Ok(json!({ "@labels": entity_2_label }))
 }
 
 // ################################################
 // ############ property map ######################
 // ################################################
 
-/// Given an IRI, a database connection, and a target table,
-/// return a map from the subject's properties to their values
-/// (encoded as a JSON Object).
+/// Given a CURIE for an entity, an LDTAb database, and a target table,
+/// return a map from the entity's properties to their LDTab values.
 ///
-/// TODO: example
-/// TODO: doc test
+/// # Examples
+/// Let zfa.db be an LDTab database containing information about "ZFA_0000354".
+/// Then get_property_map(ZFA_0000354, statements, zfa.db)
+/// returns
+///
+/// {"oboInOwl:hasDbXref":[{"object":"TAO:0000354","datatype":"xsd:string"}],
+///  "oboInOwl:id":[{"object":"ZFA:0000354","datatype":"xsd:string"}],
+///  "rdf:type":[{"object":"owl:Class","datatype":"_IRI"}],
+///  "rdfs:label":[{"object":"gill","datatype":"xsd:string"}],
+///  "oboInOwl:hasOBONamespace":[{"object":"zebrafish_anatomy","datatype":"xsd:string"}]
+///  ... }
 pub async fn get_property_map(
     subject: &str,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, Error> {
-    let query = format!("SELECT * FROM {} WHERE subject='{}'", table, subject);
+    let query = format!(
+        "SELECT * FROM {table} WHERE subject='{subject}'",
+        table = table,
+        subject = subject
+    );
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
-    let predicates: Vec<Value> = rows.iter().map(|row| ldtab_2_json_shape(row)).collect();
+    let predicates: Vec<Value> = rows
+        .iter()
+        .map(|row| ldtab_row_2_predicate_json_shape(row))
+        .collect();
 
     let mut predicate_map = Map::new();
     for p in predicates {
@@ -170,78 +241,114 @@ pub async fn get_property_map(
     Ok(Value::Object(predicate_map))
 }
 
-/// Given a row in from an LDTab database,
-/// return a JSON Object mapping the predicate value to the object value.
+/// Convert LDTab strings to serde Values.
+/// LDTab makes use of both strings and JSON strings.
+/// For example values in the 'subject' column of an LDTab database are
+/// conventional strings -- NOT JSON strings.
 ///
-/// TODO: example
-/// TODO: doc test
-pub fn ldtab_2_json_shape(row: &SqliteRow) -> Value {
+/// # Examples
+///
+/// 1. "obo:ZFA_0000354" is a string.
+/// 2. "\"obo:ZFA_0000354\"" is a JSON string.  
+/// 3. ldtab_string_2_serde_value("obo:ZFA_0000354") returns Value::String("obo:ZFA_0000354")
+/// 4. ldtab_string_2_serde_value("\"obo:ZFA_0000354\"") returns Value::String("obo:ZFA_0000354")
+/// 5. ldtab_string_2_serde_value("{\"a\":\"b\"}") returns Value::Object {"a": Value::String("b")}
+fn ldtab_string_2_serde_value(string: &str) -> Value {
+    //NB: an LDTab thick triple makes use of strings (which are not JSON strings
+    //example: "this is a string" and "\"this is a JSON string\"".).
+    let serde_value = match from_str::<Value>(string) {
+        Ok(x) => x,
+        _ => json!(string),
+    };
+
+    serde_value
+}
+
+/// Given a row in from an LDTab database, return its JSON encoding.
+///
+/// Examples
+///
+/// Let (subject=ZFA_0000354, predicate=rdfs:label, object="gill", datatype="xsd:string") a row.
+/// Return {"rdfs:label":[{"object":"gill","datatype":"xsd:string"}]}.
+fn ldtab_row_2_predicate_json_shape(row: &SqliteRow) -> Value {
     let predicate: &str = row.get("predicate");
     let object: &str = row.get("object");
     let datatype: &str = row.get("datatype");
     let annotation: &str = row.get("annotation");
 
-    //NB: an LDTab thick triple makes use of strings (which are not JSON strings
-    //example: "this is a string" and "\"this is a JSON string\"".).
-    let object_value = match from_str::<Value>(object) {
-        Ok(x) => x,
-        _ => json!(object),
-    };
+    let object_json_shape = object_2_json_shape(object, datatype, annotation);
 
-    //handle annotations
-    let object_datatype = match from_str::<Value>(annotation) {
+    json!({ predicate: vec![object_json_shape] })
+}
+
+/// Given an object, datatype, and an annotation, return an LDTab JSON shape.
+fn object_2_json_shape(object: &str, datatype: &str, annotation: &str) -> Value {
+    let object_value = ldtab_string_2_serde_value(object);
+
+    let json_shape = match from_str::<Value>(annotation) {
         Ok(annotation_value) => {
             json!({"object" : object_value, "datatype" : datatype, "annotation" : annotation_value})
         }
         _ => json!({"object" : object_value, "datatype" : datatype}),
     };
 
-    //put things into map
-    json!({ predicate: vec![object_datatype] })
+    json_shape
 }
 
 // ################################################
 // ######## HTML view #############################
 // ################################################
 //
-/// Given a property, its corresponding value, and a map from IRIs to labels
-/// return an HTML (JSON Hiccup) encoding for the term property shape.
-///
-/// TODO: example
-/// TODO: doc test
-pub fn ldtab_value_to_html(
+
+//TODO
+fn ldtab_iri_2_html(property: &str, value: &Value, iri_2_label: &HashMap<String, String>) -> Value {
+    let entity = value["object"].as_str().unwrap();
+    let label = match iri_2_label.get(entity) {
+        Some(y) => y.clone(),
+        None => String::from(entity),
+    };
+    json!(["a", {"property" : property, "resource" : value["object"]}, label ])
+}
+
+//TODO
+fn ldtab_json_2_html(
     property: &str,
     value: &Value,
     iri_2_label: &HashMap<String, String>,
 ) -> Value {
-    let datatype = &value["datatype"];
+    //TODO: encode Manchester (wiring_rs currently only provides translations for triples - not objects)
+    value.clone()
+}
 
+/// Given a property, a value, and a map from CURIEs to labels
+/// return an HTML (JSON Hiccup) encoding for the term property shape.
+///
+/// TODO: example
+/// TODO: doc test
+fn ldtab_value_2_html(
+    property: &str,
+    value: &Value,
+    iri_2_label: &HashMap<String, String>,
+) -> Value {
+    //TODO: return error
     let mut list_element = Vec::new();
     list_element.push(json!("li"));
 
+    let datatype = &value["datatype"];
+
     match datatype {
-        Value::String(x) => {
-            match x.as_str() {
-                "_IRI" => {
-                    //get label (or use IRI if no label exists)
-                    let entity = value["object"].as_str().unwrap();
-                    let label = match iri_2_label.get(entity) {
-                        Some(y) => y.clone(),
-                        None => String::from(entity),
-                    };
-                    list_element.push(
-                        json!(["a", {"property" : property, "resource" : value["object"]}, label ]),
-                    );
-                }
-                "_JSON" => {
-                    list_element.push(json!("JSON"));
-                } //TODO: encode Manchester
-                _ => {
-                    list_element.push(value["object"].clone());
-                    list_element.push(json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": x.as_str()}, x.as_str()]]));
-                }
+        Value::String(x) => match x.as_str() {
+            "_IRI" => {
+                list_element.push(ldtab_iri_2_html(property, value, iri_2_label));
             }
-        }
+            "_JSON" => {
+                list_element.push(ldtab_json_2_html(property, value, iri_2_label));
+            }
+            _ => {
+                list_element.push(value["object"].clone());
+                list_element.push(json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": x.as_str()}, x.as_str()]]));
+            }
+        },
         _ => {
             json!("ERROR");
         } //TODO
@@ -249,11 +356,11 @@ pub fn ldtab_value_to_html(
     Value::Array(list_element)
 }
 
-//Given a predicate map, a label map, a starting and ending list of CURIEs,
-//return the tuple: (order_vector, curie_2_value_map) where
-// - the order_vector contains an order of CURIEs by labels
+//Given a predicate map, a label map, a starting and ending list of predicates,
+//return the tuple: (order_vector, predicate_2_value_map) where
+// - the order_vector contains an order of predicates by labels
 //   (see https://github.com/ontodev/gizmos#predicates for details)
-// - the curie_2_value map is a HashMap from property CURIEs to values
+// - the predicate_2_value map is a HashMap from predicates to values
 pub fn sort_predicate_map_by_label(
     predicate_map: &Value,
     label_map: &HashMap<String, String>,
@@ -313,10 +420,28 @@ pub fn sort_predicate_map_by_label(
 }
 
 /// Given a subject, an LDTab database, and a target table,
-/// return an HTML (JSON Hiccup) encoding of the term property shape.
+/// return an HTML encoding (JSON Hiccup) of the term property shape.
 ///
-/// TODO: example
-/// TODO: doc test
+/// # Examples
+///
+/// Let zfa.db be an LDTab database containing information about "ZFA_0000354".
+/// Then  get_predicate_map_hiccup(ZFA_0000354, statement, zfa.db) returns the following:
+///
+/// ["ul",{"id":"annotations","style":"margin-left: -1rem;"},
+///   ["li",["a",{"resource":"rdfs:label"},"rdfs:label"],
+///         ["ul",
+///           ["li","gill",["sup",{"class":"text-black-50"},["a",{"resource":"xsd:string"},"xsd:string"]]]
+///         ]
+///   ],
+///   ["li",["a",{"resource":"oboInOwl:hasDbXref"},"oboInOwl:hasDbXref"],
+///         ["ul",
+///          ["li","TAO:0000354",["sup",{"class":"text-black-50"},["a",{"resource":"xsd:string"},"xsd:string"]]]
+///         ]
+///   ],
+///   ...  
+///   ...  
+///   ...
+/// ]
 pub async fn get_predicate_map_hiccup(
     subject: &str,
     table: &str,
@@ -329,7 +454,7 @@ pub async fn get_predicate_map_hiccup(
     signature::get_iris(&predicate_map, &mut iris);
 
     //2. labels
-    let label_map = get_label_hash_map(&iris, table, pool).await;
+    let label_map = get_label_hash_map(&iris, table, pool).await.unwrap();
 
     let mut outer_list = Vec::new();
     outer_list.push(json!("ul"));
@@ -368,7 +493,7 @@ pub async fn get_predicate_map_hiccup(
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
         for v in value.as_array().unwrap() {
-            let v_encoding = ldtab_value_to_html(&key, v, &label_map);
+            let v_encoding = ldtab_value_2_html(&key, v, &label_map);
             inner_list.push(json!(v_encoding));
         }
         outer_list_element.push(json!(inner_list));
@@ -469,4 +594,201 @@ pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Valu
         .unwrap();
 
     (subject_map, label_map, prefix_map, html_hiccup)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+    use std::collections::{HashMap, HashSet};
+
+    #[test]
+    fn test_get_prefixes() {
+        let mut curies = HashSet::new();
+        curies.insert(String::from("rdfs:label"));
+        curies.insert(String::from("obo:example"));
+
+        let prefixes = get_prefixes(&curies);
+
+        let mut expected = HashSet::new();
+        expected.insert(String::from("rdfs"));
+        expected.insert(String::from("obo"));
+
+        assert_eq!(prefixes, expected);
+    }
+
+    #[test]
+    fn test_build_prefix_query_for() {
+        let mut prefixes = HashSet::new();
+        prefixes.insert(String::from("rdf"));
+        prefixes.insert(String::from("rdfs"));
+
+        let query = build_prefix_query_for(&prefixes);
+        //Note: the order of arguments for the SQLite IN operator is not unique
+        let expected_alternative_a =
+            String::from("SELECT prefix, base FROM prefix WHERE prefix IN ('rdf','rdfs')");
+        let expected_alternative_b =
+            String::from("SELECT prefix, base FROM prefix WHERE prefix IN ('rdfs','rdf')");
+        let check = query.eq(&expected_alternative_a) || query.eq(&expected_alternative_b);
+        assert!(check);
+    }
+
+    #[tokio::test]
+    async fn test_get_prefix_hash_map() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+        curies.insert(String::from("rdfs:label"));
+
+        let prefix_hash_map = get_prefix_hash_map(&curies, &pool).await.unwrap();
+
+        let mut expected = HashMap::new();
+        expected.insert(
+            String::from("obo"),
+            String::from("http://purl.obolibrary.org/obo/"),
+        );
+        expected.insert(
+            String::from("rdfs"),
+            String::from("http://www.w3.org/2000/01/rdf-schema#"),
+        );
+        assert_eq!(prefix_hash_map, expected);
+    }
+
+    #[tokio::test]
+    async fn test_get_prefix_map() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+        curies.insert(String::from("rdfs:label"));
+        let prefix_map = get_prefix_map(&curies, &pool).await.unwrap();
+        let expected_prefix_map = json!({"@prefixes":{"obo":"http://purl.obolibrary.org/obo/","rdfs":"http://www.w3.org/2000/01/rdf-schema#"}});
+        assert_eq!(prefix_map, expected_prefix_map);
+    }
+
+    #[test]
+    fn test_build_label_query_for() {
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+        curies.insert(String::from("rdfs:label"));
+
+        let query = build_label_query_for(&curies, "statement");
+
+        //NB: the order of arguments for the SQLite IN operator is not unique
+        let expected_alternative_a = "SELECT subject, predicate, object FROM statement WHERE subject IN ('rdfs:label','obo:ZFA_0000354') AND predicate='rdfs:label'";
+        let expected_alternative_b = "SELECT subject, predicate, object FROM statement WHERE subject IN ('obo:ZFA_0000354','rdfs:label') AND predicate='rdfs:label'";
+
+        let check = query.eq(&expected_alternative_a) || query.eq(&expected_alternative_b);
+        assert!(check);
+    }
+
+    #[tokio::test]
+    async fn test_get_label_hash_map() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let table = "statement";
+
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+
+        let label_hash_map = get_label_hash_map(&curies, &table, &pool).await.unwrap();
+
+        let mut expected = HashMap::new();
+        expected.insert(String::from("obo:ZFA_0000354"), String::from("gill"));
+
+        assert_eq!(label_hash_map, expected);
+    }
+
+    #[tokio::test]
+    async fn test_get_label_map() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let table = "statement";
+
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+        let label_map = get_label_map(&curies, &table, &pool).await.unwrap();
+        let expected_label_map = json!({"@labels":{"obo:ZFA_0000354":"gill"}});
+        assert_eq!(label_map, expected_label_map);
+    }
+
+    #[tokio::test]
+    async fn test_get_property_map() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let table = "statement";
+
+        let property_map = get_property_map("obo:ZFA_0000354", &table, &pool)
+            .await
+            .unwrap();
+        let expected = json!({"obo:IAO_0000115":[{"object":"Compound organ that consists of gill filaments, gill lamellae, gill rakers and pharyngeal arches 3-7. The gills are responsible for primary gas exchange between the blood and the surrounding water.","datatype":"xsd:string","annotation":{"<http://www.geneontology.org/formats/oboInOwl#hasDbXref>":[{"datatype":"xsd:string","meta":"owl:Axiom","object":"http:http://www.briancoad.com/Dictionary/DicPics/gill.htm"}]}}],"<http://www.geneontology.org/formats/oboInOwl#hasDbXref>":[{"object":"TAO:0000354","datatype":"xsd:string"}],"rdfs:subClassOf":[{"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"}],"<http://www.geneontology.org/formats/oboInOwl#id>":[{"object":"ZFA:0000354","datatype":"xsd:string"}],"rdf:type":[{"object":"owl:Class","datatype":"_IRI"}],"rdfs:label":[{"object":"gill","datatype":"xsd:string"}],"<http://www.geneontology.org/formats/oboInOwl#hasOBONamespace>":[{"object":"zebrafish_anatomy","datatype":"xsd:string"}],"<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym>":[{"object":"gills","datatype":"xsd:string","annotation":{"<http://www.geneontology.org/formats/oboInOwl#hasSynonymType>":[{"datatype":"_IRI","meta":"owl:Axiom","object":"obo:zfa#PLURAL"}]}}]});
+
+        assert_eq!(property_map, expected);
+    }
+
+    #[test]
+    fn test_ldtab_string_2_serde_value_conventional_string() {
+        let subject = "obo:ZFA_0000354";
+        let ldtab_encoding = ldtab_string_2_serde_value(subject);
+        let expected = Value::String(String::from(subject));
+        assert_eq!(ldtab_encoding, expected);
+    }
+
+    #[test]
+    fn test_ldtab_string_2_serde_value_json_string() {
+        let subject = "\"obo:ZFA_0000354\"";
+        let ldtab_encoding = ldtab_string_2_serde_value(subject);
+        let expected = Value::String(String::from("obo:ZFA_0000354"));
+        assert_eq!(ldtab_encoding, expected);
+    }
+
+    #[tokio::test]
+    async fn test_ldtab_row_2_predicate_json_shape() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let table = "statement";
+        let query = "SELECT * FROM statement WHERE predicate='rdfs:label'";
+        let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(&pool).await.unwrap();
+        let row = &rows[0]; //NB: there is a unique row (with rdfs:label)
+        let json_shape = ldtab_row_2_predicate_json_shape(row);
+        let expected = json!({"rdfs:label":[{"object":"gill","datatype":"xsd:string"}]});
+        assert_eq!(json_shape, expected);
+    }
 }
