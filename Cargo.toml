@@ -18,6 +18,7 @@ serde = { version = "1.0.148", features = ["derive"] }
 sqlx = { version = "0.6", features = [  "runtime-async-std-native-tls", "sqlite" ] }
 tabwriter = { version = "1.2.1" }
 tokio = { version = "1.22.0", features = ["full"] }
+tokio-test = "0.4.2"
 toml = { version = "0.5.9" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
