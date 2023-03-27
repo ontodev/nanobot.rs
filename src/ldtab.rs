@@ -302,6 +302,12 @@ fn object_2_json_shape(object: &str, datatype: &str, annotation: &str) -> Value 
 
 /// Given a property, a value, and a map from CURIEs/IRIs to labels,
 /// return a hiccup-style list encoding an hyperlink.
+///
+/// Examples
+///
+/// ldtab_iri_2_hiccup("rdf:type, "owl:Class", {"owl:Class":"Class"})
+/// returns
+/// ["a",{"property":"rdf:type","resource":"owl:Class"},"Class"].  
 fn ldtab_iri_2_hiccup(
     property: &str,
     value: &Value,
@@ -323,7 +329,7 @@ fn ldtab_iri_2_hiccup(
 /// return a hiccup-style list encoding a nested LDTab expression.
 ///
 /// Example
-/// TODO
+/// TODO (depends on wiring_rs)
 fn ldtab_json_2_hiccup(
     property: &str,
     value: &Value,
@@ -340,7 +346,6 @@ fn ldtab_value_2_hiccup(
     value: &Value,
     iri_2_label: &HashMap<String, String>,
 ) -> Value {
-    //TODO: return error
     let mut list_element = Vec::new();
     list_element.push(json!("li"));
 
@@ -360,7 +365,7 @@ fn ldtab_value_2_hiccup(
             }
         },
         _ => {
-            json!("ERROR"); //TODO
+            json!("ERROR"); //TODO (depends on LDTab input -- which should be validated)
         }
     };
     Value::Array(list_element)
@@ -535,7 +540,7 @@ pub async fn get_predicate_map_hiccup(
 // ################################################
 // ######## putting things together ###############
 // ################################################
-//
+
 /// Given a subject, an LDTab database, and a target table,
 /// return an HTML (JSON Hiccup) encoding of
 /// - the term property shape
@@ -543,8 +548,32 @@ pub async fn get_predicate_map_hiccup(
 /// - the label map
 /// as a JSON object
 ///
-/// TODO: example
-/// TODO: doc test
+/// Examples:
+///
+/// Let ldb be an LDTab database containing informmation about the subject "obo:ZFA_0000354"
+/// in the table statement, then get_subject_map(&subject , &table, &pool) returns
+///
+///  {"obo:ZFA_0000354":
+///    {
+///      "oboInOwl:id":[{"object":"ZFA:0000354","datatype":"xsd:string"}],
+///      "rdf:type":[{"object":"owl:Class","datatype":"_IRI"}],
+///      "rdfs:label":[{"object":"gill","datatype":"xsd:string"}],
+///      "oboInOwl:hasOBONamespace":[{"object":"zebrafish_anatomy","datatype":"xsd:string"}]
+///    }
+///  
+///   "@labels":
+///     {
+///       "obo:ZFA_0000354":"gill"
+///     },
+///  
+///   "@prefixes":
+///     {
+///       "owl":"http://www.w3.org/2002/07/owl#",
+///       "rdf":"http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+///       "rdfs":"http://www.w3.org/2000/01/rdf-schema#",
+///       "obo":"http://purl.obolibrary.org/obo/"
+///     }
+///    }
 pub async fn get_subject_map(
     subject: &str,
     table: &str,
