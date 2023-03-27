@@ -373,8 +373,26 @@ fn ldtab_value_2_hiccup(
 ///  - the predicate_2_value map is a HashMap from predicates to values
 ///
 /// Examples
-/// TODO
-pub fn sort_predicate_map_by_label(
+///
+/// Let
+/// pm = {
+///       "rdf:type":[{"object":"owl:Class","datatype":"_IRI"}],
+///       "rdfs:label":[{"object":"gill","datatype":"xsd:string"}],
+///       "obo:IAO_0000115":[{"object":"Compound organ"}],
+///     }
+/// be a predicate map and
+///  lm = {
+///        "rdf:type":"type",
+///        "rdfs:label":"label",
+///        "obo:IAO_0000115":"definition",
+///       }
+/// a label map.
+///
+/// The lexicographical order of labels is ["definition", "label", "type"].
+/// However, sort_predicate_map_by_label(pm, lm, ["label"], ["definition])
+/// returns the tuple (["label", "type", "definition"], pm)
+///  where pm is encoded as a HashMap instead of a Value.  
+fn sort_predicate_map_by_label(
     predicate_map: &Value,
     label_map: &HashMap<String, String>,
     starting_order: &Vec<String>,
@@ -779,5 +797,45 @@ mod tests {
         let json_shape = ldtab_row_2_predicate_json_shape(row);
         let expected = json!({"rdfs:label":[{"object":"gill","datatype":"xsd:string"}]});
         assert_eq!(json_shape, expected);
+    }
+
+    #[tokio::test]
+    async fn test_sort_predicate_map_by_label() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let subject = "obo:ZFA_0000354";
+        let table = "statement";
+
+        let property_map = get_property_map(&subject, &table, &pool).await.unwrap();
+
+        let mut label_map = HashMap::new();
+        label_map.insert(String::from("rdf:type"), String::from("type"));
+        label_map.insert(String::from("rdfs:label"), String::from("label"));
+        label_map.insert(String::from("rdfs:subClassOf"), String::from("subsumption"));
+        label_map.insert(String::from("obo:IAO_0000115"), String::from("definition"));
+
+        let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
+        let ending_order = vec![String::from("rdfs:subClassOf")];
+
+        let (a, b) =
+            sort_predicate_map_by_label(&property_map, &label_map, &starting_order, &ending_order);
+        let expected_ordrer = vec![
+            "rdfs:label",
+            "obo:IAO_0000115",
+            "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>",
+            "<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym>",
+            "<http://www.geneontology.org/formats/oboInOwl#hasOBONamespace>",
+            "<http://www.geneontology.org/formats/oboInOwl#id>",
+            "rdf:type",
+            "rdfs:subClassOf",
+        ];
+
+        assert_eq!(a, expected_ordrer);
     }
 }
