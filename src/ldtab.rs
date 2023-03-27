@@ -302,19 +302,20 @@ fn object_2_json_shape(object: &str, datatype: &str, annotation: &str) -> Value 
 
 /// Given a property, a value, and a map from CURIEs/IRIs to labels,
 /// return a hiccup-style list encoding an hyperlink.
-///
-/// Example
-/// TODO
 fn ldtab_iri_2_hiccup(
     property: &str,
     value: &Value,
     iri_2_label: &HashMap<String, String>,
 ) -> Value {
+    //get object
     let entity = value["object"].as_str().unwrap();
+
+    //get label
     let label = match iri_2_label.get(entity) {
         Some(y) => y.clone(),
         None => String::from(entity),
     };
+    //hiccup-style encoding
     json!(["a", {"property" : property, "resource" : value["object"]}, label ])
 }
 
@@ -332,11 +333,8 @@ fn ldtab_json_2_hiccup(
     value.clone()
 }
 
-/// Given a property, a value, and a map from CURIEs to labels
+/// Given a property, a value, and a map from CURIEs/IRIs to labels
 /// return a hiccup-style list encoding of the term property shape.
-///
-/// TODO: example
-/// TODO: doc test
 fn ldtab_value_2_hiccup(
     property: &str,
     value: &Value,
@@ -362,8 +360,8 @@ fn ldtab_value_2_hiccup(
             }
         },
         _ => {
-            json!("ERROR");
-        } //TODO
+            json!("ERROR"); //TODO
+        }
     };
     Value::Array(list_element)
 }
@@ -461,6 +459,8 @@ pub async fn get_predicate_map_hiccup(
     subject: &str,
     table: &str,
     pool: &SqlitePool,
+    predicate_order_start: &Vec<String>,
+    predicate_order_end: &Vec<String>,
 ) -> Result<Value, Error> {
     let predicate_map = get_property_map(subject, table, pool).await?;
 
@@ -475,15 +475,12 @@ pub async fn get_predicate_map_hiccup(
     outer_list.push(json!("ul"));
     outer_list.push(json!({"id":"annotations", "style" : "margin-left: -1rem;"}));
 
-    //Give precedence to labels, definitions
-    //TODO: synonyms
-    //TODO: the ordering of predicates needs to be passed as a parameter
-    let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
-    //Put comments last
-    let ending_order = vec![String::from("rdfs:comment")];
-
-    let (order, key_2_value) =
-        sort_predicate_map_by_label(&predicate_map, &label_map, &starting_order, &ending_order);
+    let (order, key_2_value) = sort_predicate_map_by_label(
+        &predicate_map,
+        &label_map,
+        &predicate_order_start,
+        &predicate_order_end,
+    );
 
     for key in order {
         //build list elements according to the specified order
@@ -591,7 +588,7 @@ pub async fn get_subject_map(
 // ################################################
 // ######## Demo for constituent parts ############
 // ################################################
-pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value, Value) {
+pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Value, Value) {
     //build term property JSON shape
     let predicate_map = get_property_map(subject, table, pool).await.unwrap();
     let subject_map = json!({ subject: predicate_map });
@@ -604,11 +601,11 @@ pub async fn demo(subject: &str, table: &str, pool: &SqlitePool) -> (Value, Valu
     let label_map = get_label_map(&iris, table, pool).await.unwrap();
     let prefix_map = get_prefix_map(&iris, pool).await.unwrap();
 
-    let html_hiccup = get_predicate_map_hiccup(subject, table, pool)
-        .await
-        .unwrap();
+    //let html_hiccup = get_predicate_map_hiccup(subject, table, pool)
+    //    .await
+    //    .unwrap();
 
-    (subject_map, label_map, prefix_map, html_hiccup)
+    (subject_map, label_map, prefix_map)
 }
 
 #[cfg(test)]

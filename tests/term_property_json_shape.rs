@@ -84,7 +84,10 @@ async fn test_get_predicate_map_hiccup() {
     let subject = "obo:ZFA_0000354";
     let table = "statement";
 
-    let hiccup = get_predicate_map_hiccup(&subject, &table, &pool)
+    let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
+    let ending_order = vec![String::from("rdfs:comment")];
+
+    let hiccup = get_predicate_map_hiccup(&subject, &table, &pool, &starting_order, &ending_order)
         .await
         .unwrap();
     //oboInOwl prefix is not loaded in zfa_excerpt
