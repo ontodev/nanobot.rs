@@ -365,7 +365,9 @@ async fn get_type_hash_map(
 /// Examples
 ///
 /// ldtab_iri_2_hiccup("rdf:type, "owl:Class", {"owl:Class":"Class"})
+///
 /// returns
+///
 /// ["a",{"property":"rdf:type","resource":"owl:Class"},"Class"].  
 fn ldtab_iri_2_hiccup(
     property: &str,
@@ -416,8 +418,21 @@ fn ldtab_json_2_hiccup(
     ofn_rdfa
 }
 
+fn ldtab_literal_2_hiccup(value: &Value) -> Value {
+	value["object"].clone()
+}
+
+fn ldtab_datatype_2_hiccup(datatype : &str) -> Value {
+	json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": datatype}, datatype]])
+}
+
 /// Given a property, a value, and a map from CURIEs/IRIs to labels
-/// return a hiccup-style list encoding of the term property shape.
+/// return a hiccup-style list encoding of the term property shape using:
+///
+/// - RDFa in the case of LDTab values of type _JSON (see ldtab_json_2_hiccup)
+/// - hyperlinks for LDTab values of type _IRI (see ldtab_iri_2_hiccup)
+/// - plain HTML for LDTab values of other types, i.e. RDF literals, (see ldtab_literal_2_hiccup),
+///   which are rendered with their datatype as a superscript (see ldtab_datatype_2_hiccup)
 fn ldtab_value_2_hiccup(
     property: &str,
     value: &Value,
@@ -443,8 +458,8 @@ fn ldtab_value_2_hiccup(
                 ));
             }
             _ => {
-                list_element.push(value["object"].clone());
-                list_element.push(json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": x.as_str()}, x.as_str()]]));
+                list_element.push(ldtab_literal_2_hiccup(value));
+                list_element.push(ldtab_datatype_2_hiccup(x.as_str()));
             }
         },
         _ => {
