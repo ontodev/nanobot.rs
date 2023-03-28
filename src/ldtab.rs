@@ -4,6 +4,8 @@ use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::ldtab_2_ofn::class_translation::translate;
+use wiring_rs::ofn_2_rdfa::class_translation::translate as rdfa_translate;
+use wiring_rs::ofn_typing::translation::type_ofn;
 use wiring_rs::util::parser::parse_thick_triple_object;
 use wiring_rs::util::signature;
 
@@ -334,14 +336,21 @@ async fn get_type_hash_map(
     curies: &HashSet<String>,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashMap<String, String>, sqlx::Error> {
-    let mut entity_2_type = HashMap::new();
+) -> Result<HashMap<String, HashSet<String>>, sqlx::Error> {
+    let mut entity_2_type: HashMap<String, HashSet<String>> = HashMap::new();
     let query = build_type_query_for(&curies, table);
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let entity: &str = row.get("subject");
         let rdf_type: &str = row.get("object");
-        entity_2_type.insert(String::from(entity), String::from(rdf_type));
+        if entity_2_type.contains_key(entity) {
+            let types: &mut HashSet<String> = entity_2_type.get_mut(entity).unwrap();
+            types.insert(String::from(rdf_type));
+        } else {
+            entity_2_type.insert(String::from(entity), HashSet::new());
+            let types: &mut HashSet<String> = entity_2_type.get_mut(entity).unwrap();
+            types.insert(String::from(rdf_type));
+        }
     }
     Ok(entity_2_type)
 }
@@ -385,9 +394,14 @@ fn ldtab_json_2_hiccup(
     property: &str,
     value: &Value,
     iri_2_label: &HashMap<String, String>,
+    iri_2_type: &HashMap<String, HashSet<String>>,
 ) -> Value {
-    //TODO: encode Manchester (wiring_rs currently only provides translations for triples - not objects)
-    value.clone()
+    let object = value["object"].clone(); //unpack object
+    let object = parse_thick_triple_object(&object.to_string()); // get owl
+    let ofn = translate(&object); //translate to OFN
+    let ofn_typed = type_ofn(&ofn, iri_2_type); //perform typing
+    let ofn_rdfa = rdfa_translate(&ofn_typed, iri_2_label, Some(property)); //translate to RDFa
+    ofn_rdfa
 }
 
 /// Given a property, a value, and a map from CURIEs/IRIs to labels
@@ -396,6 +410,7 @@ fn ldtab_value_2_hiccup(
     property: &str,
     value: &Value,
     iri_2_label: &HashMap<String, String>,
+    iri_2_type: &HashMap<String, HashSet<String>>,
 ) -> Value {
     let mut list_element = Vec::new();
     list_element.push(json!("li"));
@@ -408,7 +423,12 @@ fn ldtab_value_2_hiccup(
                 list_element.push(ldtab_iri_2_hiccup(property, value, iri_2_label));
             }
             "_JSON" => {
-                list_element.push(ldtab_json_2_hiccup(property, value, iri_2_label));
+                list_element.push(ldtab_json_2_hiccup(
+                    property,
+                    value,
+                    iri_2_label,
+                    iri_2_type,
+                ));
             }
             _ => {
                 list_element.push(value["object"].clone());
@@ -545,6 +565,9 @@ pub async fn get_predicate_map_hiccup(
     //2. labels
     let label_map = get_label_hash_map(&iris, table, pool).await.unwrap();
 
+    //3. types
+    let type_map = get_type_hash_map(&iris, table, pool).await.unwrap();
+
     let mut outer_list = Vec::new();
     outer_list.push(json!("ul"));
     outer_list.push(json!({"id":"annotations", "style" : "margin-left: -1rem;"}));
@@ -579,7 +602,7 @@ pub async fn get_predicate_map_hiccup(
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
         for v in value.as_array().unwrap() {
-            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map);
+            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map, &type_map);
             inner_list.push(json!(v_encoding));
         }
         outer_list_element.push(json!(inner_list));
