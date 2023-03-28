@@ -223,21 +223,20 @@ pub async fn get_property_map(
     );
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
-    let predicates: Vec<Value> = rows
+    let predicates_2_values: Vec<(String, Value)> = rows
         .iter()
-        .map(|row| ldtab_row_2_predicate_json_shape(row))
+        .map(|row| ldtab_row_2_predicate_json_shape(row)) //returns a tuple: (predicate,json_value)
         .collect();
 
     let mut predicate_map = Map::new();
-    for p in predicates {
-        match p {
-            Value::Object(mut x) => predicate_map.append(&mut x),
-            _ => {
-                return Err(Error::SerdeError(SerdeError::NotAnObject(format!(
-                    "Given Value: {}",
-                    p.to_string()
-                ))))
-            }
+    for (p, v) in predicates_2_values {
+        if predicate_map.contains_key(&p) {
+            let array = predicate_map.get_mut(&p).unwrap();
+            let array = array.as_array_mut().unwrap();
+            array.push(v);
+        } else {
+            let element = vec![v];
+            predicate_map.insert(p.clone(), json!(element));
         }
     }
 
@@ -272,8 +271,8 @@ fn ldtab_string_2_serde_value(string: &str) -> Value {
 /// Examples
 ///
 /// Let (subject=ZFA_0000354, predicate=rdfs:label, object="gill", datatype="xsd:string") a row.
-/// Return {"rdfs:label":[{"object":"gill","datatype":"xsd:string"}]}.
-fn ldtab_row_2_predicate_json_shape(row: &SqliteRow) -> Value {
+/// Return {"rdfs:label":{"object":"gill","datatype":"xsd:string"}}.
+fn ldtab_row_2_predicate_json_shape(row: &SqliteRow) -> (String, Value) {
     let predicate: &str = row.get("predicate");
     let object: &str = row.get("object");
     let datatype: &str = row.get("datatype");
@@ -281,7 +280,7 @@ fn ldtab_row_2_predicate_json_shape(row: &SqliteRow) -> Value {
 
     let object_json_shape = object_2_json_shape(object, datatype, annotation);
 
-    json!({ predicate: vec![object_json_shape] })
+    (String::from(predicate), json!(object_json_shape))
 }
 
 /// Given an object, datatype, and an annotation, return an LDTab JSON shape.
@@ -881,7 +880,9 @@ mod tests {
         let type_hash_map = get_type_hash_map(&curies, &table, &pool).await.unwrap();
 
         let mut expected = HashMap::new();
-        expected.insert(String::from("obo:ZFA_0000354"), String::from("owl:Class"));
+        let mut types: HashSet<String> = HashSet::new();
+        types.insert(String::from("owl:Class"));
+        expected.insert(String::from("obo:ZFA_0000354"), types);
 
         assert_eq!(type_hash_map, expected);
     }
@@ -937,7 +938,10 @@ mod tests {
         let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(&pool).await.unwrap();
         let row = &rows[0]; //NB: there is a unique row (with rdfs:label)
         let json_shape = ldtab_row_2_predicate_json_shape(row);
-        let expected = json!({"rdfs:label":[{"object":"gill","datatype":"xsd:string"}]});
+        let expected = (
+            String::from("rdfs:label"),
+            json!({"object":"gill","datatype":"xsd:string"}),
+        );
         assert_eq!(json_shape, expected);
     }
 
