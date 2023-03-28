@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
@@ -1001,7 +1000,6 @@ mod tests {
             .await
             .unwrap();
 
-        let table = "statement";
         let query = "SELECT * FROM statement WHERE predicate='rdfs:label'";
         let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(&pool).await.unwrap();
         let row = &rows[0]; //NB: there is a unique row (with rdfs:label)
@@ -1037,7 +1035,7 @@ mod tests {
         let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
         let ending_order = vec![String::from("rdfs:subClassOf")];
 
-        let (a, b) =
+        let (a, _b) =
             sort_predicate_map_by_label(&property_map, &label_map, &starting_order, &ending_order);
         let expected_ordrer = vec![
             "rdfs:label",
