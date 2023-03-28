@@ -431,11 +431,11 @@ fn ldtab_json_2_hiccup(
 }
 
 fn ldtab_literal_2_hiccup(value: &Value) -> Value {
-	value["object"].clone()
+    value["object"].clone()
 }
 
-fn ldtab_datatype_2_hiccup(datatype : &str) -> Value {
-	json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": datatype}, datatype]])
+fn ldtab_datatype_2_hiccup(datatype: &str) -> Value {
+    json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": datatype}, datatype]])
 }
 
 /// Given a property, a value, and a map from CURIEs/IRIs to labels
@@ -450,7 +450,7 @@ fn ldtab_value_2_hiccup(
     value: &Value,
     iri_2_label: &HashMap<String, String>,
     iri_2_type: &HashMap<String, HashSet<String>>,
-) -> Result<Value,Error> {
+) -> Result<Value, Error> {
     let mut list_element = Vec::new();
     list_element.push(json!("li"));
 
@@ -477,8 +477,9 @@ fn ldtab_value_2_hiccup(
         _ => {
             //TODO (depends on LDTab input -- which should be validated)
             return Err(Error::LDTabError(LDTabError::DataFormatViolation(format!(
-                    "Given Value: {}", datatype.to_string()
-            ))))
+                "Given Value: {}",
+                datatype.to_string()
+            ))));
         }
     };
     Ok(Value::Array(list_element))
@@ -605,10 +606,10 @@ pub async fn get_predicate_map_hiccup(
     signature::get_iris(&predicate_map, &mut iris);
 
     //2. labels
-    let label_map = get_label_hash_map(&iris, table, pool).await.unwrap();
+    let label_map = get_label_hash_map(&iris, table, pool).await?;
 
     //3. types
-    let type_map = get_type_hash_map(&iris, table, pool).await.unwrap();
+    let type_map = get_type_hash_map(&iris, table, pool).await?;
 
     let mut outer_list = Vec::new();
     outer_list.push(json!("ul"));
@@ -644,7 +645,7 @@ pub async fn get_predicate_map_hiccup(
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
         for v in value.as_array().unwrap() {
-            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map, &type_map).unwrap();
+            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map, &type_map)?;
             inner_list.push(json!(v_encoding));
         }
         outer_list_element.push(json!(inner_list));
