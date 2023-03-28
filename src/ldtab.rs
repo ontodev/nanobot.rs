@@ -3,9 +3,9 @@ use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
-use wiring_rs::util::signature;
-use wiring_rs::util::parser::parse_thick_triple_object;
 use wiring_rs::ldtab_2_ofn::class_translation::translate;
+use wiring_rs::util::parser::parse_thick_triple_object;
+use wiring_rs::util::signature;
 
 #[derive(Debug)]
 pub enum SerdeError {
@@ -181,7 +181,7 @@ async fn get_label_hash_map(
 /// {"@labels":
 ///     {"obo:ZFA_0000354":"gill",
 ///      "obo:ZFA_0000272":"respiratory system"}
-/// } 
+/// }
 pub async fn get_label_map(
     iris: &HashSet<String>,
     table: &str,
@@ -297,6 +297,56 @@ fn object_2_json_shape(object: &str, datatype: &str, annotation: &str) -> Value 
 }
 
 // ################################################
+// ############### type map #######################
+// ################################################
+
+/// Given a set of CURIEs/IRIs, return a query string for an LDTab database
+/// that yields a map from CURIEs/IRIs to their respective rdfs:labels.
+///
+/// # Examples
+///
+/// Let S = {obo:ZFA_0000354, obo:ZFA_0000272} be a set of CURIEs.
+/// Then build_label_query_for(S,table) returns the query
+/// SELECT subject, predicate, object FROM table WHERE subject IN ('obo:ZFA_0000354',obo:ZFA_0000272) AND predicate='rdf:type'
+fn build_type_query_for(curies: &HashSet<String>, table: &str) -> String {
+    let quoted_curies: HashSet<String> = curies.iter().map(|x| format!("'{}'", x)).collect();
+    let joined_quoted_curies = itertools::join(&quoted_curies, ",");
+    let query = format!(
+        "SELECT subject, predicate, object FROM {table} WHERE subject IN ({curies}) AND predicate='rdf:type'",
+        table=table,
+        curies=joined_quoted_curies
+    );
+    query
+}
+
+/// Given a set of CURIEs/IRIs, and an LDTab database,
+/// return a map from CURIEs/IRIs to their respective rdfs:labels.
+///
+/// # Example
+///
+/// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
+/// and Ldb an LDTab database.
+/// Then get_label_hash_map(S, table, Ldb) returns the map
+/// {"obo:ZFA_0000354": "gill",
+///  "rdfs:label": "label"}
+/// extracted from a given table in Ldb.  
+async fn get_type_hash_map(
+    curies: &HashSet<String>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashMap<String, String>, sqlx::Error> {
+    let mut entity_2_type = HashMap::new();
+    let query = build_type_query_for(&curies, table);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let entity: &str = row.get("subject");
+        let rdf_type: &str = row.get("object");
+        entity_2_type.insert(String::from(entity), String::from(rdf_type));
+    }
+    Ok(entity_2_type)
+}
+
+// ################################################
 // ######## HTML view #############################
 // ################################################
 //
@@ -337,9 +387,6 @@ fn ldtab_json_2_hiccup(
     iri_2_label: &HashMap<String, String>,
 ) -> Value {
     //TODO: encode Manchester (wiring_rs currently only provides translations for triples - not objects)
-    //let object = parse_thick_triple_object(&value.to_string()); 
-    //let v = translate(&object);
-    //v
     value.clone()
 }
 
@@ -583,7 +630,7 @@ pub async fn get_subject_map(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, Error> {
-    //1. predicate map
+    //1. subject map
     let predicate_map = get_property_map(subject, table, pool).await?;
     let subject_map = json!({ subject: predicate_map });
 
@@ -775,6 +822,45 @@ mod tests {
         let label_map = get_label_map(&curies, &table, &pool).await.unwrap();
         let expected_label_map = json!({"@labels":{"obo:ZFA_0000354":"gill"}});
         assert_eq!(label_map, expected_label_map);
+    }
+
+    #[test]
+    fn test_build_type_query_for() {
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+        curies.insert(String::from("rdfs:label"));
+
+        let query = build_type_query_for(&curies, "statement");
+
+        //NB: the order of arguments for the SQLite IN operator is not unique
+        let expected_alternative_a = "SELECT subject, predicate, object FROM statement WHERE subject IN ('rdfs:label','obo:ZFA_0000354') AND predicate='rdf:type'";
+        let expected_alternative_b = "SELECT subject, predicate, object FROM statement WHERE subject IN ('obo:ZFA_0000354','rdfs:label') AND predicate='rdf:type'";
+
+        let check = query.eq(&expected_alternative_a) || query.eq(&expected_alternative_b);
+        assert!(check);
+    }
+
+    #[tokio::test]
+    async fn test_get_type_hash_map() {
+        let connection = "src/resources/test_data/zfa_excerpt.db";
+        let connection_string = format!("sqlite://{}?mode=rwc", connection);
+        let pool: SqlitePool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .connect(&connection_string)
+            .await
+            .unwrap();
+
+        let table = "statement";
+
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+
+        let type_hash_map = get_type_hash_map(&curies, &table, &pool).await.unwrap();
+
+        let mut expected = HashMap::new();
+        expected.insert(String::from("obo:ZFA_0000354"), String::from("owl:Class"));
+
+        assert_eq!(type_hash_map, expected);
     }
 
     #[tokio::test]
