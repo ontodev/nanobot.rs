@@ -384,11 +384,24 @@ fn ldtab_iri_2_hiccup(
     json!(["a", {"property" : property, "resource" : value["object"]}, label ])
 }
 
-/// Given a property, a value, and a map from CURIEs/IRIs to labels,
-/// return a hiccup-style list encoding a nested LDTab expression.
+/// Given a property, an LDTab value with type _JSON,
+/// a map from CURIEs/IRIs to labels, and
+/// a map from CURIEs/IRIs to rdf:types,
+/// return a hiccup-style list encoding of
+/// the LDTab value's RDFa representation.
 ///
-/// Example
-/// TODO (depends on wiring_rs)
+/// Examples
+///
+/// Consider the following as given input:
+///
+/// property = rdfs:subClassOf
+/// value =  {"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000272"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"}
+/// iri_2_label = {"obo:ZFA_0000272":"respiratory system"}
+/// iri_2_type = {"obo:ZFA_0000272":{"owl:Class"}}
+///
+/// Then this ldtab_json_2_hiccup(&property, &value, &iri_2_label, &iri_2_type) returns:
+///
+/// ["span",{"property":"rdfs:subClassOf","typeof":"owl:Restriction"},["a",{"property":"owl:onProperty","resource":"obo:BFO_0000050"},"obo:BFO_0000050"]," some ",["a",{"property":"owl:someValuesFrom","resource":"obo:ZFA_0000272"},"respiratory system"]]
 fn ldtab_json_2_hiccup(
     property: &str,
     value: &Value,
@@ -396,10 +409,10 @@ fn ldtab_json_2_hiccup(
     iri_2_type: &HashMap<String, HashSet<String>>,
 ) -> Value {
     let object = value["object"].clone(); //unpack object
-    let object = parse_thick_triple_object(&object.to_string()); // get owl
-    let ofn = translate(&object); //translate to OFN
-    let ofn_typed = type_ofn(&ofn, iri_2_type); //perform typing
-    let ofn_rdfa = rdfa_translate(&ofn_typed, iri_2_label, Some(property)); //translate to RDFa
+    let owl = parse_thick_triple_object(&object.to_string()); //parse as owl
+    let ofn = translate(&owl);
+    let ofn_typed = type_ofn(&ofn, iri_2_type);
+    let ofn_rdfa = rdfa_translate(&ofn_typed, iri_2_label, Some(property));
     ofn_rdfa
 }
 
@@ -921,6 +934,30 @@ mod tests {
         let ldtab_encoding = ldtab_string_2_serde_value(subject);
         let expected = Value::String(String::from("obo:ZFA_0000354"));
         assert_eq!(ldtab_encoding, expected);
+    }
+
+    #[test]
+    fn test_ldtab_json_2_hiccup() {
+        let mut label_map = HashMap::new();
+        label_map.insert(
+            String::from("obo:ZFA_0000272"),
+            String::from("respiratory system"),
+        );
+
+        let mut type_map: HashMap<String, HashSet<String>> = HashMap::new();
+        let mut types = HashSet::new();
+        types.insert(String::from("owl:Class"));
+        type_map.insert(String::from("obo:ZFA_0000272"), types);
+
+        let hiccup = ldtab_json_2_hiccup(
+            "rdfs:subClassOf",
+            &json!({"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000272"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"}),
+            &label_map,
+            &type_map,
+        );
+
+        let expected = json!(["span",{"property":"rdfs:subClassOf","typeof":"owl:Restriction"},["a",{"property":"owl:onProperty","resource":"obo:BFO_0000050"},"obo:BFO_0000050"]," some ",["a",{"property":"owl:someValuesFrom","resource":"obo:ZFA_0000272"},"respiratory system"]]);
+        assert_eq!(hiccup, expected);
     }
 
     #[tokio::test]
