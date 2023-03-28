@@ -16,9 +16,15 @@ pub enum SerdeError {
 }
 
 #[derive(Debug)]
+pub enum LDTabError {
+    DataFormatViolation(String),
+}
+
+#[derive(Debug)]
 pub enum Error {
     SerdeError(SerdeError),
     SQLError(sqlx::Error),
+    LDTabError(LDTabError),
 }
 
 impl From<sqlx::Error> for Error {
@@ -30,6 +36,12 @@ impl From<sqlx::Error> for Error {
 impl From<SerdeError> for Error {
     fn from(e: SerdeError) -> Self {
         Error::SerdeError(e)
+    }
+}
+
+impl From<LDTabError> for Error {
+    fn from(e: LDTabError) -> Self {
+        Error::LDTabError(e)
     }
 }
 
@@ -438,7 +450,7 @@ fn ldtab_value_2_hiccup(
     value: &Value,
     iri_2_label: &HashMap<String, String>,
     iri_2_type: &HashMap<String, HashSet<String>>,
-) -> Value {
+) -> Result<Value,Error> {
     let mut list_element = Vec::new();
     list_element.push(json!("li"));
 
@@ -463,10 +475,13 @@ fn ldtab_value_2_hiccup(
             }
         },
         _ => {
-            json!("ERROR"); //TODO (depends on LDTab input -- which should be validated)
+            //TODO (depends on LDTab input -- which should be validated)
+            return Err(Error::LDTabError(LDTabError::DataFormatViolation(format!(
+                    "Given Value: {}", datatype.to_string()
+            ))))
         }
     };
-    Value::Array(list_element)
+    Ok(Value::Array(list_element))
 }
 
 /// Given a predicate map, a label map, a starting and ending list of predicates,
@@ -629,7 +644,7 @@ pub async fn get_predicate_map_hiccup(
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
         for v in value.as_array().unwrap() {
-            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map, &type_map);
+            let v_encoding = ldtab_value_2_hiccup(&key, v, &label_map, &type_map).unwrap();
             inner_list.push(json!(v_encoding));
         }
         outer_list_element.push(json!(inner_list));
