@@ -367,18 +367,19 @@ pub fn identify_roots(
 /// The two relationships are defined as follows:
 ///  - is-a is a relationship for (transitive) ancestors of the input entity
 ///  - part-of is a relationship defined via an OWL axiom of the form: "part 'is-a' 'part-of' some filler"
-/// 
-/// Example: 
+///
+/// Example:
+///
 /// The axioms
-/// 
+///
 /// axiom 1: 'gill' is-a 'compound organ'
 /// axiom 2: 'gill' is-a 'part-of' some 'compound organ'
 /// axiom 3: 'gill' is-a 'part-of' some 'respiratory system'
 /// axiom 4: 'respiratory system' is-a 'anatomical system'
 /// axiom 5: 'anatomical system' is-a 'part-of' some 'whole organism'
-/// 
-///  Would be turned into the following maps: 
-/// 
+///
+///  Would be turned into the following maps:
+///
 ///  class_2_subclass:
 ///  {
 ///    'compound organ' : {'gill'},
@@ -390,7 +391,7 @@ pub fn identify_roots(
 ///    'whole organism' : {'anatomical system'},
 ///    'respiratory system' : {'gill'},
 ///    'compound organ' : {'gill'},
-///  } 
+///  }
 pub async fn get_hierarchy_maps(
     entity: &str,
     table: &str,
@@ -408,7 +409,6 @@ pub async fn get_hierarchy_maps(
     //w.r.t. classes that are used as fillers in axioms for part-of relations.
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
     let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
-
 
     //We assume the 'is-a' and 'part-of' relations to be acyclic.
     //Since both relations can be interpreted in terms of a partial order,
@@ -434,7 +434,7 @@ pub async fn get_hierarchy_maps(
             update_hierarchy_map(&mut class_2_parts, &parts_updates);
 
             //collect fillers of 'part-of' restrictions
-            //with which we will continue the breadth first search,i.e.
+            //with which we will continue the breadth-first search,i.e.
             //querying for all 'is-a' relationships,
             //extracting 'part-of' relations, etc.
             //until no 'part-of' relations are found.
@@ -460,14 +460,28 @@ pub async fn get_hierarchy_maps(
     Ok((class_2_subclasses, class_2_parts))
 }
 
-///Given a CURIE for an entity and a connection to an LDTab database,
-///return a map capturing (transitive) information about the 'is-a' relationship.
-///The mapping is structured in a hierarchical descending manner in which
-///a key-value pair consists of an entity (the key) and a set (the value) of all
-///its immediate subclasses ('is-a' relationship).
+/// Given a CURIE for an entity and a connection to an LDTab database,
+/// return a map capturing (transitive) information about the 'is-a' relationship.
+/// The mapping is structured in a hierarchical descending manner in which
+/// a key-value pair consists of an entity (the key) and a set (the value) of all
+/// its immediate subclasses ('is-a' relationship).
 ///
-///TODO: text example
-///TODO: code example
+/// Example:
+///
+/// The information captured by the axioms
+///
+/// axiom 1: 'gill' is-a 'compound organ'
+/// axiom 2: 'compound organ' is-a 'whole organism'
+/// axiom 3: 'whole organism' is-a 'anatomical group'
+/// axiom 4: 'anatomical system' is-a 'anatomical group'
+///
+/// would be represented by the map
+///
+/// {
+///  'compound organ' : {'gill'},
+///  'whole organism' : {'compound organism'},
+///  'anatomical group' : {'whole organism', 'anatomical system'}
+/// }
 pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
@@ -495,9 +509,11 @@ pub async fn get_class_2_subclass_map(
 
         match class_2_subclasses.get_mut(&object_string) {
             Some(x) => {
+                //there already exists an entry in the map
                 x.insert(subject_string);
             }
             None => {
+                //create a new entry in the map
                 let mut subclasses = HashSet::new();
                 subclasses.insert(subject_string);
                 class_2_subclasses.insert(object_string, subclasses);
@@ -507,34 +523,57 @@ pub async fn get_class_2_subclass_map(
     Ok(class_2_subclasses)
 }
 
-///Given a mapping from classes to sets of their subclasses,
-///extract and return a mapping from classes to sets of their parthoods.
-///In particular, whenever there is an subclass mapping of the form
+/// Given a mapping from classes to sets of their subclasses,
+/// extract and return a mapping from classes to sets of their parthoods.
+/// In particular, a part-of relation expressed via an OWL axiom of the form
 ///
-///entity -> part-of some filler
+/// 'entity' is-a 'part-of' some 'filler'
 ///
-///then add a 'part-of' map of the form
+/// then this information is represented via the following mapping:
 ///
-///filler -> entity
+/// {filler : entity}
 ///
-///TODO: text example
-///TODO: code example
+/// Examples
+///
+/// Consider the axioms
+
+/// axiom 1: 'gill' is-a 'part-of' some 'compound organ'
+/// axiom 2: 'gill' is-a 'part-of' some 'respiratory system'
+/// axiom 2: 'anatomical system' is-a 'part-of' some 'whole organism'
+///
+/// represented in class_2_subclasses via the following map:
+///
+/// {
+///   'part-of' some 'compound organ' : {'gill'},
+///   'part-of' some 'respiratory system' : {'gill'},
+///   'part-of' some 'whole organism' : {'anatomical system'},
+/// }.
+///
+/// The function get_part_of_information then returns the following map:
+///
+/// {
+///    'compound organ', : {'gill'}
+///    'respiratory system: {'gill'}
+///    'whole organism' : {'anatomical system'},
+/// }.  
 pub fn get_part_of_information(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> HashMap<String, HashSet<String>> {
     let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
 
-    //S subclassof part-of some filler
-    //map will hold: filler -> S  (read: filler has-part S)
+    //original axiom: S is-a part-of some filler
+    //class_2_subclass map will contain: filler -> S
     for (class, subclasses) in class_2_subclasses {
         let class_value = ldtab_2_value(class);
 
+        //check whether there is an existential restriction
         let part_of_restriction = match class_value.clone() {
             Value::Object(x) => check_part_of_restriction(&x),
             _ => false,
         };
 
         if part_of_restriction {
+            //encode information in class_2_parts
             let part_of_filler = class_value
                 .get("owl:someValuesFrom")
                 .unwrap()
