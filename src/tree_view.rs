@@ -10,7 +10,6 @@ static IS_A: &'static str = "rdfs:subClassOf";
 #[derive(Debug)]
 pub struct LabelNotFound;
 
-
 /// Convert LDTab strings to serde Values.
 /// LDTab makes use of both strings and JSON strings.
 /// For example values in the 'subject' column of an LDTab database are
@@ -110,7 +109,6 @@ pub async fn get_label(
 
     Err(LabelNotFound)
 }
-
 
 ///Given an LDTab JSON string,
 ///return IRIs and CURIEs that occur in the string
@@ -804,54 +802,96 @@ pub async fn get_preferred_roots(
     Ok(preferred_roots)
 }
 
-async fn get_preferred_roots_hierarchy_maps(class_2_subclasses : &mut HashMap<String, HashSet<String>>, class_2_parts : &mut HashMap<String, HashSet<String>>, table: &str, pool : &SqlitePool ) {
+async fn get_preferred_roots_hierarchy_maps(
+    class_2_subclasses: &mut HashMap<String, HashSet<String>>,
+    class_2_parts: &mut HashMap<String, HashSet<String>>,
+    table: &str,
+    pool: &SqlitePool,
+) {
+    //query for preferred roots
+    let preferred_roots = get_preferred_roots(table, pool).await.unwrap();
 
-        //query for preferred roots
-        let preferred_roots = get_preferred_roots(table, pool).await.unwrap();
-
-        //collect all transitive ancestors
-        let mut preferred_root_ancestor = HashSet::new();
-        let mut current = HashSet::new();
-        current.extend(preferred_roots);
-        let mut next = HashSet::new();
-        while !current.is_empty() {
-            for preferred in &current {
-                if class_2_subclasses.contains_key(preferred) {
-                    for (key, value) in &mut *class_2_subclasses {
-                        if value.contains(preferred) {
-                            preferred_root_ancestor.insert(key.clone());
-                            next.insert(key.clone());
-                        }
-                    }
-                }
-
-                if class_2_parts.contains_key(preferred) {
-                    for (key, value) in &mut *class_2_parts {
-                        if value.contains(preferred) {
-                            preferred_root_ancestor.insert(key.clone());
-                            next.insert(key.clone());
-                        }
+    //collect all transitive ancestors
+    let mut preferred_root_ancestor = HashSet::new();
+    let mut current = HashSet::new();
+    current.extend(preferred_roots);
+    let mut next = HashSet::new();
+    while !current.is_empty() {
+        for preferred in &current {
+            if class_2_subclasses.contains_key(preferred) {
+                for (key, value) in &mut *class_2_subclasses {
+                    if value.contains(preferred) {
+                        preferred_root_ancestor.insert(key.clone());
+                        next.insert(key.clone());
                     }
                 }
             }
-            current.clear();
-            for n in &next {
-                current.insert(n.clone());
-            }
-            next.clear();
-        }
 
-        //remove ancestors for preferred root terms
-        for ancestor in preferred_root_ancestor {
-            class_2_subclasses.remove(&ancestor);
-            class_2_parts.remove(&ancestor);
+            if class_2_parts.contains_key(preferred) {
+                for (key, value) in &mut *class_2_parts {
+                    if value.contains(preferred) {
+                        preferred_root_ancestor.insert(key.clone());
+                        next.insert(key.clone());
+                    }
+                }
+            }
         }
+        current.clear();
+        for n in &next {
+            current.insert(n.clone());
+        }
+        next.clear();
+    }
+
+    //remove ancestors for preferred root terms
+    for ancestor in preferred_root_ancestor {
+        class_2_subclasses.remove(&ancestor);
+        class_2_parts.remove(&ancestor);
+    }
 }
 
-///Given a CURIE of an entity and a connection to an LDTab database,
-///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
+/// Given a CURIE of an entity and a connection to an LDTab database,
+/// return a term tree (encoded in JSON) representing information about its subsumption and parthood relations.
+/// The tree contains information about all available ancestor (or preferred root terms) of the target entity
+/// as well as its immediate children and grandchildren.
 ///
-///TODO: example
+/// # Examples
+///
+/// Consider the entity obo:ZFA_0000354 (gill) and an LDTab data base zfa.db for zebrafish.
+/// Then get_rich_json_tree_view(obo:ZFA_0000354, false, statement, zfa.db)
+/// returns a tree of the form:
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
+///   "property": "rdfs:subClassOf",
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",              <= ancestor of obo:ZFA_0000354 (gill)
+///       "property": "rdfs:subClassOf",
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",
+///           "children": [
+///             {
+///               "curie": "obo:ZFA_0000716",
+///               "label": "afferent branchial artery",  <= child of obo:ZFA_0000354 (gill)
+///               "property": "obo:BFO_0000050",
+///               "children": [
+///                 {
+///                   "curie": "obo:ZFA_0005012",
+///                   "label": "afferent filamental artery",   <= grand child of obo:ZFA_0000354 (gill)
+///                   "property": "obo:BFO_0000050",
+///                   "children": []
+///                 },
+///               ]
+///              }]
+///          }]
+///      }]
+/// }]
 pub async fn get_rich_json_tree_view(
     entity: &str,
     preferred_roots: bool,
@@ -862,8 +902,15 @@ pub async fn get_rich_json_tree_view(
     let (mut class_2_subclasses, mut class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await?;
 
+    //modify ancestor information w.r.t. preferred root terms
     if preferred_roots {
-           get_preferred_roots_hierarchy_maps(&mut class_2_subclasses, &mut class_2_parts, table, pool).await; 
+        get_preferred_roots_hierarchy_maps(
+            &mut class_2_subclasses,
+            &mut class_2_parts,
+            table,
+            pool,
+        )
+        .await;
     }
 
     //get elements with no ancestors (i.e., roots)
@@ -874,26 +921,27 @@ pub async fn get_rich_json_tree_view(
     iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
     iris.extend(get_iris_from_subclass_map(&class_2_parts));
 
-    //get labels for curies
+    //get labels for CURIEs/IRIs
     let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
 
-    //build ancestor tree
+    //build JSON tree
     let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
 
     //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree);
 
-    //add branch of immediate children to first occurrence of entity in the ancestor tree
+    //get immediate children of leaf entities in the ancestor tree
     //NB: sorting the tree first ensures that the tree with added children is deterministic
     let mut children = get_immediate_children_tree(entity, table, pool).await?;
 
-    //get grand children
+    //add childrens of children to children
     for child in children.as_array_mut().unwrap() {
         let child_iri = child["curie"].as_str().unwrap();
         let grand_children = get_immediate_children_tree(child_iri, table, pool).await?;
         child["children"] = grand_children;
     }
 
+    //add children to the first occurrence of their respective parents in the (sorted) JSON tree
     add_children(&mut sorted, &children);
 
     Ok(sorted)
@@ -1201,7 +1249,7 @@ mod tests {
     use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
     use std::collections::{HashMap, HashSet};
 
-   #[test]
+    #[test]
     fn test_build_label_query_for() {
         let mut curies = HashSet::new();
         curies.insert(String::from("obo:ZFA_0000354"));
@@ -1217,7 +1265,3 @@ mod tests {
         assert!(check);
     }
 }
-
-
-
-
