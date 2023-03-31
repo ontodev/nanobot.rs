@@ -358,15 +358,39 @@ pub fn identify_roots(
     roots
 }
 
-///Given a CURIE for an entity and a connection to an LDTab database,
-///return maps capturing information about the relationships 'is-a' and 'part-of'.
-///The mappings are structured in a hierarchical descending manner in which
-///a key-value pair consists of an entity (the key) and a set (the value) of all
-///its immediate subclasses ('is-a' relationship) or its parthoods ('part-of' relationship).
+/// Given a CURIE for an entity and a connection to an LDTab database,
+/// return maps capturing information about the relationships 'is-a' and 'part-of'.
+/// The mappings are structured in a hierarchical descending manner in which
+/// a key-value pair consists of an entity (the key) and a set (the value) of all
+/// its immediate subclasses ('is-a' relationship) or its parthoods ('part-of' relationship).
 ///
+/// The two relationships are defined as follows:
+///  - is-a is a relationship for (transitive) ancestors of the input entity
+///  - part-of is a relationship defined via an OWL axiom of the form: "part 'is-a' 'part-of' some filler"
+/// 
+/// Example: 
+/// The axioms
+/// 
+/// axiom 1: 'gill' is-a 'compound organ'
+/// axiom 2: 'gill' is-a 'part-of' some 'compound organ'
+/// axiom 3: 'gill' is-a 'part-of' some 'respiratory system'
+/// axiom 4: 'respiratory system' is-a 'anatomical system'
+/// axiom 5: 'anatomical system' is-a 'part-of' some 'whole organism'
+/// 
+///  Would be turned into the following maps: 
+/// 
+///  class_2_subclass:
+///  {
+///    'compound organ' : {'gill'},
+///    'anatomical system' : {'respiratory system'},
+///  }
 ///
-///TODO: text example
-///TODO: code example
+///  class_2_parts:
+///  {
+///    'whole organism' : {'anatomical system'},
+///    'respiratory system' : {'gill'},
+///    'compound organ' : {'gill'},
+///  } 
 pub async fn get_hierarchy_maps(
     entity: &str,
     table: &str,
@@ -378,8 +402,9 @@ pub async fn get_hierarchy_maps(
     ),
     sqlx::Error,
 > {
-    //both maps are build by iteratively querying for combinations of 'is-a'
-    //and 'part-of' relationships.
+    //both maps are build by iteratively querying for combinations of
+    //is-a and part-of relationships.
+
     //TODO: explain the way these two relations are combined
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
     let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
