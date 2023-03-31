@@ -10,53 +10,78 @@ static IS_A: &'static str = "rdfs:subClassOf";
 #[derive(Debug)]
 pub struct LabelNotFound;
 
-//An LDTab string is either a JSON string or a string.
-//In the case of a JSON string, the input string can be parsed as a Value.
-//In the case of a string, the input string needs to be converted to a Serde Value
-//
-pub fn ldtab_2_value(input: &str) -> Value {
-    match from_str::<Value>(input) {
-        Ok(x) => x,        //JSON string was parsed to a serde Value
-        _ => json!(input), //normal string is converted to a serde Value
-    }
+
+/// Convert LDTab strings to serde Values.
+/// LDTab makes use of both strings and JSON strings.
+/// For example values in the 'subject' column of an LDTab database are
+/// conventional strings -- NOT JSON strings.
+///
+/// # Examples
+///
+/// 1. "obo:ZFA_0000354" is a string.
+/// 2. "\"obo:ZFA_0000354\"" is a JSON string.  
+/// 3. ldtab_string_2_serde_value("obo:ZFA_0000354") returns Value::String("obo:ZFA_0000354")
+/// 4. ldtab_string_2_serde_value("\"obo:ZFA_0000354\"") returns Value::String("obo:ZFA_0000354")
+/// 5. ldtab_string_2_serde_value("{\"a\":\"b\"}") returns Value::Object {"a": Value::String("b")}
+fn ldtab_2_value(string: &str) -> Value {
+    //NB: an LDTab thick triple makes use of strings (which are not JSON strings
+    //example: "this is a string" and "\"this is a JSON string\"".).
+    let serde_value = match from_str::<Value>(string) {
+        Ok(x) => x,
+        _ => json!(string),
+    };
+
+    serde_value
 }
 
 // ################################################
 // ######## build label map ######################
 // ################################################
 
-///Given a set of CURIEs and an LDTab database,
-///return a JSON object that maps CURIEs to their labels
+/// Given a set of CURIEs/IRIs, return a query string for an LDTab database
+/// that yields a map from CURIEs/IRIs to their respective rdfs:labels.
 ///
-///TODO: code example
-pub async fn get_label_map(iris: &HashSet<String>, table: &str, pool: &SqlitePool) -> Value {
-    let entity_2_label = get_label_hash_map(iris, table, pool).await;
-
-    json!({ "@labels": entity_2_label })
+/// # Examples
+///
+/// Let S = {obo:ZFA_0000354, obo:ZFA_0000272} be a set of CURIEs.
+/// Then build_label_query_for(S,table) returns the query
+/// SELECT subject, predicate, object FROM table WHERE subject IN ('obo:ZFA_0000354',obo:ZFA_0000272) AND predicate='rdfs:label'
+fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
+    let quoted_curies: HashSet<String> = curies.iter().map(|x| format!("'{}'", x)).collect();
+    let joined_quoted_curies = itertools::join(&quoted_curies, ",");
+    let query = format!(
+        "SELECT subject, predicate, object FROM {table} WHERE subject IN ({curies}) AND predicate='rdfs:label'",
+        table=table,
+        curies=joined_quoted_curies
+    );
+    query
 }
 
-///Given a set of CURIEs and an LDTab database,
-///return a map from CURIEs to their respective labels
+/// Given a set of CURIEs/IRIs, and an LDTab database,
+/// return a map from CURIEs/IRIs to their respective rdfs:labels.
 ///
-///TODO: code example
-pub async fn get_label_hash_map(
-    iris: &HashSet<String>,
+/// # Example
+///
+/// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
+/// and Ldb an LDTab database.
+/// Then get_label_hash_map(S, table, Ldb) returns the map
+/// {"obo:ZFA_0000354": "gill",
+///  "rdfs:label": "label"}
+/// extracted from a given table in Ldb.  
+async fn get_label_hash_map(
+    curies: &HashSet<String>,
     table: &str,
     pool: &SqlitePool,
-) -> HashMap<String, String> {
+) -> Result<HashMap<String, String>, sqlx::Error> {
     let mut entity_2_label = HashMap::new();
-
-    for i in iris {
-        let label = get_label(&i, table, pool).await;
-        match label {
-            Ok(x) => {
-                entity_2_label.insert(i.clone(), x);
-            }
-            Err(_x) => {} //TODO how should missing labels be treated?
-        };
+    let query = build_label_query_for(&curies, table);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let entity: &str = row.get("subject");
+        let label: &str = row.get("object");
+        entity_2_label.insert(String::from(entity), String::from(label));
     }
-
-    entity_2_label
+    Ok(entity_2_label)
 }
 
 ///Given an entity's CURIE and an LDTab database,
@@ -85,6 +110,7 @@ pub async fn get_label(
 
     Err(LabelNotFound)
 }
+
 
 ///Given an LDTab JSON string,
 ///return IRIs and CURIEs that occur in the string
@@ -509,233 +535,6 @@ pub fn get_part_of_information(
     class_2_parts
 }
 
-///TODO:
-pub fn build_is_a_branch(
-    to_insert: &str,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    class_2_parts: &HashMap<String, HashSet<String>>,
-) -> Value {
-    let mut json_map = Map::new();
-
-    match class_2_subclasses.get(to_insert) {
-        Some(is_a_children) => {
-            for c in is_a_children {
-                match build_is_a_branch(c, class_2_subclasses, class_2_parts) {
-                    Value::Object(x) => {
-                        json_map.extend(x);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        None => {}
-    }
-    match class_2_parts.get(to_insert) {
-        Some(part_of_children) => {
-            for c in part_of_children {
-                match build_part_of_branch(c, class_2_subclasses, class_2_parts) {
-                    Value::Object(x) => {
-                        json_map.extend(x);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        None => {}
-    }
-
-    //leaf case
-    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        json_map.insert(
-            String::from(to_insert),
-            Value::String(String::from("owl:Nothing")),
-        );
-        Value::Object(json_map)
-    } else {
-        json!({ to_insert: json_map })
-    }
-}
-
-pub fn build_part_of_branch(
-    to_insert: &str,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    class_2_parts: &HashMap<String, HashSet<String>>,
-) -> Value {
-    let mut json_map = Map::new();
-
-    match class_2_subclasses.get(to_insert) {
-        Some(is_a_children) => {
-            for c in is_a_children {
-                match build_is_a_branch(c, class_2_subclasses, class_2_parts) {
-                    Value::Object(x) => {
-                        json_map.extend(x);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        None => {}
-    }
-    match class_2_parts.get(to_insert) {
-        Some(part_of_children) => {
-            for c in part_of_children {
-                match build_part_of_branch(c, class_2_subclasses, class_2_parts) {
-                    Value::Object(x) => {
-                        json_map.extend(x);
-                    }
-                    _ => {}
-                }
-            }
-        }
-        None => {}
-    }
-
-    //leaf case
-    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        json_map.insert(
-            format!("partOf {}", to_insert),
-            Value::String(String::from("owl:Nothing")),
-        );
-        Value::Object(json_map)
-    } else {
-        json!({ format!("partOf {}", to_insert): json_map })
-    }
-}
-
-///Given a set of entities, and maps for subclass and parthood relations,
-///return an encoding of the term tree via JSON objects.
-///
-///TODO: example
-///TODO: code example
-pub fn build_tree(
-    to_insert: &HashSet<String>,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    class_2_parts: &HashMap<String, HashSet<String>>,
-) -> Value {
-    let mut json_map = Map::new();
-    for i in to_insert {
-        //handle 'is-a' case
-        if class_2_subclasses.contains_key(i) {
-            match build_is_a_branch(i, class_2_subclasses, class_2_parts) {
-                Value::Object(x) => {
-                    json_map.extend(x);
-                }
-                _ => {}
-            }
-        }
-        //handle 'part-of' case
-        if class_2_parts.contains_key(i) {
-            match build_part_of_branch(i, class_2_subclasses, class_2_parts) {
-                Value::Object(x) => {
-                    json_map.extend(x);
-                }
-                _ => {}
-            }
-        }
-
-        //leaf case
-        //TODO: remove use of owl:Nothing?
-        if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
-            json_map.insert(String::from(i), Value::String(String::from("owl:Nothing")));
-        }
-    }
-    Value::Object(json_map)
-}
-
-///Given a CURIE for an entity and a connection to an LDTab database,
-///return a tree (encoded in JSON) for the entity that displays information about
-///the relationships 'is-a' as well as 'part-of'
-///
-///TODO: text example
-///TODO: code example
-pub async fn get_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-    //extract information about an entities 'is-a' and 'part-of' relationships
-    let (class_2_subclasses, class_2_parts) =
-        get_hierarchy_maps(entity, table, &pool).await.unwrap();
-
-    //organise the information in a (rooted) tree (or forest)
-    let roots = identify_roots(&class_2_subclasses, &class_2_parts);
-    build_tree(&roots, &class_2_subclasses, &class_2_parts)
-}
-
-///Given a tree (encoded in JSON) representing information about
-///the relationships 'is-a' as well as 'part-of' as well as
-///a mapo from CURIEs to their labels,
-///return the tree with CURIEs replaced with labels.
-///
-///TODO: text example
-///TODO: code example
-pub fn build_labelled_tree(tree: &Value, label_map: &HashMap<String, String>) -> Value {
-    let mut json_map = Map::new();
-
-    match tree {
-        Value::Object(x) => {
-            for (k, v) in x {
-                if k.starts_with("partOf ") {
-                    //TODO rethink encoding of part-of relation
-                    let curie = k.strip_prefix("partOf ").unwrap();
-                    match label_map.get(curie) {
-                        Some(label) => {
-                            json_map.insert(
-                                format!("partOf {}", label),
-                                build_labelled_tree(v, label_map),
-                            );
-                        }
-                        None => {
-                            json_map.insert(k.clone(), build_labelled_tree(v, label_map));
-                        }
-                    }
-                } else {
-                    match label_map.get(k) {
-                        Some(label) => {
-                            json_map.insert(label.clone(), build_labelled_tree(v, label_map));
-                        }
-                        None => {
-                            json_map.insert(k.clone(), build_labelled_tree(v, label_map));
-                        }
-                    }
-                }
-            }
-        }
-        Value::String(x) => {
-            return Value::String(x.clone());
-        }
-        _ => {
-            json!("ERROR");
-        }
-    }
-    Value::Object(json_map)
-}
-
-///Given a CURIE for an entity and a connection to an LDTab database,
-///return a tree (encoded in JSON) for the entity that displays information about
-///the relationships 'is-a' as well as 'part-of'. The returned tree uses labels instead of CURIEs.
-///
-///TODO: text example
-///TODO: code example
-pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
-    //get information about subsumption and parthood relations
-    let (class_2_subclasses, class_2_parts) =
-        get_hierarchy_maps(entity, table, &pool).await.unwrap();
-
-    //root entities for subsumption and parthood relations
-    let roots = identify_roots(&class_2_subclasses, &class_2_parts);
-
-    //extract CURIEs/IRIs
-    let mut iris = HashSet::new();
-    iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
-    iris.extend(get_iris_from_subclass_map(&class_2_parts));
-
-    //get map from CURIEs/IRIs to labels
-    let label_hash_map = get_label_hash_map(&iris, table, pool).await;
-
-    //build term tree
-    let tree = build_tree(&roots, &class_2_subclasses, &class_2_parts);
-
-    //replace CURIEs with labels
-    build_labelled_tree(&tree, &label_hash_map)
-}
-
 //#######################                   #######################
 //#######################  Rich JSON format #######################
 //#######################                   #######################
@@ -968,7 +767,7 @@ pub async fn get_immediate_children_tree(
     iris.extend(get_iris_from_set(&direct_part_ofs));
 
     //get labels for curies
-    let curie_2_label = get_label_hash_map(&iris, table, pool).await;
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
 
     let mut children = Vec::new();
     for sub in direct_subclasses {
@@ -1071,7 +870,7 @@ pub async fn get_rich_json_tree_view(
     iris.extend(get_iris_from_subclass_map(&class_2_parts));
 
     //get labels for curies
-    let curie_2_label = get_label_hash_map(&iris, table, pool).await;
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
 
     //build ancestor tree
     let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
@@ -1181,47 +980,6 @@ pub async fn get_direct_sub_parts(
         };
     }
     Ok(sub_parts)
-}
-
-//#################################################################
-//####################### Human readable Text format (Markdown) ###
-//#################################################################
-
-///Given a simple term tree, return a human-readable representation
-///in Markdown.
-//TODO: Return Result
-pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
-    let indentation = "\t".repeat(indent);
-    let mut res = Vec::new();
-    match json_tree {
-        Value::Object(map) => {
-            for (k, v) in map {
-                res.push(format!(
-                    "{}- {}{}",
-                    indentation,
-                    k,
-                    json_tree_2_text(v, indent + 1)
-                ));
-            }
-
-            let mut result = String::from("");
-            for e in res {
-                result = format!("{}\n{}", result, e);
-            }
-            result
-        }
-        Value::String(s) => format!("\n{}- {}", indentation, s),
-        _ => String::from("error"),
-    }
-}
-
-///Given a CURIE of an entity and an LDTab database,
-///return a human-readable representation in Markdown.
-pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> String {
-    //get term tree (encoded in JSON)
-    let labelled_json_tree = get_labelled_json_tree_view(entity, table, pool).await;
-    //transform JSON to Markdown
-    json_tree_2_text(&labelled_json_tree, 0)
 }
 
 //#################################################################
@@ -1408,6 +1166,7 @@ pub async fn get_html_top_hierarchy(
     for row in rows {
         let subject: &str = row.get("subject");
 
+        //TODO: remove these label calls
         let subject_label = get_label(subject, table, pool).await;
 
         match subject_label {
@@ -1430,3 +1189,30 @@ pub async fn get_html_top_hierarchy(
     res.push(json!(["li", case, children_list]));
     Ok(Value::Array(res))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+    use std::collections::{HashMap, HashSet};
+
+   #[test]
+    fn test_build_label_query_for() {
+        let mut curies = HashSet::new();
+        curies.insert(String::from("obo:ZFA_0000354"));
+        curies.insert(String::from("rdfs:label"));
+
+        let query = build_label_query_for(&curies, "statement");
+
+        //NB: the order of arguments for the SQLite IN operator is not unique
+        let expected_alternative_a = "SELECT subject, predicate, object FROM statement WHERE subject IN ('rdfs:label','obo:ZFA_0000354') AND predicate='rdfs:label'";
+        let expected_alternative_b = "SELECT subject, predicate, object FROM statement WHERE subject IN ('obo:ZFA_0000354','rdfs:label') AND predicate='rdfs:label'";
+
+        let check = query.eq(&expected_alternative_a) || query.eq(&expected_alternative_b);
+        assert!(check);
+    }
+}
+
+
+
+
