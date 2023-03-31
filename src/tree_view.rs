@@ -402,26 +402,30 @@ pub async fn get_hierarchy_maps(
     ),
     sqlx::Error,
 > {
-    //both maps are build by iteratively querying for combinations of
-    //is-a and part-of relationships.
-
-    //TODO: explain the way these two relations are combined
+    //both maps are build by iteratively querying for
+    //combinations of is-a and part-of relationships.
+    //In particular, this means querying for is-a relations
+    //w.r.t. classes that are used as fillers in axioms for part-of relations.
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
     let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
 
-    let mut updates = HashSet::new();
-    updates.insert(String::from(entity));
 
     //We assume the 'is-a' and 'part-of' relations to be acyclic.
     //Since both relations can be interpreted in terms of a partial order,
     //we can collect information about both relationships via a
     //breadth-first traversal according to the partial order.
-    //Note that this removes the necessity for recursive function calls.
+    //(this removes the necessity for recursive function calls.)
+
+    //start the search with the target entity
+    let mut updates = HashSet::new();
+    updates.insert(String::from(entity));
+
+    //breadth-first traversal (from bottom to top)
     while !updates.is_empty() {
         let mut new_parts: HashSet<String> = HashSet::new();
 
         for update in &updates {
-            //recursive SQL query to get all 'is-a' ancestors
+            //query database to get all 'is-a' ancestors
             let subclasses_updates = get_class_2_subclass_map(&update, table, pool).await?;
             update_hierarchy_map(&mut class_2_subclasses, &subclasses_updates);
 
@@ -430,10 +434,10 @@ pub async fn get_hierarchy_maps(
             update_hierarchy_map(&mut class_2_parts, &parts_updates);
 
             //collect fillers of 'part-of' restrictions
-            //on which we will 'recurse' in the next iteration, i.e.,
+            //with which we will continue the breadth first search,i.e.
             //querying for all 'is-a' relationships,
-            //extracting 'part-of' relations,
-            //and recurse until no 'part-of' relations are found.
+            //extracting 'part-of' relations, etc.
+            //until no 'part-of' relations are found.
             for part in parts_updates.keys() {
                 if !class_2_subclasses.contains_key(part) {
                     new_parts.insert(part.clone());
@@ -441,7 +445,7 @@ pub async fn get_hierarchy_maps(
             }
         }
 
-        //prepare filler of part-of relations for next iteration/recursion
+        //prepare filler of part-of relations for next iteration
         updates.clear();
         for new in new_parts {
             updates.insert(new.clone());
