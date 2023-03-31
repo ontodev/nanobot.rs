@@ -804,23 +804,10 @@ pub async fn get_preferred_roots(
     Ok(preferred_roots)
 }
 
-///Given a CURIE of an entity and a connection to an LDTab database,
-///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
-///
-///TODO: example
-pub async fn get_rich_json_tree_view(
-    entity: &str,
-    preferred_roots: bool,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<Value, sqlx::Error> {
-    //get the entity's ancestor information w.r.t. subsumption and parthood relations
-    let (mut class_2_subclasses, mut class_2_parts) =
-        get_hierarchy_maps(entity, table, &pool).await?;
+async fn get_preferred_roots_hierarchy_maps(class_2_subclasses : &mut HashMap<String, HashSet<String>>, class_2_parts : &mut HashMap<String, HashSet<String>>, table: &str, pool : &SqlitePool ) {
 
-    if preferred_roots {
         //query for preferred roots
-        let preferred_roots = get_preferred_roots(table, pool).await?;
+        let preferred_roots = get_preferred_roots(table, pool).await.unwrap();
 
         //collect all transitive ancestors
         let mut preferred_root_ancestor = HashSet::new();
@@ -830,7 +817,7 @@ pub async fn get_rich_json_tree_view(
         while !current.is_empty() {
             for preferred in &current {
                 if class_2_subclasses.contains_key(preferred) {
-                    for (key, value) in &class_2_subclasses {
+                    for (key, value) in &mut *class_2_subclasses {
                         if value.contains(preferred) {
                             preferred_root_ancestor.insert(key.clone());
                             next.insert(key.clone());
@@ -839,7 +826,7 @@ pub async fn get_rich_json_tree_view(
                 }
 
                 if class_2_parts.contains_key(preferred) {
-                    for (key, value) in &class_2_parts {
+                    for (key, value) in &mut *class_2_parts {
                         if value.contains(preferred) {
                             preferred_root_ancestor.insert(key.clone());
                             next.insert(key.clone());
@@ -859,6 +846,24 @@ pub async fn get_rich_json_tree_view(
             class_2_subclasses.remove(&ancestor);
             class_2_parts.remove(&ancestor);
         }
+}
+
+///Given a CURIE of an entity and a connection to an LDTab database,
+///return a term tree (encoded in JSON) representing information about its subsumption and parthood relations
+///
+///TODO: example
+pub async fn get_rich_json_tree_view(
+    entity: &str,
+    preferred_roots: bool,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
+    //get the entity's ancestor information w.r.t. subsumption and parthood relations
+    let (mut class_2_subclasses, mut class_2_parts) =
+        get_hierarchy_maps(entity, table, &pool).await?;
+
+    if preferred_roots {
+           get_preferred_roots_hierarchy_maps(&mut class_2_subclasses, &mut class_2_parts, table, pool).await; 
     }
 
     //get elements with no ancestors (i.e., roots)
