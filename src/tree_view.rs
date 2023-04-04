@@ -776,18 +776,18 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
 /// [{
 ///   "curie": "obo:ZFA_0100000",
 ///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
-///   "property": "rdfs:subClassOf",
+///   "property": "rdfs:subClassOf",               (related to ancestor via subclass-of by default) 
 ///   "children": [
 ///     {
 ///       "curie": "obo:ZFA_0000272",
 ///       "label": "respiratory system",              <= ancestor of obo:ZFA_0000354 (gill)
-///       "property": "rdfs:subClassOf",
+///       "property": "rdfs:subClassOf",                 (related to ancestor via subclass-of)
 ///       "children": [
 ///         {
 ///           "curie": "obo:ZFA_0000354",
 ///           "label": "gill",
-///           "property": "obo:BFO_0000050",
-///           "children": [ ]
+///           "property": "obo:BFO_0000050",      <= obo:ZFA_0000354 (gill)
+///           "children": [ ]                        (related to ancestor via part-of)
 ///          }]
 ///      }]
 /// }]
