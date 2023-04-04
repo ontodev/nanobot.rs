@@ -708,10 +708,23 @@ pub fn build_rich_part_of_branch(
     json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : PART_OF, "children" : children_vec})
 }
 
+/// Given a node in a term tree, return its associated label.
+/// 
+/// Examples
+///
+/// Given the node
+///  {
+///   "curie": "obo:ZFA_00002722",
+///   "label": "respiratory system",
+///   "property": "rdfs:subClassOf",  
+///   "children": [  ]
+///  }
+///
+/// Return "respiratory system"
 pub fn extract_label(v: &Value) -> String {
     match v {
         Value::Object(_x) => String::from(v["label"].as_str().unwrap()),
-        Value::String(x) => String::from(x), //use IRI instead of label
+        Value::String(x) => String::from(x), //use IRI instead of label (TODO: this case shouldn't occur)
         _ => String::from("error"),
     }
 }
@@ -741,7 +754,6 @@ pub fn sort_array(array: &Vec<Value>) -> Value {
 pub fn sort_object(v: &Map<String, Value>) -> Value {
     //serde objects are sorted by keys:
     //"By default the map is backed by a BTreeMap."
-    //TODO: think about this
     let mut map = Map::new();
 
     //sort nested values
@@ -752,6 +764,65 @@ pub fn sort_object(v: &Map<String, Value>) -> Value {
     Value::Object(map)
 }
 
+/// Given a rich term tree (encoded with JSON),
+/// sort the tree lexicographically w.r.t. entity labels
+/// (this means sorting JSON arrays and JSON objects by keys).
+///
+/// Examples
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",
+///   "property": "rdfs:subClassOf",        
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_00002722",
+///       "label": "respiratory system_B",  <- B
+///       "property": "rdfs:subClassOf",  
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002721",
+///       "label": "respiratory system_C", <- C
+///       "property": "rdfs:subClassOf", 
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002723",
+///       "label": "respiratory system_A", <- A
+///       "property": "rdfs:subClassOf", 
+///       "children": [  ]
+///      }]
+/// }]
+///
+/// will be turned into
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",
+///   "property": "rdfs:subClassOf",        
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_00002723",
+///       "label": "respiratory system_A",  <- A
+///       "property": "rdfs:subClassOf",  
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002722",
+///       "label": "respiratory system_B", <- B
+///       "property": "rdfs:subClassOf",  
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002721",
+///       "label": "respiratory system_C", <- C
+///       "property": "rdfs:subClassOf", 
+///       "children": [  ]
+///      }]
+/// }]
+///
+/// 
 pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
     match tree {
         Value::Array(a) => sort_array(a),
