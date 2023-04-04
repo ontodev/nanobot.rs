@@ -799,7 +799,9 @@ pub fn build_rich_tree(
 ) -> Value {
     let mut json_vec: Vec<Value> = Vec::new();
 
+    //iterate over starting entities in which the tree will be rooted ...
     for i in to_insert {
+        //... and build branches w.r.t. is-a and part-of relationships
         if class_2_subclasses.contains_key(i) {
             match build_rich_is_a_branch(i, class_2_subclasses, class_2_parts, curie_2_label) {
                 Value::Object(x) => {
@@ -817,7 +819,7 @@ pub fn build_rich_tree(
             }
         }
 
-        //leaf case
+        //... or insert entity as a leaf node
         if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
             json_vec.push(json!(String::from(i)));
         }
