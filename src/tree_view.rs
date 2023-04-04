@@ -760,6 +760,37 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
     }
 }
 
+
+/// Given a set (root) entities,
+/// a map from entities to superclasses, 
+/// a map from entities to part-of ancesetors, 
+/// a map from entities to labels, 
+/// return a term tree (encoded in JSON) representing information about its subsumption and parthood relations.
+///
+/// # Examples
+///
+/// Consider the entity obo:ZFA_0000354 (gill) and an LDTab data base zfa.db for zebrafish.
+/// Then get_rich_json_tree_view(obo:ZFA_0000354, false, statement, zfa.db)
+/// returns a tree of the form:
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
+///   "property": "rdfs:subClassOf",
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",              <= ancestor of obo:ZFA_0000354 (gill)
+///       "property": "rdfs:subClassOf",
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",
+///           "children": [ ]
+///          }]
+///      }]
+/// }]
 pub fn build_rich_tree(
     to_insert: &HashSet<String>,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -1274,6 +1305,11 @@ pub async fn get_html_top_hierarchy(
     );
 
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+
+    //go through rows 
+    // -> collect set of iris for labels
+    // -> build label map
 
     //build HTML view
     let mut res = Vec::new();
