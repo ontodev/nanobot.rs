@@ -83,6 +83,7 @@ async fn get_label_hash_map(
     Ok(entity_2_label)
 }
 
+///TODO:  remove this function
 ///Given an entity's CURIE and an LDTab database,
 ///return the entity's label
 ///
@@ -110,10 +111,20 @@ pub async fn get_label(
     Err(LabelNotFound)
 }
 
-///Given an LDTab JSON string,
-///return IRIs and CURIEs that occur in the string
+/// Given an LDTab string,
+/// return all IRIs/CURIEs ocurring in the string
 ///
-///TODO: code example
+/// Examples
+///
+/// Consider the LDTab string
+///
+/// s =  {"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],
+///       "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000040"}],
+///       "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
+///
+/// then get_iris_from_ldtab_string(s) returns the set
+///
+/// {"owl:onProperty", "obo:BFO_0000050", "owl:someValuesFrom","obo:ZFA_0000040", "rdf:type", "owl:Restriction"}
 pub fn get_iris_from_ldtab_string(s: &str) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
 
@@ -130,10 +141,22 @@ pub fn get_iris_from_ldtab_string(s: &str) -> HashSet<String> {
     iris
 }
 
-///Given a map from entities to their respective subclasses,
-///return all IRIs that occur in the map.
+/// Given a map from entities (encoded as LDTab strings -- this could be a string or a JSON string)
+/// to their respective subclasses,
+/// return the set of all occuring entities (encoded as strings)
 ///
-///TODO: code example
+/// # Examples
+///
+/// Consider the map M
+///
+/// {
+///   exp:A : {exp:B, exp:C},
+///   exp:B : {exp:D}
+/// }
+///
+/// Then get_iris_from_subclass_map(M) returns the set
+///
+/// {exp:A, exp:B, exp:C, exp:D}
 pub fn get_iris_from_subclass_map(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> HashSet<String> {
@@ -147,9 +170,16 @@ pub fn get_iris_from_subclass_map(
     iris
 }
 
-///Given a set of strings, return all IRIs that occur in the set.
+/// Given a set of entities (encoded as LDTab strings -- this could be a string or a JSON string)
+/// return the set of entities (encoded as strings).
 ///
-///TODO: code example
+/// # Examples
+///
+/// Consider the set S =  { exp:A, \"exp:B\", exp:C}
+///
+/// Then get_iris_from_set(S) returns the set
+///
+/// { exp:A, exp:B, exp:C }
 pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
     for e in set {
@@ -162,10 +192,15 @@ pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
 // ######## build tree view #######################
 // ################################################
 
-///Given an LDTab predicate map encoded as a Serde Value, return true
-///if the Value represents the 'part-of' relation (obo:BFO_0000050).
+/// Given an LDTab predicate map encoded as a Serde Value, return true
+/// if the Value represents the 'part-of' relation (obo:BFO_0000050).
 ///
-///TODO: code example
+/// # Examples
+///
+/// Consider the value
+/// v = {"datatype":"_IRI","object":"obo:BFO_0000050"}
+///
+/// then check_part_of_property(v) returns true
 pub fn check_part_of_property(value: &Value) -> bool {
     match value {
         Value::Object(x) => {
@@ -177,11 +212,23 @@ pub fn check_part_of_property(value: &Value) -> bool {
     }
 }
 
-///Given an LDTab predicate map encoded as a Serde Value, return true
-///if the Value represents an atomic entity (as opposed to another nested
-///Serde Value representing, e.g., an anonymous class expression.
+/// Given an LDTab predicate map encoded as a Serde Value, return true
+/// if the Value represents an atomic entity (as opposed to another nested
+/// Serde Value representing, e.g., an anonymous class expression.
 ///
-///TODO: code example
+/// # Examples
+///
+/// Consider the value
+///
+/// v_1 = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],
+///        "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000040"}],
+///        "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
+///
+/// v_2 = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],
+///        "owl:someValuesFrom":[{"datatype":"_JSON","object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000030"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}}],
+///        "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
+///
+/// then check_filler(v_1) returns true  and check_filler(v_2) returns false
 pub fn check_filler(value: &Value) -> bool {
     match value {
         Value::Object(x) => {
@@ -195,10 +242,15 @@ pub fn check_filler(value: &Value) -> bool {
     }
 }
 
-///Given an LDTab predicate map encoded, return true
-///if the Map encodes an existential restriction using the 'part-of' property
+/// Given an LDTab predicate map encoded, return true
+/// if the Map encodes an existential restriction using the 'part-of' property
 ///
-///TODO: code example
+/// Consider the value
+/// v = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],
+///      "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000040"}],
+///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
+///
+/// then check_part_of_restriction(v) returns true
 pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
     if value.contains_key("owl:onProperty")
         & value.contains_key("owl:someValuesFrom")
@@ -214,12 +266,27 @@ pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
     }
 }
 
-///Given a map from class expression (in LDTab format) to their subclasses
-///and a target class expression,
-///remove any occurrence of the target class epxression from the map
-///while maintaining transitive subclass relationships.
+/// Given a class expression and
+/// a mutable map from class expression (in LDTab format) to their subclasses,
+/// remove any occurrence of the target class epxression from the map
+/// while maintaining transitive subclass relationships.
 ///
-///TODO: example
+/// # Examples
+///
+/// Consider the class expression "p some f" and the map
+/// m = { a : {b,c,p some f},
+///       p some f : { d, e },
+///       e : {f g},
+///       h : {d, p some f},
+///     }
+///
+/// then remove_invalid_class('p some f', m) returns the map
+///
+/// m = { a : {b,c,d,e},
+///       e : {f g},
+///       h : {d},
+///     }
+/// TODO: this is not used?
 pub fn remove_invalid_class(
     target: &str,
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
@@ -241,12 +308,27 @@ pub fn remove_invalid_class(
     }
 }
 
-///Given a map from class expression (in LDTab format) to their subclasses
-///and a set of target class expressions,
-///remove any occurrence of the target class epxressions from the map
-///while maintaining transitive subclass relationships.
+/// Given a map from class expression (in LDTab format) to their subclasses
+/// and a set of target class expressions,
+/// remove any occurrence of the target class epxressions from the map
+/// (without maintaining transitive relationships) .
 ///
-///TODO: example
+/// # Examples
+///
+/// Consider the class expression "p some f" and the map
+///
+/// m = { a : {b,c,p some f},
+///       p some f : { d, e },
+///       e : {f g},
+///       h : {d, p some f},
+///     }
+///
+/// then remove_invalid_class('p some f', m) returns the map
+///
+/// m = { a : {b,c},
+///       e : {f g},
+///       h : {d},
+///     }
 pub fn remove_invalid_classes(
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
     invalid: &HashSet<String>,
@@ -263,11 +345,22 @@ pub fn remove_invalid_classes(
     }
 }
 
-///Given a map from classes to (direct) subclasses in LDTab format,
-///identify anonymous class expressions. These anonymous class expressions
-///are unwanted for the HTML view.
+/// Given a map from classes to (direct) subclasses in LDTab format,
+/// identify anonymous class expressions.
+/// (These anonymous class expressions are unwanted for the HTML view.)
 ///
-///TODO: doc string + doc test
+/// # Examples
+///
+/// Consider the class expression "p some f" and the map
+///
+/// m = { a : {b,c,p some f},
+///       p some f : { d, e },
+///       e : {f g},
+///       h : {d, r some g},
+///     }
+///
+/// Then the set {p some f, r some g} is returned
+///  as the set of identified invalid classes.
 pub fn identify_invalid_classes(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
 ) -> HashSet<String> {
@@ -300,9 +393,29 @@ pub fn identify_invalid_classes(
     invalid
 }
 
-///Given two maps from classes to subclasses,
-///insert the information from the second map ('updates') to the first ('to_update').
-///TODO: code example
+/// Given two maps from classes to subclasses,
+/// insert the information from the second map ('updates') to the first ('to_update').
+///
+/// # Examples
+///
+/// Consider the maps
+///
+/// m_1 = { a : {b,c,d},
+///         e : {f, g},
+///         h : {d},
+///       },
+///
+/// m_2 = { d : {g,h},
+///         e : {i, j},
+///       }
+///
+/// Then return the map
+///
+/// m = { a : {b,c,d},
+///       d : {g,h}
+///       e : {f, g, i, j},
+///       h : {d},
+///     },
 pub fn update_hierarchy_map(
     to_update: &mut HashMap<String, HashSet<String>>,
     updates: &HashMap<String, HashSet<String>>,
@@ -326,10 +439,19 @@ pub fn update_hierarchy_map(
     }
 }
 
-///Given two maps for subclass and parthood relations,
-///identify root classes, i.e., classes without parents.
+/// Given two maps for subclass and parthood relations,
+/// identify root classes, i.e., classes without parents.
 ///
-///TODO: code example
+/// # Examples
+///
+/// Consider the map
+///
+/// m = { a : {b,c,d,e},
+///       e : {f, g},
+///       h : {d},
+///     }
+///
+/// then identify_roots identifies a and h as roots.  
 pub fn identify_roots(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
     class_2_parts: &HashMap<String, HashSet<String>>,
@@ -604,6 +726,37 @@ pub fn get_part_of_information(
 //#######################                   #######################
 //#######################  Rich JSON format #######################
 //#######################                   #######################
+
+/// Given a set (root) entities,
+/// a map from entities to superclasses,
+/// a map from entities to part-of ancestors,
+/// a map from entities to labels,
+/// return a term tree (encoded in JSON)
+/// representing information about its subsumption and parthood relations
+/// that is related via the 'is-a' relationship to some ancestor.
+///
+/// # Examples
+///
+/// Consider the tree
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",         
+///   "property": "rdfs:subClassOf",               
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",               
+///       "property": "rdfs:subClassOf",              <= this is an 'is-a' branch for
+///       "children": [                                  the ancestor "obo:ZFA_0100000"
+///         {                                            ("zebrafish anatomical entity")
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",      
+///           "children": [ ]                        
+///          }]
+///      }]
+/// }]
 pub fn build_rich_is_a_branch(
     to_insert: &str,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -657,6 +810,36 @@ pub fn build_rich_is_a_branch(
     json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : IS_A, "children" : children_vec})
 }
 
+/// Given a set (root) entities,
+/// a map from entities to superclasses,
+/// a map from entities to part-of ancestors,
+/// a map from entities to labels,
+/// return a term tree (encoded in JSON)
+/// representing information about its subsumption and parthood relations
+/// that is related via the 'part-of' relationship to some ancestor.
+///
+/// # Examples
+///
+/// Consider the tree
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",         
+///   "property": "rdfs:subClassOf",               
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",               
+///       "property": "rdfs:subClassOf",
+///       "children": [                
+///         {                         
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",          <= this is a 'part-of' branch for
+///           "children": [ ]                            the ancestor "obo:ZFA_0000272"
+///          }]                                          ("respiratory system")
+///      }]
+/// }]
 pub fn build_rich_part_of_branch(
     to_insert: &str,
     class_2_subclasses: &HashMap<String, HashSet<String>>,
@@ -709,10 +892,11 @@ pub fn build_rich_part_of_branch(
 }
 
 /// Given a node in a term tree, return its associated label.
-/// 
+///
 /// Examples
 ///
 /// Given the node
+///
 ///  {
 ///   "curie": "obo:ZFA_00002722",
 ///   "label": "respiratory system",
@@ -720,7 +904,7 @@ pub fn build_rich_part_of_branch(
 ///   "children": [  ]
 ///  }
 ///
-/// Return "respiratory system"
+/// return "respiratory system"
 pub fn extract_label(v: &Value) -> String {
     match v {
         Value::Object(_x) => String::from(v["label"].as_str().unwrap()),
@@ -784,13 +968,13 @@ pub fn sort_object(v: &Map<String, Value>) -> Value {
 ///      {
 ///       "curie": "obo:ZFA_00002721",
 ///       "label": "respiratory system_C", <- C
-///       "property": "rdfs:subClassOf", 
+///       "property": "rdfs:subClassOf",
 ///       "children": [  ]
 ///      },
 ///      {
 ///       "curie": "obo:ZFA_00002723",
 ///       "label": "respiratory system_A", <- A
-///       "property": "rdfs:subClassOf", 
+///       "property": "rdfs:subClassOf",
 ///       "children": [  ]
 ///      }]
 /// }]
@@ -817,12 +1001,10 @@ pub fn sort_object(v: &Map<String, Value>) -> Value {
 ///      {
 ///       "curie": "obo:ZFA_00002721",
 ///       "label": "respiratory system_C", <- C
-///       "property": "rdfs:subClassOf", 
+///       "property": "rdfs:subClassOf",
 ///       "children": [  ]
 ///      }]
 /// }]
-///
-/// 
 pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
     match tree {
         Value::Array(a) => sort_array(a),
@@ -831,23 +1013,27 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
     }
 }
 
-
 /// Given a set (root) entities,
-/// a map from entities to superclasses, 
-/// a map from entities to part-of ancesetors, 
-/// a map from entities to labels, 
+/// a map from entities to superclasses,
+/// a map from entities to part-of ancestors,
+/// a map from entities to labels,
 /// return a term tree (encoded in JSON) representing information about its subsumption and parthood relations.
 ///
 /// # Examples
 ///
-/// Consider the entity obo:ZFA_0000354 (gill) and an LDTab data base zfa.db for zebrafish.
-/// Then get_rich_json_tree_view(obo:ZFA_0000354, false, statement, zfa.db)
-/// returns a tree of the form:
+/// Consider the entity obo:ZFA_0000354 (gill),
+/// a map for subclasses {obo:ZFA_0100000 : {obo:ZFA_0000272}},
+/// a map for part-of relations {obo:ZFA_0000272 : {obo:ZFA_0000354}},
+/// a map for labels {obo:ZFA_0100000 : zebrafish anatomical entity,
+///                   obo:ZFA_0000272 : respiratory system,
+///                   obo:ZFA_0000354 : gill },
+///
+/// Then the function get_rich_json_tree_view returns a tree of the form:
 ///
 /// [{
 ///   "curie": "obo:ZFA_0100000",
 ///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
-///   "property": "rdfs:subClassOf",               (related to ancestor via subclass-of by default) 
+///   "property": "rdfs:subClassOf",               (related to ancestor via subclass-of by default)
 ///   "children": [
 ///     {
 ///       "curie": "obo:ZFA_0000272",
@@ -898,6 +1084,106 @@ pub fn build_rich_tree(
     Value::Array(json_vec)
 }
 
+/// Given a rich term tree,
+/// add children to the first occurrence of their respective parents in the tree.
+///
+/// # Examples
+///
+/// Consider the rich term tree
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",
+///   "property": "rdfs:subClassOf",        
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",   
+///       "property": "rdfs:subClassOf",  
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",
+///           "children": [ ]              
+///          }]
+///      }]
+/// }]
+///
+/// and children/descendants for obo:ZFA_0000354:
+///
+/// [
+///   {
+///     "curie": "obo:ZFA_0000716",
+///     "label": "afferent branchial artery",
+///     "property": "obo:BFO_0000050",
+///     "children": [
+///       {
+///         "curie": "obo:ZFA_0005012",
+///         "label": "afferent filamental artery",
+///         "property": "obo:BFO_0000050",
+///         "children": []
+///       },
+///       {
+///         "curie": "obo:ZFA_0005014",
+///         "label": "recurrent branch afferent branchial artery",
+///         "property": "obo:BFO_0000050",
+///         "children": []
+///       }
+///     ]
+///   },
+///   {
+///     "curie": "obo:ZFA_0000319",
+///     "label": "branchiostegal membrane",
+///     "property": "obo:BFO_0000050",
+///     "children": []
+///   },
+/// ]
+///
+/// Then return
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",
+///   "property": "rdfs:subClassOf",        
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",   
+///       "property": "rdfs:subClassOf",  
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",
+///           "children": [
+///                        {
+///                          "curie": "obo:ZFA_0000716",
+///                          "label": "afferent branchial artery",
+///                          "property": "obo:BFO_0000050",
+///                          "children": [
+///                            {
+///                              "curie": "obo:ZFA_0005012",
+///                              "label": "afferent filamental artery",
+///                              "property": "obo:BFO_0000050",
+///                              "children": []
+///                            },
+///                            {
+///                              "curie": "obo:ZFA_0005014",
+///                              "label": "recurrent branch afferent branchial artery",
+///                              "property": "obo:BFO_0000050",
+///                              "children": []
+///                            }
+///                          ]
+///                        },
+///                        {
+///                          "curie": "obo:ZFA_0000319",
+///                          "label": "branchiostegal membrane",
+///                          "property": "obo:BFO_0000050",
+///                          "children": []
+///                        }]
+///      }]
+/// }]
 pub fn add_children(tree: &mut Value, children: &Value) {
     match tree {
         Value::Object(_x) => {
@@ -922,13 +1208,47 @@ pub fn add_children(tree: &mut Value, children: &Value) {
     }
 }
 
+/// Given an entity and a connection to an LDTab database,
+/// return the immediate children of the entity w.r.t. the relationships is-a and part-of.
+/// as rich JSON term tree nodes.
+///
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|is-a|a
+/// c|is-a|a
+/// d|is-a|'part-of' some a
+/// (... rdfs:label information for a,b,c, ...)
+///
+///   then get_immediate_children_tree for a returns
+///
+///  [{
+///    "curie": "b",
+///    "label": "b_label",
+///    "property": "rdfs:subClassOf",
+///    "children": []
+///    },
+///    {
+///     "curie": "c",
+///     "label": "c_label",
+///     "property": "rdfs:subClassOf",
+///     "children": []
+///    },
+///    {
+///     "curie": "d",
+///     "label": "d_label",
+///     "property": "obo:BFO_0000050",
+///     "children": []
+///    }]
 pub async fn get_immediate_children_tree(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, sqlx::Error> {
     //get the entity's immediate descendents w.r.t. subsumption and parthood relations
-    let direct_subclasses = get_direct_sub_hierarchy_maps(entity, table, pool).await?;
+    let direct_subclasses = get_direct_named_subclasses(entity, table, pool).await?;
     let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await?;
 
     //get labels
@@ -956,6 +1276,18 @@ pub async fn get_immediate_children_tree(
     Ok(sorted)
 }
 
+/// Given an LDTab database,
+/// return the set of preferred root terms in the database
+///
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// o|obo:IAO_0000700|a
+/// o|obo:IAO_0000700|d
+///
+/// then get_preferred_roots returns the set {a,d}.
 pub async fn get_preferred_roots(
     table: &str,
     pool: &SqlitePool,
@@ -974,6 +1306,24 @@ pub async fn get_preferred_roots(
     Ok(preferred_roots)
 }
 
+/// Given a map from classes to their subclasses,
+/// a map from classes to their part-of ancestors,
+/// an LDTab database connection,
+/// modify the two ancestor maps so that they are rooted in preferred roots (if possible)
+///
+/// # Examples
+///
+/// Consider the map
+///
+/// m = {a : {d},
+///      d : {e,f},
+///      f : {g}}
+///
+/// and assume that d is a preferred root.
+/// Then get_preferred_roots_hierarchy_maps modifies m as follows:
+///
+/// m = {d : {e,f},
+///      f : {g}}
 async fn get_preferred_roots_hierarchy_maps(
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
     class_2_parts: &mut HashMap<String, HashSet<String>>,
@@ -1113,17 +1463,29 @@ pub async fn get_rich_json_tree_view(
         child["children"] = grand_children;
     }
 
+    println!("Sorted {}", sorted.to_string());
+    println!("Children {}", children.to_string());
+
     //add children to the first occurrence of their respective parents in the (sorted) JSON tree
     add_children(&mut sorted, &children);
 
     Ok(sorted)
 }
 
-///Given a CURIE of an entity and a connection to an LDTab database,
-///return the set of immediate (named) descendants w.r.t. its subsumption and parthood relations
+/// Given an entity and a connection to an LDTab database,
+/// return the set of immediate (named) descendants w.r.t. its subsumption.
 ///
-///TODO: example
-pub async fn get_direct_sub_hierarchy_maps(
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|rdfs:subClassOf|a
+/// c|rdfs:subClassOf|a
+/// r some d|rdfs:subClassOf|a
+///
+/// then get_direct_named_subclasses returns the set {b,c}.
+pub async fn get_direct_named_subclasses(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
@@ -1144,10 +1506,19 @@ pub async fn get_direct_sub_hierarchy_maps(
     Ok(is_a)
 }
 
-///Given a CURIE of an entity and a connection to an LDTab database,
-///return the set of immediate descendants w.r.t. the subsumption relation
+/// Given an entity and a connection to an LDTab database,
+/// return the set of immediate descendants w.r.t. the subsumption relation
 ///
-///TODO: example
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|rdfs:subClassOf|a
+/// c|rdfs:subClassOf|a
+/// r some d|rdfs:subClassOf|a
+///
+/// then get_direct_named_subclasses returns the set {b,c,r some d}.
 pub async fn get_direct_subclasses(
     entity: &str,
     table: &str,
@@ -1170,10 +1541,19 @@ pub async fn get_direct_subclasses(
     Ok(subclasses)
 }
 
-///Given a CURIE of an entity and a connection to an LDTab database,
-///return the set of immediate descendants w.r.t. the parthood relation
+/// Given an entity and a connection to an LDTab database,
+/// return the set of immediate (named) descendants w.r.t. the parthood relation
 ///
-///TODO: example
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|rdfs:subClassOf|part-of some a
+/// c|rdfs:subClassOf|a
+/// r some d|rdfs:subClassOf|part-of some a
+///
+/// then get_direct_sub_parts returns the set {b}.
 pub async fn get_direct_sub_parts(
     entity: &str,
     table: &str,
@@ -1379,8 +1759,7 @@ pub async fn get_html_top_hierarchy(
 
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
-
-    //go through rows 
+    //go through rows
     // -> collect set of iris for labels
     // -> build label map
 
