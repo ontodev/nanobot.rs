@@ -1,4 +1,4 @@
-use nanobot::tree_view::{get_rich_json_tree_view, build_html_hiccup, get_html_top_hierarchy};
+use nanobot::tree_view::{build_html_hiccup, get_html_top_hierarchy, get_rich_json_tree_view};
 use serde_json::{from_str, json, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::fs;
@@ -1595,7 +1595,7 @@ async fn test_get_html_top_hierarchy() {
     let table = "statement";
     let subject = "obo:ZFA_0000354";
 
-    //boolean is for preferred root terms 
+    //boolean is for preferred root terms
     let top_class_hierarchy = get_html_top_hierarchy("Class", table, &pool).await.unwrap();
 
     let expected_string = r#"
@@ -1631,5 +1631,4 @@ async fn test_get_html_top_hierarchy() {
     let expected = from_str::<Value>(expected_string);
 
     assert_eq!(top_class_hierarchy, expected.unwrap());
-
 }
