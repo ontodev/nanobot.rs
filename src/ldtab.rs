@@ -1,3 +1,4 @@
+use hiccupriir::hiccup;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
@@ -651,6 +652,26 @@ pub async fn get_predicate_map_hiccup(
         outer_list.push(json!(outer_list_element));
     }
     Ok(json!(outer_list))
+}
+
+pub async fn get_predicate_map_html(
+    subject: &str,
+    table: &str,
+    pool: &SqlitePool,
+    predicate_order_start: &Vec<String>,
+    predicate_order_end: &Vec<String>,
+) -> Result<String, Error> {
+    let hiccup = get_predicate_map_hiccup(
+        subject,
+        table,
+        pool,
+        predicate_order_start,
+        predicate_order_end,
+    )
+    .await?;
+    let html = hiccup::render(&hiccup, 0);
+
+    Ok(html)
 }
 
 // ################################################
