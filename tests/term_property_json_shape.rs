@@ -64,7 +64,7 @@ async fn test_get_property_map() {
           "object": "Compound organ that consists of gill filaments, gill lamellae, gill rakers and pharyngeal arches 3-7. The gills are responsible for primary gas exchange between the blood and the surrounding water.",
           "datatype": "xsd:string",
           "annotation": {
-            "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>": [
+            "oboInOwl:hasDbXref": [
               {
                 "datatype": "xsd:string",
                 "meta": "owl:Axiom",
@@ -74,7 +74,7 @@ async fn test_get_property_map() {
           }
         }
       ],
-      "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>": [
+      "oboInOwl:hasDbXref": [
         {
           "object": "TAO:0000354",
           "datatype": "xsd:string"
@@ -178,7 +178,7 @@ async fn test_get_property_map() {
           "datatype": "_JSON"
         }
       ],
-      "<http://www.geneontology.org/formats/oboInOwl#id>": [
+      "oboInOwl:id": [
         {
           "object": "ZFA:0000354",
           "datatype": "xsd:string"
@@ -196,18 +196,18 @@ async fn test_get_property_map() {
           "datatype": "xsd:string"
         }
       ],
-      "<http://www.geneontology.org/formats/oboInOwl#hasOBONamespace>": [
+      "oboInOwl:hasOBONamespace": [
         {
           "object": "zebrafish_anatomy",
           "datatype": "xsd:string"
         }
       ],
-      "<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym>": [
+      "oboInOwl:hasExactSynonym": [
         {
           "object": "gills",
           "datatype": "xsd:string",
           "annotation": {
-            "<http://www.geneontology.org/formats/oboInOwl#hasSynonymType>": [
+            "oboInOwl:hasSynonymType": [
               {
                 "datatype": "_IRI",
                 "meta": "owl:Axiom",
@@ -312,9 +312,9 @@ async fn test_get_predicate_map_hiccup() {
         [
           "a",
           {
-            "resource": "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>"
+            "resource": "oboInOwl:hasDbXref"
           },
-          "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>"
+          "oboInOwl:hasDbXref"
         ],
         [
           "ul",
@@ -342,9 +342,9 @@ async fn test_get_predicate_map_hiccup() {
         [
           "a",
           {
-            "resource": "<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym>"
+            "resource": "oboInOwl:hasExactSynonym"
           },
-          "<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym>"
+          "oboInOwl:hasExactSynonym"
         ],
         [
           "ul",
@@ -372,9 +372,9 @@ async fn test_get_predicate_map_hiccup() {
         [
           "a",
           {
-            "resource": "<http://www.geneontology.org/formats/oboInOwl#hasOBONamespace>"
+            "resource": "oboInOwl:hasOBONamespace"
           },
-          "<http://www.geneontology.org/formats/oboInOwl#hasOBONamespace>"
+          "oboInOwl:hasOBONamespace"
         ],
         [
           "ul",
@@ -402,9 +402,9 @@ async fn test_get_predicate_map_hiccup() {
         [
           "a",
           {
-            "resource": "<http://www.geneontology.org/formats/oboInOwl#id>"
+            "resource": "oboInOwl:id"
           },
-          "<http://www.geneontology.org/formats/oboInOwl#id>"
+          "oboInOwl:id"
         ],
         [
           "ul",
@@ -608,7 +608,7 @@ async fn test_get_subject_map() {
             "object": "Compound organ that consists of gill filaments, gill lamellae, gill rakers and pharyngeal arches 3-7. The gills are responsible for primary gas exchange between the blood and the surrounding water.",
             "datatype": "xsd:string",
             "annotation": {
-              "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>": [
+              "oboInOwl:hasDbXref": [
                 {
                   "datatype": "xsd:string",
                   "meta": "owl:Axiom",
@@ -618,7 +618,7 @@ async fn test_get_subject_map() {
             }
           }
         ],
-        "<http://www.geneontology.org/formats/oboInOwl#hasDbXref>": [
+        "oboInOwl:hasDbXref": [
           {
             "object": "TAO:0000354",
             "datatype": "xsd:string"
@@ -722,7 +722,7 @@ async fn test_get_subject_map() {
             "datatype": "_JSON"
           }
         ],
-        "<http://www.geneontology.org/formats/oboInOwl#id>": [
+        "oboInOwl:id": [
           {
             "object": "ZFA:0000354",
             "datatype": "xsd:string"
@@ -740,18 +740,18 @@ async fn test_get_subject_map() {
             "datatype": "xsd:string"
           }
         ],
-        "<http://www.geneontology.org/formats/oboInOwl#hasOBONamespace>": [
+        "oboInOwl:hasOBONamespace": [
           {
             "object": "zebrafish_anatomy",
             "datatype": "xsd:string"
           }
         ],
-        "<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym>": [
+        "oboInOwl:hasExactSynonym": [
           {
             "object": "gills",
             "datatype": "xsd:string",
             "annotation": {
-              "<http://www.geneontology.org/formats/oboInOwl#hasSynonymType>": [
+              "oboInOwl:hasSynonymType": [
                 {
                   "datatype": "_IRI",
                   "meta": "owl:Axiom",
@@ -773,6 +773,7 @@ async fn test_get_subject_map() {
         "owl": "http://www.w3.org/2002/07/owl#",
         "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
         "obo": "http://purl.obolibrary.org/obo/",
+        "oboInOwl": "http://www.geneontology.org/formats/oboInOwl#",
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#"
       }
     }
