@@ -1,5 +1,6 @@
 use nanobot::ldtab::{
-    get_label_map, get_predicate_map_hiccup, get_prefix_map, get_property_map, get_subject_map,
+    get_label_map, get_predicate_map_hiccup, get_predicate_map_html, get_prefix_map,
+    get_property_map, get_subject_map,
 };
 use nanobot::sql::{parse, select_to_sql, select_to_url, Direction, Operator, Select};
 use serde_json::json;
@@ -586,6 +587,132 @@ async fn test_get_predicate_map_hiccup() {
     ]
     );
     assert_eq!(hiccup, expected);
+}
+
+#[tokio::test]
+async fn test_get_predicate_map_html() {
+    let connection = "src/resources/test_data/zfa_excerpt.db";
+    let connection_string = format!("sqlite://{}?mode=rwc", connection);
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
+
+    let subject = "obo:ZFA_0000354";
+    let table = "statement";
+
+    let starting_order = vec![String::from("rdfs:label"), String::from("obo:IAO_0000115")];
+    let ending_order = vec![String::from("rdfs:comment")];
+
+    let html = get_predicate_map_html(&subject, &table, &pool, &starting_order, &ending_order)
+        .await
+        .unwrap();
+
+    let expected = r#"<ul id="annotations" style="margin-left: -1rem;">
+  <li>
+    <a resource="rdfs:label">rdfs:label</a>
+    <ul>
+      <li>gill
+        <sup class="text-black-50">
+          <a resource="xsd:string">xsd:string</a>
+        </sup>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="obo:IAO_0000115">obo:IAO_0000115</a>
+    <ul>
+      <li>Compound organ that consists of gill filaments, gill lamellae, gill rakers and pharyngeal arches 3-7. The gills are responsible for primary gas exchange between the blood and the surrounding water.
+        <sup class="text-black-50">
+          <a resource="xsd:string">xsd:string</a>
+        </sup>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="oboInOwl:hasDbXref">oboInOwl:hasDbXref</a>
+    <ul>
+      <li>TAO:0000354
+        <sup class="text-black-50">
+          <a resource="xsd:string">xsd:string</a>
+        </sup>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="oboInOwl:hasExactSynonym">oboInOwl:hasExactSynonym</a>
+    <ul>
+      <li>gills
+        <sup class="text-black-50">
+          <a resource="xsd:string">xsd:string</a>
+        </sup>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="oboInOwl:hasOBONamespace">oboInOwl:hasOBONamespace</a>
+    <ul>
+      <li>zebrafish_anatomy
+        <sup class="text-black-50">
+          <a resource="xsd:string">xsd:string</a>
+        </sup>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="oboInOwl:id">oboInOwl:id</a>
+    <ul>
+      <li>ZFA:0000354
+        <sup class="text-black-50">
+          <a resource="xsd:string">xsd:string</a>
+        </sup>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="rdf:type">rdf:type</a>
+    <ul>
+      <li>
+        <a property="rdf:type" resource="owl:Class">owl:Class</a>
+      </li>
+    </ul>
+  </li>
+  <li>
+    <a resource="rdfs:subClassOf">rdfs:subClassOf</a>
+    <ul>
+      <li>
+        <span property="rdfs:subClassOf" typeof="owl:Restriction">
+          <a property="owl:onProperty" resource="obo:BFO_0000050">obo:BFO_0000050</a> some 
+          <a property="owl:someValuesFrom" resource="obo:ZFA_0000272">respiratory system</a>
+        </span>
+      </li>
+      <li>
+        <span property="rdfs:subClassOf" typeof="owl:Restriction">
+          <a property="owl:onProperty" resource="obo:RO_0002497">obo:RO_0002497</a> some 
+          <a property="owl:someValuesFrom" resource="obo:ZFS_0000044">adult</a>
+        </span>
+      </li>
+      <li>
+        <span property="rdfs:subClassOf" typeof="owl:Restriction">
+          <a property="owl:onProperty" resource="obo:RO_0002202">obo:RO_0002202</a> some 
+          <a property="owl:someValuesFrom" resource="obo:ZFA_0001107">internal gill bud</a>
+        </span>
+      </li>
+      <li>
+        <a property="rdfs:subClassOf" resource="obo:ZFA_0000496">obo:ZFA_0000496</a>
+      </li>
+      <li>
+        <span property="rdfs:subClassOf" typeof="owl:Restriction">
+          <a property="owl:onProperty" resource="obo:RO_0002496">obo:RO_0002496</a> some 
+          <a property="owl:someValuesFrom" resource="obo:ZFS_0000000">Unknown</a>
+        </span>
+      </li>
+    </ul>
+  </li>
+</ul>"#;
+
+    assert_eq!(html, expected);
 }
 
 #[tokio::test]
