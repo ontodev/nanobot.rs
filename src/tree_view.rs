@@ -67,7 +67,7 @@ fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
 /// {"obo:ZFA_0000354": "gill",
 ///  "rdfs:label": "label"}
 /// extracted from a given table in Ldb.  
-async fn get_label_hash_map(
+pub async fn get_label_hash_map(
     curies: &HashSet<String>,
     table: &str,
     pool: &SqlitePool,
@@ -323,7 +323,7 @@ pub fn remove_invalid_class(
 ///       h : {d, p some f},
 ///     }
 ///
-/// then remove_invalid_class('p some f', m) returns the map
+/// then remove_invalid_classes('p some f', m) returns the map
 ///
 /// m = { a : {b,c},
 ///       e : {f g},
@@ -500,7 +500,7 @@ pub fn identify_roots(
 /// axiom 4: 'respiratory system' is-a 'anatomical system'
 /// axiom 5: 'anatomical system' is-a 'part-of' some 'whole organism'
 ///
-///  Would be turned into the following maps:
+/// Would be turned into the following maps:
 ///
 ///  class_2_subclass:
 ///  {
@@ -1462,9 +1462,6 @@ pub async fn get_rich_json_tree_view(
         let grand_children = get_immediate_children_tree(child_iri, table, pool).await?;
         child["children"] = grand_children;
     }
-
-    println!("Sorted {}", sorted.to_string());
-    println!("Children {}", children.to_string());
 
     //add children to the first occurrence of their respective parents in the (sorted) JSON tree
     add_children(&mut sorted, &children);
