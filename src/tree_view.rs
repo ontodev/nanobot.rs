@@ -22,7 +22,7 @@ pub struct LabelNotFound;
 /// 3. ldtab_string_2_serde_value("obo:ZFA_0000354") returns Value::String("obo:ZFA_0000354")
 /// 4. ldtab_string_2_serde_value("\"obo:ZFA_0000354\"") returns Value::String("obo:ZFA_0000354")
 /// 5. ldtab_string_2_serde_value("{\"a\":\"b\"}") returns Value::Object {"a": Value::String("b")}
-fn ldtab_2_value(string: &str) -> Value {
+pub fn ldtab_2_value(string: &str) -> Value {
     //NB: an LDTab thick triple makes use of strings (which are not JSON strings
     //example: "this is a string" and "\"this is a JSON string\"".).
     let serde_value = match from_str::<Value>(string) {
@@ -45,7 +45,7 @@ fn ldtab_2_value(string: &str) -> Value {
 /// Let S = {obo:ZFA_0000354, obo:ZFA_0000272} be a set of CURIEs.
 /// Then build_label_query_for(S,table) returns the query
 /// SELECT subject, predicate, object FROM table WHERE subject IN ('obo:ZFA_0000354',obo:ZFA_0000272) AND predicate='rdfs:label'
-fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
+pub fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
     let quoted_curies: HashSet<String> = curies.iter().map(|x| format!("'{}'", x)).collect();
     let joined_quoted_curies = itertools::join(&quoted_curies, ",");
     let query = format!(
@@ -1324,7 +1324,7 @@ pub async fn get_preferred_roots(
 ///
 /// m = {d : {e,f},
 ///      f : {g}}
-async fn get_preferred_roots_hierarchy_maps(
+pub async fn get_preferred_roots_hierarchy_maps(
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
     class_2_parts: &mut HashMap<String, HashSet<String>>,
     table: &str,
