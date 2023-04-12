@@ -885,6 +885,53 @@ pub fn extract_label(v: &Value) -> String {
     }
 }
 
+/// Given an array of nodes in a term tree, return the array sorted by node labels.
+///
+/// # Examples
+///
+/// Consider the following array of term tree node
+///
+///   [
+///     {
+///       "curie": "obo:ZFA_00002722",
+///       "label": "respiratory system_B",  <- B
+///       "property": "rdfs:subClassOf",  
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002721",
+///       "label": "respiratory system_C", <- C
+///       "property": "rdfs:subClassOf",
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002723",
+///       "label": "respiratory system_A", <- A
+///       "property": "rdfs:subClassOf",
+///       "children": [  ]
+///      }]
+///
+///   This array will be sorted by labels as follows:
+///
+///   [
+///     {
+///       "curie": "obo:ZFA_00002723",
+///       "label": "respiratory system_A",  <- A
+///       "property": "rdfs:subClassOf",  
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002722",
+///       "label": "respiratory system_B", <- B
+///       "property": "rdfs:subClassOf",  
+///       "children": [  ]
+///      },
+///      {
+///       "curie": "obo:ZFA_00002721",
+///       "label": "respiratory system_C", <- C
+///       "property": "rdfs:subClassOf",
+///       "children": [  ]
+///      }]
 pub fn sort_array(array: &Vec<Value>) -> Value {
     let mut labels = Vec::new();
     let mut label_2_element = HashMap::new();
@@ -910,6 +957,8 @@ pub fn sort_array(array: &Vec<Value>) -> Value {
 pub fn sort_object(v: &Map<String, Value>) -> Value {
     //serde objects are sorted by keys:
     //"By default the map is backed by a BTreeMap."
+    //However, this order does not (necessarily) match
+    //a lexicographical order by labels
     let mut map = Map::new();
 
     //sort nested values
@@ -1561,12 +1610,12 @@ pub async fn get_direct_sub_parts(
 //#################################################################
 
 //TODO: Return Result
-pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
+pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> Value {
     let mut res = Vec::new();
     res.push(json!("ul"));
     res.push(json!({"id" : "children"}));
 
-    match value {
+    match direct_children {
         Value::Array(children) => {
             for child in children {
                 let mut res_element = Vec::new();
@@ -1575,7 +1624,7 @@ pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
                 res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
 
                 //encode grand children
-                let grand_children_html = tree_2_html_hiccup_children(
+                let grand_children_html = tree_2_hiccup_direct_children(
                     child["curie"].as_str().unwrap(),
                     &child["children"],
                 );
@@ -1590,11 +1639,11 @@ pub fn tree_2_html_hiccup_children(parent: &str, value: &Value) -> Value {
 }
 
 //TODO: Return Result
-pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value) -> Value {
+pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value) -> Value {
     let mut res = Vec::new();
     res.push(json!("ul"));
 
-    match value {
+    match descendants {
         Value::Array(children) => {
             for child in children {
                 let mut res_elements = Vec::new();
@@ -1602,7 +1651,7 @@ pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value)
 
                 res_elements.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
 
-                encode_element(entity, &child, &mut res_elements);
+                node_2_hiccup(entity, &child, &mut res_elements);
 
                 res.push(Value::Array(res_elements));
             }
@@ -1612,42 +1661,43 @@ pub fn tree_2_html_hiccup_descendants(entity: &str, parent: &str, value: &Value)
     }
 }
 
-pub fn encode_element(entity: &str, value: &Value, res: &mut Vec<Value>) {
-    if value["curie"].as_str().unwrap().eq(entity) {
+pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
+    if node["curie"].as_str().unwrap().eq(entity) {
         //base case
-        res.push(tree_2_html_hiccup_children(
-            value["curie"].as_str().unwrap(),
-            &value["children"],
+        hiccup.push(tree_2_hiccup_direct_children(
+            node["curie"].as_str().unwrap(),
+            &node["children"],
         ));
     } else {
         //recurse
-        res.push(tree_2_html_hiccup_descendants(
+        hiccup.push(tree_2_hiccup_descendants(
             entity,
-            value["curie"].as_str().unwrap(),
-            &value["children"],
+            node["curie"].as_str().unwrap(),
+            &node["children"],
         ));
     }
 }
 
 //TODO: Return Result
-pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
-    let mut res = Vec::new();
-    res.push(json!("ul"));
+pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
+    let mut tree_hiccup = Vec::new();
+    tree_hiccup.push(json!("ul"));
 
-    match value {
+    match tree {
+        //the tree consist of an array of root notes (i.e. it might be a forest)
         Value::Array(roots) => {
             for root in roots {
-                let mut res_elements = Vec::new();
+                let mut node_hiccup = Vec::new();
 
-                res_elements.push(json!("li"));
+                node_hiccup.push(json!("li"));
 
-                res_elements.push(json!(["a", {"resource" : root["curie"] }, root["label"] ]));
+                node_hiccup.push(json!(["a", {"resource" : root["curie"] }, root["label"] ]));
 
-                encode_element(entity, &root, &mut res_elements);
+                node_2_hiccup(entity, &root, &mut node_hiccup);
 
-                res.push(Value::Array(res_elements));
+                tree_hiccup.push(Value::Array(node_hiccup));
             }
-            Value::Array(res)
+            Value::Array(tree_hiccup)
         }
         _ => json!("ERROR"), //TODO: encode error
     }
@@ -1656,7 +1706,7 @@ pub fn tree_2_html_hiccup_roots(entity: &str, value: &Value) -> Value {
 //TODO: Return Result
 ///Given a CURIE of an entity and an LDTab database,
 ///return an HTML view of a term tree.
-pub async fn build_html_hiccup(
+pub async fn build_hiccup(
     entity: &str,
     preferred_roots: bool,
     table: &str,
@@ -1664,7 +1714,7 @@ pub async fn build_html_hiccup(
 ) -> Result<Value, sqlx::Error> {
     let tree = get_rich_json_tree_view(entity, preferred_roots, table, pool).await?;
 
-    let roots = tree_2_html_hiccup_roots(entity, &tree);
+    let roots = tree_2_hiccup(entity, &tree);
 
     let mut res = Vec::new();
     res.push(json!("ul"));
