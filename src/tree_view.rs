@@ -83,34 +83,6 @@ pub async fn get_label_hash_map(
     Ok(entity_2_label)
 }
 
-///TODO:  remove this function
-///Given an entity's CURIE and an LDTab database,
-///return the entity's label
-///
-///TODO: code example
-pub async fn get_label(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<String, LabelNotFound> {
-    let query = format!(
-        "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
-        table, entity
-    );
-    let rows: Vec<SqliteRow> = sqlx::query(&query)
-        .fetch_all(pool)
-        .await
-        .map_err(|_| LabelNotFound)?;
-    //NB: this should be a singleton
-    for row in rows {
-        //let subject: &str = row.get("subject");
-        let label: &str = row.get("object");
-        return Ok(String::from(label));
-    }
-
-    Err(LabelNotFound)
-}
-
 /// Given an LDTab string,
 /// return all IRIs/CURIEs ocurring in the string
 ///
@@ -1769,29 +1741,38 @@ pub async fn get_html_top_hierarchy(
     children_list.push(json!("ul"));
     children_list.push(json!({"id" : "children"}));
 
+    let mut entities = HashSet::new();
+    let mut ent_vec = Vec::new();//workaround to ensure deterministic output (for testing purposes)
+
+    //collect entities
     for row in rows {
         let subject: &str = row.get("subject");
+        entities.insert(String::from(subject));
+        ent_vec.push(String::from(subject));
+    }
 
-        //TODO: remove these label calls
-        let subject_label = get_label(subject, table, pool).await;
+    //get labels for entities
+    let entity_2_label = get_label_hash_map(&entities, table, pool).await.unwrap();
 
-        match subject_label {
-            Ok(x) => {
+    for subject in ent_vec {
+        match entity_2_label.get(&subject) {
+            Some(x) => {
                 children_list.push(
                     json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"}, x  ]]),
                 );
-            }
-            _ => {
+            },
+            None => {
                 children_list.push(
                     json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"},subject ]]),
                 );
             }
-        }
+        } 
         //TODO: handle children
         //let children = get_immediate_children_tree(subject, table, pool).await.unwrap();
         //TODO: children for object properties
         //TODO: children for data properties
-    }
+    } 
+
     res.push(json!(["li", case, children_list]));
     Ok(Value::Array(res))
 }
