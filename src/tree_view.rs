@@ -1609,6 +1609,30 @@ pub async fn get_direct_sub_parts(
 //####################### HTML view (JSON hiccup) #################
 //#################################################################
 
+/// Given an entity and the branches of decsendants in a term tree,
+/// return the hiccup style encoding of the tree.
+///
+/// Consider the following input
+/// 
+/// # Example
+///
+/// parent   =  obo:ZFA_0000211
+///
+/// children = [{"curie":"obo:ZFA_0005015",
+///              "label":"afferent lamellar arteriole",
+///               "property":"obo:BFO_0000050",
+///               "children":[]},
+///             {"curie":"obo:ZFA_0005019",
+///              "label":"efferent lamellar arteriole",
+///              "property":"obo:BFO_0000050",
+///              "children":[]}]
+///
+///  then tree_2_hiccup_direct_children returns 
+///
+/// ["ul" {"id" : "children"}
+///  ["li" ["a", {"resource" : "obo:ZFA_0005015, "about": obo:ZFA_0000211, "rev":"obo:BFO_0000050" }, "afferent lamellar arteriole"] ]
+///  ["li" ["a", {"resource" : "obo:ZFA_0005019, "about": obo:ZFA_0000211, "rev":"obo:BFO_0000050" }, "efferent lamellar arteriole"] ]
+/// ]
 //TODO: Return Result
 pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> Value {
     let mut res = Vec::new();
@@ -1638,8 +1662,31 @@ pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> V
     }
 }
 
-//TODO: Return Result
+/// Given an entity, its parent entiy, and the branches of decsendants in the term tree,
+/// return the hiccup style encoding of the tree.
+/// 
+/// # Example
+///
+/// Consider the following input
+///
+/// entity      = obo:ZFA_0000354
+/// parent      = obo:ZFA_0001094
+/// descendants = [
+///                {"curie":"obo:ZFA_0001439","label":"anatomical system","property":"obo:BFO_0000050","children":[{"curie":"obo:ZFA_0000272","label":"respiratory system","property":"rdfs:subClassOf","children":[{"curie":"obo:ZFA_0000354","label":"gill","property":"obo:BFO_0000050","children":[]}]}]},
+///                {"curie":"obo:ZFA_0000496","label":"compound organ","property":"obo:BFO_0000050","children":[{"curie":"obo:ZFA_0000354","label":"gill","property":"rdfs:subClassOf","children":[]}]}]
+///
+/// Then tree_2_hiccup_descendants returns
+/// ["ul" 
+///   ["li" ["a", {"resource" : "obo:ZFA_0001439", "about": "obo:ZFA_0001094", "rev": "obo:BFO_0000050"}, "anatomical system" ]
+///         [ 'recursive encoding for children' -> node_2_hiccup ... ]
+///   ]
+///   ["li" ["a", {"resource" : "obo:ZFA_0000496", "about": "obo:ZFA_0001094", "rev": "obo:BFO_0000050"}, "compound organ" ]
+///         [ 'recursive encoding for children' -> node_2_hiccup ... ]
+///   ]
+/// ]
+/// TODO: Return Result
 pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value) -> Value {
+
     let mut res = Vec::new();
     res.push(json!("ul"));
 
@@ -1661,15 +1708,31 @@ pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value
     }
 }
 
+/// Given an entity, its corresponding node in a branch of a term tree,
+/// and a hiccup-style encoding of the entity's ancestor tree, 
+/// return the hiccup style encoding of the tree.
+/// 
+/// # Example
+///
+/// Consider the following input:
+///
+/// entity = obo:ZFA_0000354,
+/// node   = {"curie":"obo:ZFA_0000354","label":"gill","property":"obo:BFO_0000050","children":[]},
+/// hiccup = ["li",["a",{"resource":"obo:ZFA_0000354","about":"obo:ZFA_0000272","rev":"obo:BFO_0000050"},"gill"]]
+//
+/// Then node_2_hiccup only wraps 
+///
+/// returns ["ul" hiccup] because there are no more children nodes to be added.
+/// TODO: return result + error handling
 pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
     if node["curie"].as_str().unwrap().eq(entity) {
-        //base case
+        //base case for direct children
         hiccup.push(tree_2_hiccup_direct_children(
             node["curie"].as_str().unwrap(),
             &node["children"],
         ));
     } else {
-        //recurse
+        //recursive call for nested children
         hiccup.push(tree_2_hiccup_descendants(
             entity,
             node["curie"].as_str().unwrap(),
@@ -1678,8 +1741,75 @@ pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
     }
 }
 
-//TODO: Return Result
+/// Given an entity and its (rich json) term tree,
+/// return the hiccup style encoding of the tree.
+/// 
+/// # Examples
+///
+/// Consider the entity obo:0obo:ZFA_00003540 and its
+/// term tree 
+
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
+///   "property": "rdfs:subClassOf",
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",              <= ancestor of obo:ZFA_0000354 (gill)
+///       "property": "rdfs:subClassOf",
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",
+///           "children": [
+///             {
+///               "curie": "obo:ZFA_0000716",
+///               "label": "afferent branchial artery",  <= child of obo:ZFA_0000354 (gill)
+///               "property": "obo:BFO_0000050",
+///               "children": [
+///                 {
+///                   "curie": "obo:ZFA_0005012",
+///                   "label": "afferent filamental artery",   <= grand child of obo:ZFA_0000354 (gill)
+///                   "property": "obo:BFO_0000050",
+///                   "children": []
+///                 },
+///               ]
+///              }]
+///          }]
+///      }]
+/// }]
+///
+/// then return the following hiccup-style list (only an excerpt is shown) 
+/// 
+/// ["ul",
+///   ["li", "Ontology"],
+///   ["li",
+///     ["a", {"resource": "owl:Class"}, "owl:Class"],
+///     ["ul",
+///       ["li",
+///         ["a",{"resource": "obo:ZFA_0100000"},"zebrafish anatomical entity"],
+///         ["ul",
+///           ["li",
+///             ["a",{
+///                 "resource": "obo:ZFA_0000272",
+///                 "about": "obo:ZFA_0100000",
+///                 "rev": "rdfs:subClassOf"},
+///               "respiratory system"
+///             ],
+///             ["ul",
+///              ["li",
+///                ["a",{
+///                    "resource": "obo:ZFA_0001512",
+///                    "about": "obo:ZFA_0000272",
+///                    "rev": "rdfs:subClassOf"
+///                  },
+///                  "anatomical group"
+///                ],
+///             ...  
 pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
+//TODO: return Result and add error handling 
     let mut tree_hiccup = Vec::new();
     tree_hiccup.push(json!("ul"));
 
@@ -1703,10 +1833,42 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
     }
 }
 
-//TODO: Return Result
-///Given a CURIE of an entity and an LDTab database,
-///return an HTML view of a term tree.
-pub async fn build_hiccup(
+/// Given a CURIE/IRI of an entity and an LDTab database,
+/// return a term tree for the entity.
+///
+/// # Examples
+///
+/// Consider the entity obo:ZFA_0000354 and an
+/// LDTab database with information about the ZFA ontology.
+/// Then, get_hiccup_term_tre(obo:ZFA_0000354, false, statement, zfa)
+/// will return a term tree of the following form (only an excerpt is shown):
+///
+/// ["ul",
+///   ["li", "Ontology"],
+///   ["li",
+///     ["a", {"resource": "owl:Class"}, "owl:Class"],
+///     ["ul",
+///       ["li",
+///         ["a",{"resource": "obo:ZFA_0100000"},"zebrafish anatomical entity"],
+///         ["ul",
+///           ["li",
+///             ["a",{
+///                 "resource": "obo:ZFA_0000037",
+///                 "about": "obo:ZFA_0100000",
+///                 "rev": "rdfs:subClassOf"},
+///               "anatomical structure"
+///             ],
+///             ["ul",
+///              ["li",
+///                ["a",{
+///                    "resource": "obo:ZFA_0001512",
+///                    "about": "obo:ZFA_0000037",
+///                    "rev": "rdfs:subClassOf"
+///                  },
+///                  "anatomical group"
+///                ],
+///             ...  
+pub async fn get_hiccup_term_tree(
     entity: &str,
     preferred_roots: bool,
     table: &str,
@@ -1725,7 +1887,7 @@ pub async fn build_hiccup(
     Ok(Value::Array(res))
 }
 
-pub async fn get_html_top_hierarchy(
+pub async fn get_hiccup_top_hierarchy(
     case: &str,
     table: &str,
     pool: &SqlitePool,
@@ -1777,10 +1939,6 @@ pub async fn get_html_top_hierarchy(
     );
 
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-
-    //go through rows
-    // -> collect set of iris for labels
-    // -> build label map
 
     //build HTML view
     let mut res = Vec::new();
