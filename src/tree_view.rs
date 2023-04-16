@@ -1613,7 +1613,7 @@ pub async fn get_direct_sub_parts(
 /// return the hiccup style encoding of the tree.
 ///
 /// Consider the following input
-/// 
+///
 /// # Example
 ///
 /// parent   =  obo:ZFA_0000211
@@ -1627,7 +1627,7 @@ pub async fn get_direct_sub_parts(
 ///              "property":"obo:BFO_0000050",
 ///              "children":[]}]
 ///
-///  then tree_2_hiccup_direct_children returns 
+///  then tree_2_hiccup_direct_children returns
 ///
 /// ["ul" {"id" : "children"}
 ///  ["li" ["a", {"resource" : "obo:ZFA_0005015, "about": obo:ZFA_0000211, "rev":"obo:BFO_0000050" }, "afferent lamellar arteriole"] ]
@@ -1664,7 +1664,7 @@ pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> V
 
 /// Given an entity, its parent entiy, and the branches of decsendants in the term tree,
 /// return the hiccup style encoding of the tree.
-/// 
+///
 /// # Example
 ///
 /// Consider the following input
@@ -1676,7 +1676,7 @@ pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> V
 ///                {"curie":"obo:ZFA_0000496","label":"compound organ","property":"obo:BFO_0000050","children":[{"curie":"obo:ZFA_0000354","label":"gill","property":"rdfs:subClassOf","children":[]}]}]
 ///
 /// Then tree_2_hiccup_descendants returns
-/// ["ul" 
+/// ["ul"
 ///   ["li" ["a", {"resource" : "obo:ZFA_0001439", "about": "obo:ZFA_0001094", "rev": "obo:BFO_0000050"}, "anatomical system" ]
 ///         [ 'recursive encoding for children' -> node_2_hiccup ... ]
 ///   ]
@@ -1686,7 +1686,6 @@ pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> V
 /// ]
 /// TODO: Return Result
 pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value) -> Value {
-
     let mut res = Vec::new();
     res.push(json!("ul"));
 
@@ -1709,9 +1708,9 @@ pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value
 }
 
 /// Given an entity, its corresponding node in a branch of a term tree,
-/// and a hiccup-style encoding of the entity's ancestor tree, 
+/// and a hiccup-style encoding of the entity's ancestor tree,
 /// return the hiccup style encoding of the tree.
-/// 
+///
 /// # Example
 ///
 /// Consider the following input:
@@ -1720,7 +1719,7 @@ pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value
 /// node   = {"curie":"obo:ZFA_0000354","label":"gill","property":"obo:BFO_0000050","children":[]},
 /// hiccup = ["li",["a",{"resource":"obo:ZFA_0000354","about":"obo:ZFA_0000272","rev":"obo:BFO_0000050"},"gill"]]
 //
-/// Then node_2_hiccup only wraps 
+/// Then node_2_hiccup only wraps
 ///
 /// returns ["ul" hiccup] because there are no more children nodes to be added.
 /// TODO: return result + error handling
@@ -1743,11 +1742,11 @@ pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
 
 /// Given an entity and its (rich json) term tree,
 /// return the hiccup style encoding of the tree.
-/// 
+///
 /// # Examples
 ///
 /// Consider the entity obo:0obo:ZFA_00003540 and its
-/// term tree 
+/// term tree
 
 /// [{
 ///   "curie": "obo:ZFA_0100000",
@@ -1781,8 +1780,8 @@ pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
 ///      }]
 /// }]
 ///
-/// then return the following hiccup-style list (only an excerpt is shown) 
-/// 
+/// then return the following hiccup-style list (only an excerpt is shown)
+///
 /// ["ul",
 ///   ["li", "Ontology"],
 ///   ["li",
@@ -1809,7 +1808,7 @@ pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
 ///                ],
 ///             ...  
 pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
-//TODO: return Result and add error handling 
+    //TODO: return Result and add error handling
     let mut tree_hiccup = Vec::new();
     tree_hiccup.push(json!("ul"));
 
@@ -1887,6 +1886,41 @@ pub async fn get_hiccup_term_tree(
     Ok(Value::Array(res))
 }
 
+/// Given a target OWL type, e.g., "Class", "Object Property", and "Datatype Property",
+/// return a hiccup-style list of all the top-level nodes of that type.
+///
+/// # Examples
+///
+/// The call get_hiccup_top_hierarchy("Object Property", "statement", &zfa_connection)
+/// returns (only an excerpt is shown)
+///
+/// ["ul",
+///   ["li", "Ontology"],
+///   ["li","Object Property",
+///     ["ul", { "id": "children" },
+///       ["li",
+///         ["a",
+///           {
+///             "resource": "obo:RO_0002131",
+///             "rev": "rdfs:subClassOf"
+///           },
+///           "overlaps"
+///         ]
+///       ],
+///       ["li",
+///         ["a",
+///           {
+///             "resource": "obo:RO_0002150",
+///             "rev": "rdfs:subClassOf"
+///           },
+///           "continuous with"
+///         ]
+///       ],
+///       ,
+///      ...
+///     ]
+///   ]
+/// ]
 pub async fn get_hiccup_top_hierarchy(
     case: &str,
     table: &str,
@@ -1950,7 +1984,7 @@ pub async fn get_hiccup_top_hierarchy(
     children_list.push(json!({"id" : "children"}));
 
     let mut entities = HashSet::new();
-    let mut ent_vec = Vec::new();//workaround to ensure deterministic output (for testing purposes)
+    let mut ent_vec = Vec::new(); //workaround to ensure deterministic output (for testing purposes)
 
     //collect entities
     for row in rows {
@@ -1968,18 +2002,18 @@ pub async fn get_hiccup_top_hierarchy(
                 children_list.push(
                     json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"}, x  ]]),
                 );
-            },
+            }
             None => {
                 children_list.push(
                     json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"},subject ]]),
                 );
             }
-        } 
+        }
         //TODO: handle children
         //let children = get_immediate_children_tree(subject, table, pool).await.unwrap();
         //TODO: children for object properties
         //TODO: children for data properties
-    } 
+    }
 
     res.push(json!(["li", case, children_list]));
     Ok(Value::Array(res))
