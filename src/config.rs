@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::any::{AnyPool, AnyPoolOptions};
 use std::fs;
 use toml::map::Map;
 use toml::Value;
@@ -17,7 +17,7 @@ pub struct Config {
     pub version: String,
     pub edition: String,
     pub connection: String,
-    pub pool: Option<SqlitePool>,
+    pub pool: Option<AnyPool>,
     pub debug: Debug,
 }
 
@@ -64,11 +64,8 @@ impl Config {
 
     pub async fn start_pool(&mut self) -> &mut Config {
         let connection_string = format!("sqlite://{}?mode=rwc", &self.connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: AnyPool =
+            AnyPoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
         self.pool = Some(pool);
         self
     }

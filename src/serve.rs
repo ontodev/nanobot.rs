@@ -1,10 +1,11 @@
 use crate::config::Config;
-use crate::{get, sql};
+use crate::get;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
+use ontodev_sqlrest::parse;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -30,10 +31,7 @@ pub async fn app(config: &Config) -> Result<String, String> {
     // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    axum::Server::bind(&addr).serve(app.into_make_service()).await.unwrap();
 
     let hello = String::from("Hello, world!");
     Ok(hello)
@@ -65,7 +63,7 @@ async fn table(
     };
 
     tracing::info!("URL: {}", url);
-    let select = sql::parse(&url);
+    let select = parse(&url).unwrap();
     tracing::info!("select {:?}", select);
     match get::get_rows(&state.config, &select, "page", &format).await {
         Ok(x) => match format {

@@ -1,12 +1,14 @@
 use crate::config::Config;
 use crate::sql::{
-    get_count_from_pool, get_message_counts_from_pool, get_rows_from_pool, get_table_from_pool,
-    get_total_from_pool, rows_to_map, select_to_url, Operator, Select, LIMIT_DEFAULT, LIMIT_MAX,
+    get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
+    rows_to_map, LIMIT_DEFAULT, LIMIT_MAX,
 };
+use enquote::unquote;
 use minijinja::Environment;
+use ontodev_sqlrest::{Filter, Select};
 use regex::Regex;
 use serde_json::{json, Map, Value};
-use sqlx::sqlite::SqlitePool;
+use sqlx::any::AnyPool;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -41,14 +43,20 @@ impl From<sqlx::Error> for GetError {
     }
 }
 
+impl From<String> for GetError {
+    fn from(error: String) -> GetError {
+        GetError::new(error)
+    }
+}
+
 pub async fn get_table(
     config: &Config,
     table: &str,
     shape: &str,
     format: &str,
 ) -> Result<String, GetError> {
-    let mut select = Select::new();
-    select.table(table).limit(LIMIT_DEFAULT);
+    let mut select = Select::new(table);
+    select.limit(LIMIT_DEFAULT);
     get_rows(config, &select, shape, format).await
 }
 
@@ -59,37 +67,30 @@ pub async fn get_rows(
     format: &str,
 ) -> Result<String, GetError> {
     // Get all the tables
-    let mut select = Select::new();
-    select
-        .table("table")
-        .select(vec!["table", "path", "type", "description"]);
+    let mut select = Select::new("\"table\"");
+    select.select(vec!["\"table\"", "\"path\"", "\"type\"", "\"description\""]);
     let pool = config.pool.as_ref().unwrap();
 
     let table_rows = get_table_from_pool(&pool, &select).await?;
     let table_map = rows_to_map(table_rows, "table");
-    if !table_map.contains_key(&base_select.table) {
-        return Err(GetError::new(format!(
-            "Invalid table '{}'",
-            &base_select.table
-        )));
+    let unquoted_table = unquote(&base_select.table).unwrap_or(base_select.table.to_string());
+    if !table_map.contains_key(&unquoted_table) {
+        return Err(GetError::new(format!("Invalid table '{}'", &base_select.table)));
     }
 
     // Get the columns for the selected table
-    let mut select = Select::new();
+    let mut select = Select::new("\"column\"");
     select
-        .table("column")
         .select(vec![
-            "column",
-            "nulltype",
-            "datatype",
-            "structure",
-            "description",
+            "\"column\"",
+            "\"nulltype\"",
+            "\"datatype\"",
+            "\"structure\"",
+            "\"description\"",
         ])
-        .filter(vec![(
-            "table".to_string(),
-            Operator::Equals,
-            base_select.table.clone(),
-        )]);
+        .filter(vec![
+            Filter::new("\"table\"", "eq", json!(format!("'{}'", unquoted_table,))).unwrap()
+        ]);
 
     let column_rows = get_table_from_pool(&pool, &select).await?;
 
@@ -104,14 +105,12 @@ pub async fn get_rows(
             .map(|r| r.get("column").unwrap().as_str().unwrap().to_string())
             .collect(),
     );
-    let mut limit = base_select.limit;
-    if limit > LIMIT_MAX {
-        limit = LIMIT_MAX;
-    } else if limit == 0 {
-        limit = LIMIT_DEFAULT;
-    }
+
     let mut select = Select::clone(base_select);
-    select.select(columns).limit(limit);
+    match select.limit {
+        Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
+        _ => select.limit(LIMIT_DEFAULT),
+    };
 
     match shape {
         "value_rows" => {
@@ -143,7 +142,7 @@ pub async fn get_rows(
 }
 
 async fn get_page(
-    pool: &SqlitePool,
+    pool: &AnyPool,
     select: &Select,
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
@@ -162,11 +161,11 @@ async fn get_page(
         }
         let mut filters: Vec<Value> = vec![];
         for filter in &select.filter {
-            if filter.0 == key {
+            if filter.lhs == key {
                 filters.push(json!([
-                    filter.0.clone(),
-                    filter.1.clone(),
-                    filter.2.clone(),
+                    filter.lhs.clone(),
+                    filter.operator.clone(),
+                    filter.rhs.clone(),
                 ]));
             }
         }
@@ -179,82 +178,67 @@ async fn get_page(
 
     // get the data and the messages
     let start = std::time::Instant::now();
-    let mut view_select = Select {
-        table: format!("{}_view", select.table.clone()),
+    let view_select = Select {
+        table: format!("{}_view", unquote(&select.table).unwrap_or(select.table.to_string())),
         ..select.clone()
     };
 
     // If we're filtering for rows with messages
-    if select.message != "" {
-        let sql = format!(
-            r#"
-            SELECT json_object('row', row) AS json_result
-            FROM (
-              SELECT DISTINCT row
-              FROM message
-              WHERE "table" = '{}'
-              ORDER BY row
-              LIMIT {}
-              OFFSET {}
-            )
-        "#,
-            select.table, select.limit, select.offset
-        );
-        let result = get_rows_from_pool(&pool, &sql).await?;
-        let row_numbers: Vec<Value> = result
-            .clone()
-            .into_iter()
-            .map(|r| r.get("row").unwrap().clone())
-            .collect();
-        view_select = Select {
-            filter: vec![(
-                "row_number".to_string(),
-                Operator::In,
-                format!(
-                    "({})",
-                    row_numbers
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(",")
-                ),
-            )],
-            offset: 0,
-            ..view_select
-        };
-    }
+    // if select.message != "" {
+    //     let sql = format!(
+    //         r#"
+    //         SELECT json_object('row', row) AS json_result
+    //         FROM (
+    //           SELECT DISTINCT row
+    //           FROM message
+    //           WHERE "table" = '{}'
+    //           ORDER BY row
+    //           LIMIT {}
+    //           OFFSET {}
+    //         )
+    //     "#,
+    //         select.table, select.limit, select.offset
+    //     );
+    //     // TODO: Use one of the sqlrest.rs library functions to do this instead of the
+    //     // get_rows_from_pool() function which has been deleted.
+    //     let result = get_rows_from_pool(&pool, &sql).await?;
+    //     let row_numbers: Vec<Value> = result
+    //         .clone()
+    //         .into_iter()
+    //         .map(|r| r.get("row").unwrap().clone())
+    //         .collect();
+    //     view_select = Select {
+    //         filter: vec![(
+    //             "row_number".to_string(),
+    //             Operator::In,
+    //             format!(
+    //                 "({})",
+    //                 row_numbers
+    //                     .iter()
+    //                     .map(|x| x.to_string())
+    //                     .collect::<Vec<String>>()
+    //                     .join(",")
+    //             ),
+    //         )],
+    //         offset: 0,
+    //         ..view_select
+    //     };
+    // }
 
     // Use the view to select the data
     let value_rows = get_table_from_pool(&pool, &view_select).await?;
-    let row_numbers: Vec<Value> = value_rows
-        .clone()
-        .into_iter()
-        .map(|r| r.get("row_number").unwrap().clone())
-        .collect();
-    let select_messages = Select {
-        table: "message".to_string(),
-        select: vec!["table", "row", "column", "level", "rule", "message"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
-        filter: vec![
-            ("table".to_string(), Operator::Equals, select.table.clone()),
-            (
-                "row".to_string(),
-                Operator::In,
-                format!(
-                    "({})",
-                    row_numbers
-                        .iter()
-                        .map(|x| x.to_string())
-                        .collect::<Vec<String>>()
-                        .join(",")
-                ),
-            ),
-        ],
-        limit: 1000,
-        ..Default::default()
-    };
+    let row_numbers: Vec<Value> =
+        value_rows.clone().into_iter().map(|r| r.get("row_number").unwrap().clone()).collect();
+    let mut select_messages = Select::new("message");
+    select_messages
+        .table("message")
+        .select(vec!["\"table\"", "\"row\"", "\"column\"", "\"level\"", "\"rule\"", "\"message\""])
+        .filter(vec![
+            Filter::new("\"table\"", "eq", json!(select.table.clone())).unwrap(),
+            Filter::new("row", "in", json!(row_numbers)).unwrap(),
+        ])
+        .limit(1000);
+
     let message_rows = get_table_from_pool(&pool, &select_messages).await?;
     let message_counts = get_message_counts_from_pool(&pool, &select.table.clone()).await?;
 
@@ -337,15 +321,15 @@ async fn get_page(
     }
 
     let mut counts = Map::new();
-    let mut count = get_count_from_pool(&pool, &select).await?;
-    if select.message != "" {
-        count = message_counts
-            .get("message_row")
-            .unwrap()
-            .as_u64()
-            .unwrap()
-            .clone() as usize;
-    }
+    let count = get_count_from_pool(&pool, &select).await?;
+    // if select.message != "" {
+    //     count = message_counts
+    //         .get("message_row")
+    //         .unwrap()
+    //         .as_u64()
+    //         .unwrap()
+    //         .clone() as usize;
+    // }
     counts.insert("count".to_string(), json!(count));
 
     let total = get_total_from_pool(&pool, &select.table).await?;
@@ -354,56 +338,56 @@ async fn get_page(
         counts.insert(k, v);
     }
 
-    let end = select.offset + cell_rows.len();
+    let end = select.offset.unwrap_or(0) + cell_rows.len();
 
-    let mut this_table = table_map
-        .get(&select.table)
-        .unwrap()
-        .as_object()
-        .unwrap()
-        .clone();
-    this_table.insert("table".to_string(), json!(select.table.clone()));
-    this_table.insert("href".to_string(), json!(format!("/{}", select.table)));
-    this_table.insert("start".to_string(), json!(select.offset + 1));
+    let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
+
+    let mut this_table = table_map.get(&unquoted_table).unwrap().as_object().unwrap().clone();
+    this_table.insert("table".to_string(), json!(unquoted_table.clone()));
+    this_table.insert("href".to_string(), json!(format!("/{}", unquoted_table)));
+    this_table.insert("start".to_string(), json!(select.offset.unwrap_or(0) + 1));
     this_table.insert("end".to_string(), json!(end));
     this_table.insert("counts".to_string(), json!(counts));
 
     let mut formats = Map::new();
 
     let mut select_format = Select::clone(select);
-    select_format.table(format!("{}.json", select.table));
+    select_format.table(format!("\"{}.json\"", unquoted_table));
 
-    let href = select_to_url(&select_format);
+    let href = select_format.to_url();
     formats.insert("JSON".to_string(), json!(href));
 
-    select_format.table(format!("{}.pretty.json", select.table));
-    let href = select_to_url(&select_format);
+    select_format.table(format!("\"{}.pretty.json\"", unquoted_table));
+    let href = select_format.to_url();
 
     formats.insert("JSON (Pretty)".to_string(), json!(href));
     this_table.insert("formats".to_string(), json!(formats));
 
     // Pagination
     let mut select_offset = Select::clone(select);
-    if select.offset > 0 {
-        let href = select_to_url(&select_offset.offset(0));
+    if select.offset.unwrap_or(0) > 0 {
+        let href = select_offset.offset(0).to_url();
         this_table.insert("first".to_string(), json!(href));
         if select.offset > select.limit {
-            let href = select_to_url(&select_offset.offset(select.offset - select.limit));
+            let href = select_offset
+                .offset(select.offset.unwrap_or(0) - select.limit.unwrap_or(LIMIT_DEFAULT))
+                .to_url();
             this_table.insert("previous".to_string(), json!(href));
         } else {
             this_table.insert("previous".to_string(), json!(href));
         }
     }
     if end < count {
-        let href = select_to_url(&select_offset.offset(select.offset + select.limit));
+        let href =
+            select_offset.offset(select.offset.unwrap_or(0) + select.limit.unwrap_or(0)).to_url();
         this_table.insert("next".to_string(), json!(href));
-        let remainder = count % select.limit;
+        let remainder = count % select.limit.unwrap_or(LIMIT_DEFAULT);
         let last = if remainder == 0 {
-            count - select.limit
+            count - select.limit.unwrap_or(LIMIT_DEFAULT)
         } else {
-            count - (count % select.limit)
+            count - (count % select.limit.unwrap_or(LIMIT_DEFAULT))
         };
-        let href = select_to_url(&select_offset.offset(last));
+        let href = select_offset.offset(last).to_url();
         this_table.insert("last".to_string(), json!(href));
     }
 
@@ -416,7 +400,7 @@ async fn get_page(
         "page": {
             "project_name": "Nanobot",
             "tables": tables,
-            "title": select.table,
+            "title": unquoted_table,
             "select": select,
             "elapsed": start.elapsed().as_millis() as usize,
         },
@@ -491,10 +475,8 @@ fn page_to_html(page: &Value) -> String {
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);
-    env.add_template("page.html", include_str!("resources/page.html"))
-        .unwrap();
-    env.add_template("table.html", include_str!("resources/table.html"))
-        .unwrap();
+    env.add_template("page.html", include_str!("resources/page.html")).unwrap();
+    env.add_template("table.html", include_str!("resources/table.html")).unwrap();
 
     let template = env.get_template("table.html").unwrap();
     template.render(page).unwrap()
