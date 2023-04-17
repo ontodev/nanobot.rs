@@ -1,4 +1,4 @@
-use nanobot::tree_view::{
+use crate::tree_view::{
     get_hierarchy_maps, get_iris_from_subclass_map, get_label_hash_map, identify_roots,
 };
 use serde_json::{from_str, json, Map, Value};
