@@ -10,7 +10,6 @@ use std::io::BufReader;
 use std::path::Path;
 
 async fn set_up_database(tsv: &str, db: &str) -> SqlitePool {
-
     let test_database = format!("src/resources/.tmp/{}", db);
     let connection_string = format!("sqlite://{}?mode=rwc", test_database);
     let pool: SqlitePool = SqlitePoolOptions::new()
