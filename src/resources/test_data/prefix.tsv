@@ -1,0 +1,10 @@
+prefix	base
+rdf	http://www.w3.org/1999/02/22-rdf-syntax-ns#
+rdfs	http://www.w3.org/2000/01/rdf-schema#
+xsd	http://www.w3.org/2001/XMLSchema#
+owl	http://www.w3.org/2002/07/owl#
+ex	http://example.com
+ncbitaxon	http://purl.obolibrary.org/obo/ncbitaxon#
+oboInOwl	http://www.geneontology.org/formats/oboInOwl#
+obo	http://purl.obolibrary.org/obo/
+ldtab	https://ldtab.org/2021/10/ldtab#
