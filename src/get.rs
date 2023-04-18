@@ -69,7 +69,15 @@ pub async fn get_rows(
     // Get all the tables
     let mut select = Select::new("\"table\"");
     select.select(vec!["\"table\"", "\"path\"", "\"type\"", "\"description\""]);
-    let pool = config.pool.as_ref().unwrap();
+    let pool = match config.pool.as_ref() {
+        Some(p) => p,
+        _ => {
+            return Err(GetError::new(format!(
+                "Could not connect to database using pool {:?}",
+                config.pool
+            )))
+        }
+    };
 
     let table_rows = get_table_from_pool(&pool, &select).await?;
     let table_map = rows_to_map(table_rows, "table");
@@ -89,7 +97,10 @@ pub async fn get_rows(
             "\"description\"",
         ])
         .filter(vec![
-            Filter::new("\"table\"", "eq", json!(format!("'{}'", unquoted_table,))).unwrap()
+            match Filter::new("\"table\"", "eq", json!(format!("'{}'", unquoted_table,))) {
+                Ok(f) => f,
+                Err(e) => return Err(GetError::new(e)),
+            },
         ]);
 
     let column_rows = get_table_from_pool(&pool, &select).await?;
@@ -108,7 +119,8 @@ pub async fn get_rows(
 
     let mut select = Select::clone(base_select);
     match select.limit {
-        Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
+        Some(l) if l > LIMIT_MAX => select.select(columns).limit(LIMIT_MAX),
+        Some(l) if l > 0 => select.select(columns).limit(l),
         _ => select.limit(LIMIT_DEFAULT),
     };
 
@@ -234,8 +246,14 @@ async fn get_page(
         .table("message")
         .select(vec!["\"table\"", "\"row\"", "\"column\"", "\"level\"", "\"rule\"", "\"message\""])
         .filter(vec![
-            Filter::new("\"table\"", "eq", json!(select.table.clone())).unwrap(),
-            Filter::new("row", "in", json!(row_numbers)).unwrap(),
+            match Filter::new("\"table\"", "eq", json!(select.table.clone())) {
+                Ok(f) => f,
+                Err(e) => return Err(GetError::new(e)),
+            },
+            match Filter::new("row", "in", json!(row_numbers)) {
+                Ok(f) => f,
+                Err(e) => return Err(GetError::new(e)),
+            },
         ])
         .limit(1000);
 
@@ -365,27 +383,28 @@ async fn get_page(
 
     // Pagination
     let mut select_offset = Select::clone(select);
-    if select.offset.unwrap_or(0) > 0 {
-        let href = select_offset.offset(0).to_url();
-        this_table.insert("first".to_string(), json!(href));
-        if select.offset > select.limit {
-            let href = select_offset
-                .offset(select.offset.unwrap_or(0) - select.limit.unwrap_or(LIMIT_DEFAULT))
-                .to_url();
-            this_table.insert("previous".to_string(), json!(href));
-        } else {
-            this_table.insert("previous".to_string(), json!(href));
+    match select.offset {
+        Some(offset) if offset > 0 => {
+            let href = select_offset.offset(0).to_url();
+            this_table.insert("first".to_string(), json!(href));
+            if offset > select.limit.unwrap_or(0) {
+                let href = select_offset.offset(offset - select.limit.unwrap_or(0)).to_url();
+                this_table.insert("previous".to_string(), json!(href));
+            } else {
+                this_table.insert("previous".to_string(), json!(href));
+            }
         }
-    }
+        _ => (),
+    };
     if end < count {
         let href =
             select_offset.offset(select.offset.unwrap_or(0) + select.limit.unwrap_or(0)).to_url();
         this_table.insert("next".to_string(), json!(href));
-        let remainder = count % select.limit.unwrap_or(LIMIT_DEFAULT);
+        let remainder = count % select.limit.unwrap_or(0);
         let last = if remainder == 0 {
-            count - select.limit.unwrap_or(LIMIT_DEFAULT)
+            count - select.limit.unwrap_or(0)
         } else {
-            count - (count % select.limit.unwrap_or(LIMIT_DEFAULT))
+            count - (count % select.limit.unwrap_or(0))
         };
         let href = select_offset.offset(last).to_url();
         this_table.insert("last".to_string(), json!(href));
