@@ -33,7 +33,7 @@ TEST_TSVS = $(foreach T,${TEST_TABLES},src/resources/test_data/${T}.tsv)
 src/resources/test_data/zfa_excerpt.db: ${TEST_TSVS}
 	rm -f $@
 	sqlite3 $@ ".mode tabs" \
-      $(foreach T,${TEST_TABLES},".import src/resources/test_data/${T}.tsv ${T}")
+	$(foreach T,${TEST_TABLES},".import src/resources/test_data/${T}.tsv ${T}")
 
 .PHONY: test
 test:
