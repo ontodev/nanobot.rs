@@ -1,0 +1,1403 @@
+[
+  "ul",
+  [
+    "li",
+    "Ontology"
+  ],
+  [
+    "li",
+    "Class",
+    [
+      "ul",
+      {
+        "id": "children"
+      },
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000002",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000002"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000015",
+            "rev": "rdfs:subClassOf"
+          },
+          "anatomical set"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000021",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000021"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000025",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000025"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000055",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000055"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000057",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000057"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000061",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000061"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000065",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000065"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000070",
+            "rev": "rdfs:subClassOf"
+          },
+          "sensory axons peripheral"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000087",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000087"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000103",
+            "rev": "rdfs:subClassOf"
+          },
+          "embryo"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000104",
+            "rev": "rdfs:subClassOf"
+          },
+          "lateral cells"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000127",
+            "rev": "rdfs:subClassOf"
+          },
+          "mesenchyme condensations"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000129",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000129"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000134",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000134"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000139",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000139"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000145",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000145"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000147",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000147"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000169",
+            "rev": "rdfs:subClassOf"
+          },
+          "antorbital"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000171",
+            "rev": "rdfs:subClassOf"
+          },
+          "basisphenoid"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000187",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000187"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000198",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000198"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000203",
+            "rev": "rdfs:subClassOf"
+          },
+          "epicentrals"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000214",
+            "rev": "rdfs:subClassOf"
+          },
+          "hypobranchial vessel"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000218",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000218"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000224",
+            "rev": "rdfs:subClassOf"
+          },
+          "larva"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000251",
+            "rev": "rdfs:subClassOf"
+          },
+          "opercular-branchiostegal series"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000273",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000273"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000283",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000283"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000289",
+            "rev": "rdfs:subClassOf"
+          },
+          "supramaxillae"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000336",
+            "rev": "rdfs:subClassOf"
+          },
+          "hypural arches"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000337",
+            "rev": "rdfs:subClassOf"
+          },
+          "dermopalatine"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000348",
+            "rev": "rdfs:subClassOf"
+          },
+          "duodenum"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000361",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000361"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000367",
+            "rev": "rdfs:subClassOf"
+          },
+          "infraorbital bridge"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000373",
+            "rev": "rdfs:subClassOf"
+          },
+          "juvenile"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000375",
+            "rev": "rdfs:subClassOf"
+          },
+          "last preural centrum"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000377",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000377"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000378",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000378"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000409",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000409"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000432",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000432"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000437",
+            "rev": "rdfs:subClassOf"
+          },
+          "stomach"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000460",
+            "rev": "rdfs:subClassOf"
+          },
+          "Mauthner axon"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000478",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000478"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000483",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000483"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000489",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000489"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000515",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000515"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000544",
+            "rev": "rdfs:subClassOf"
+          },
+          "medial pterygiophores anal fin"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000562",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000562"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000572",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000572"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000584",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000584"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000596",
+            "rev": "rdfs:subClassOf"
+          },
+          "supraorbital series"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000613",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000613"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000624",
+            "rev": "rdfs:subClassOf"
+          },
+          "brachium conjunctivum"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000625",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000625"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000644",
+            "rev": "rdfs:subClassOf"
+          },
+          "dental plate"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000659",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000659"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000675",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000675"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000699",
+            "rev": "rdfs:subClassOf"
+          },
+          "ural ossification"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000736",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000736"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000820",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive neuron neural tube"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000875",
+            "rev": "rdfs:subClassOf"
+          },
+          "facial neural crest"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000911",
+            "rev": "rdfs:subClassOf"
+          },
+          "medial pterygiophores dorsal fin"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000942",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000942"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000945",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000945"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001002",
+            "rev": "rdfs:subClassOf"
+          },
+          "peripheral motor axons"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001087",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001087"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001088",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001088"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001090",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001090"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001091",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001091"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001092",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001092"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001102",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001102"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001103",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001103"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001160",
+            "rev": "rdfs:subClassOf"
+          },
+          "adult"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001196",
+            "rev": "rdfs:subClassOf"
+          },
+          "pars tuberalis"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001219",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001219"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001248",
+            "rev": "rdfs:subClassOf"
+          },
+          "pharyngobranchial 1"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001253",
+            "rev": "rdfs:subClassOf"
+          },
+          "pharyngobranchial 2+3"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001254",
+            "rev": "rdfs:subClassOf"
+          },
+          "cranial motoneurons"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001255",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001255"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001275",
+            "rev": "rdfs:subClassOf"
+          },
+          "mentomeckelian"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001333",
+            "rev": "rdfs:subClassOf"
+          },
+          "visceral organ"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001337",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001337"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001352",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001352"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001353",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001353"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001354",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001354"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001380",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001380"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001398",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001398"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001413",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001413"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001474",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive cardinal organ"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001475",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive organ"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001476",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive organ system"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001532",
+            "rev": "rdfs:subClassOf"
+          },
+          "axial bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001544",
+            "rev": "rdfs:subClassOf"
+          },
+          "chondrocranium bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001545",
+            "rev": "rdfs:subClassOf"
+          },
+          "cranial bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001546",
+            "rev": "rdfs:subClassOf"
+          },
+          "pharyngeal arch bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001547",
+            "rev": "rdfs:subClassOf"
+          },
+          "dermatocranium bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001548",
+            "rev": "rdfs:subClassOf"
+          },
+          "axial fin bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001549",
+            "rev": "rdfs:subClassOf"
+          },
+          "paired fin bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001553",
+            "rev": "rdfs:subClassOf"
+          },
+          "fin bone"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001618",
+            "rev": "rdfs:subClassOf"
+          },
+          "pons"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001661",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001661"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001664",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001664"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005071",
+            "rev": "rdfs:subClassOf"
+          },
+          "distal conduction system"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005182",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005182"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005228",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005228"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005318",
+            "rev": "rdfs:subClassOf"
+          },
+          "lymph node"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005330",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005330"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005493",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005493"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0007007",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0007007"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009008",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009008"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009122",
+            "rev": "rdfs:subClassOf"
+          },
+          "obsolete_auditory hair cell"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009161",
+            "rev": "rdfs:subClassOf"
+          },
+          "metanephric mesenchyme stem cell"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009172",
+            "rev": "rdfs:subClassOf"
+          },
+          "non-visual cell (sensu Vertebrata)"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009192",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009192"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009197",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009197"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009208",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009208"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009340",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009340"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009341",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009341"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009373",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009373"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009377",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009377"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009378",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009378"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009381",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009381"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009382",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009382"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0100000",
+            "rev": "rdfs:subClassOf"
+          },
+          "zebrafish anatomical entity"
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFS_0100000",
+            "rev": "rdfs:subClassOf"
+          },
+          "Stages"
+        ]
+      ]
+    ]
+  ]
+]

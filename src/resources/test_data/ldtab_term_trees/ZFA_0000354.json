@@ -1,0 +1,232 @@
+[{
+  "curie": "obo:ZFA_0100000",
+  "label": "zebrafish anatomical entity",
+  "property": "rdfs:subClassOf",
+  "children": [
+    {
+      "curie": "obo:ZFA_0000037",
+      "label": "anatomical structure",
+      "property": "rdfs:subClassOf",
+      "children": [
+        {
+          "curie": "obo:ZFA_0001512",
+          "label": "anatomical group",
+          "property": "rdfs:subClassOf",
+          "children": [
+            {
+              "curie": "obo:ZFA_0001439",
+              "label": "anatomical system",
+              "property": "rdfs:subClassOf",
+              "children": [
+                {
+                  "curie": "obo:ZFA_0000272",
+                  "label": "respiratory system",
+                  "property": "rdfs:subClassOf",
+                  "children": [
+                    {
+                      "curie": "obo:ZFA_0000354",
+                      "label": "gill",
+                      "property": "obo:BFO_0000050",
+                      "children": [
+                        {
+                          "curie": "obo:ZFA_0000716",
+                          "label": "afferent branchial artery",
+                          "property": "obo:BFO_0000050",
+                          "children": [
+                            {
+                              "curie": "obo:ZFA_0005012",
+                              "label": "afferent filamental artery",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0005013",
+                              "label": "concurrent branch afferent branchial artery",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0005014",
+                              "label": "recurrent branch afferent branchial artery",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "curie": "obo:ZFA_0000319",
+                          "label": "branchiostegal membrane",
+                          "property": "obo:BFO_0000050",
+                          "children": []
+                        },
+                        {
+                          "curie": "obo:ZFA_0000202",
+                          "label": "efferent branchial artery",
+                          "property": "obo:BFO_0000050",
+                          "children": [
+                            {
+                              "curie": "obo:ZFA_0005018",
+                              "label": "efferent filamental artery",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "curie": "obo:ZFA_0000667",
+                          "label": "gill filament",
+                          "property": "obo:BFO_0000050",
+                          "children": [
+                            {
+                              "curie": "obo:ZFA_0000666",
+                              "label": "filamental artery",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "curie": "obo:ZFA_0005324",
+                          "label": "gill ionocyte",
+                          "property": "obo:BFO_0000050",
+                          "children": []
+                        },
+                        {
+                          "curie": "obo:ZFA_0000211",
+                          "label": "gill lamella",
+                          "property": "obo:BFO_0000050",
+                          "children": [
+                            {
+                              "curie": "obo:ZFA_0005015",
+                              "label": "afferent lamellar arteriole",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0005019",
+                              "label": "efferent lamellar arteriole",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            }
+                          ]
+                        },
+                        {
+                          "curie": "obo:ZFA_0001613",
+                          "label": "pharyngeal arch 3-7",
+                          "property": "obo:BFO_0000050",
+                          "children": [
+                            {
+                              "curie": "obo:ZFA_0000172",
+                              "label": "branchial muscle",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0005390",
+                              "label": "gill ray",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0001606",
+                              "label": "pharyngeal arch 3",
+                              "property": "rdfs:subClassOf",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0000095",
+                              "label": "pharyngeal arch 3-7 skeleton",
+                              "property": "obo:BFO_0000050",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0001607",
+                              "label": "pharyngeal arch 4",
+                              "property": "rdfs:subClassOf",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0001608",
+                              "label": "pharyngeal arch 5",
+                              "property": "rdfs:subClassOf",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0001609",
+                              "label": "pharyngeal arch 6",
+                              "property": "rdfs:subClassOf",
+                              "children": []
+                            },
+                            {
+                              "curie": "obo:ZFA_0001610",
+                              "label": "pharyngeal arch 7",
+                              "property": "rdfs:subClassOf",
+                              "children": []
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "curie": "obo:ZFA_0000496",
+          "label": "compound organ",
+          "property": "rdfs:subClassOf",
+          "children": [
+            {
+              "curie": "obo:ZFA_0000354",
+              "label": "gill",
+              "property": "rdfs:subClassOf",
+              "children": []
+            }
+          ]
+        },
+        {
+          "curie": "obo:ZFA_0001094",
+          "label": "whole organism",
+          "property": "rdfs:subClassOf",
+          "children": [
+            {
+              "curie": "obo:ZFA_0001439",
+              "label": "anatomical system",
+              "property": "obo:BFO_0000050",
+              "children": [
+                {
+                  "curie": "obo:ZFA_0000272",
+                  "label": "respiratory system",
+                  "property": "rdfs:subClassOf",
+                  "children": [
+                    {
+                      "curie": "obo:ZFA_0000354",
+                      "label": "gill",
+                      "property": "obo:BFO_0000050",
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "curie": "obo:ZFA_0000496",
+              "label": "compound organ",
+              "property": "obo:BFO_0000050",
+              "children": [
+                {
+                  "curie": "obo:ZFA_0000354",
+                  "label": "gill",
+                  "property": "rdfs:subClassOf",
+                  "children": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}]

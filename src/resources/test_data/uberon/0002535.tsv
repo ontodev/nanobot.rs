@@ -1,0 +1,47 @@
+1	0	graph	obo:UBERON_0000467	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000051"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0000062"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000467	rdfs:label	anatomical system	xsd:string	
+1	0	graph	obo:BFO_0000004	rdfs:label	independent continuant	@en	
+1	0	graph	obo:BFO_0000004	rdfs:subClassOf	obo:BFO_0000002	_IRI	
+1	0	graph	obo:BFO_0000002	rdfs:subClassOf	{"owl:allValuesFrom":[{"datatype":"_IRI","object":"obo:BFO_0000002"}],"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000465	rdfs:subClassOf	obo:BFO_0000040	_IRI	
+1	0	graph	obo:UBERON_0000062	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002162"}],"owl:someValuesFrom":[{"datatype":"_JSON","object":{"owl:complementOf":[{"datatype":"_IRI","object":"obo:NCBITaxon_110815"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Class"}]}}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:BFO_0000002	rdfs:subClassOf	obo:BFO_0000001	_IRI	
+1	0	graph	obo:UBERON_0001004	rdfs:subClassOf	obo:UBERON_0000467	_IRI	
+1	0	graph	obo:UBERON_0000062	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0000467"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000467	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0000468"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000062	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002002"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0006984"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000465	rdfs:subClassOf	obo:UBERON_0001062	_IRI	
+1	0	graph	obo:UBERON_0002535	rdfs:subClassOf	obo:UBERON_0000062	_IRI	
+1	0	graph	obo:BFO_0000040	rdfs:subClassOf	obo:BFO_0000004	_IRI	
+1	0	graph	obo:UBERON_0001004	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002215"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:GO_0007585"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0002535	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0001004"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:BFO_0000001	rdfs:label	entity	@en	
+1	0	graph	obo:UBERON_0000468	rdfs:label	multicellular organism	xsd:string	
+1	0	graph	obo:UBERON_0000061	rdfs:subClassOf	obo:UBERON_0000465	_IRI	
+1	0	graph	obo:BFO_0000002	rdfs:label	continuant	@en	
+1	0	graph	obo:UBERON_0000467	rdfs:subClassOf	obo:UBERON_0000061	_IRI	
+1	0	graph	obo:UBERON_0001004	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002160"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:NCBITaxon_33213"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0002535	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002160"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:NCBITaxon_33213"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000062	rdfs:subClassOf	obo:UBERON_0010000	_IRI	
+1	0	graph	obo:UBERON_0000465	rdfs:label	material anatomical entity	xsd:string	
+1	0	graph	obo:UBERON_0001004	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002492"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0000066"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0001062	rdfs:label	anatomical entity	xsd:string	
+1	0	graph	obo:UBERON_0000062	rdfs:label	organ	xsd:string	
+1	0	graph	obo:UBERON_0000061	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:UBERON_0000071"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0010000	rdfs:label	multicellular anatomical structure	xsd:string	
+1	0	graph	obo:UBERON_0010000	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0000086"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:PATO_0001993"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0001004	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002162"}],"owl:someValuesFrom":[{"datatype":"_JSON","object":{"owl:complementOf":[{"datatype":"_IRI","object":"obo:NCBITaxon_147099"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Class"}]}}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:BFO_0000004	rdfs:subClassOf	{"owl:allValuesFrom":[{"datatype":"_IRI","object":"obo:BFO_0000004"}],"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0010000	rdfs:subClassOf	obo:UBERON_0000061	_IRI	
+1	0	graph	obo:UBERON_0002535	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002322"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ENVO_00002030"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0001004	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002215"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:GO_0003016"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0010000	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000051"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:CL_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0002535	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002162"}],"owl:someValuesFrom":[{"datatype":"_JSON","object":{"owl:complementOf":[{"datatype":"_IRI","object":"obo:NCBITaxon_32524"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Class"}]}}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000061	rdfs:label	anatomical structure	xsd:string	
+1	0	graph	obo:UBERON_0002535	rdfs:label	gill	xsd:string	
+1	0	graph	obo:BFO_0000040	rdfs:label	material entity	@en	
+1	0	graph	obo:UBERON_0001004	rdfs:label	respiratory system	xsd:string	
+1	0	graph	obo:BFO_0000040	rdfs:label	material entity	xsd:string	
+1	0	graph	obo:UBERON_0001062	rdfs:subClassOf	obo:BFO_0000004	_IRI	
+1	0	graph	obo:UBERON_0000062	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002215"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:GO_0008150"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:UBERON_0000468	rdfs:subClassOf	obo:UBERON_0010000	_IRI	

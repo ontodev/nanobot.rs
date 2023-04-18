@@ -1,0 +1,258 @@
+1	0	graph	obo:ZFA_0001439	rdfs:label	anatomical system	xsd:string	
+1	0	graph	obo:ZFA_0000095	rdfs:label	pharyngeal arch 3-7 skeleton	xsd:string	
+1	0	graph	obo:ZFA_0000172	rdfs:label	branchial muscle	xsd:string	
+1	0	graph	obo:ZFA_0001609	rdfs:label	pharyngeal arch 6	xsd:string	
+1	0	graph	obo:ZFA_0005014	rdfs:label	recurrent branch afferent branchial artery	xsd:string	
+1	0	graph	obo:ZFA_0001512	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001609	rdfs:subClassOf	obo:ZFA_0001613	_IRI	
+1	0	graph	obo:ZFA_0000716	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001607	rdfs:label	pharyngeal arch 4	xsd:string	
+1	0	graph	obo:ZFA_0001094	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000001"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005390	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001613"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000354	rdfs:label	gill	xsd:string	
+1	0	graph	obo:ZFA_0005324	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000272	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001094	rdfs:label	whole organism	xsd:string	
+1	0	graph	obo:ZFA_0000666	rdfs:label	filamental artery	xsd:string	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000202	rdfs:label	efferent branchial artery	xsd:string	
+1	0	graph	obo:ZFA_0000496	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001094"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000319	rdfs:label	branchiostegal membrane	xsd:string	
+1	0	graph	obo:ZFA_0000496	rdfs:label	compound organ	xsd:string	
+1	0	graph	obo:ZFA_0000667	rdfs:label	gill filament	xsd:string	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002202"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001107"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001607	rdfs:subClassOf	obo:ZFA_0001613	_IRI	
+1	0	graph	obo:ZFA_0000037	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001610	rdfs:label	pharyngeal arch 7	xsd:string	
+1	0	graph	obo:ZFA_0000319	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000037	rdfs:label	anatomical structure	xsd:string	
+1	0	graph	obo:ZFA_0000716	rdfs:label	afferent branchial artery	xsd:string	
+1	0	graph	obo:ZFA_0100000	rdfs:label	zebrafish anatomical entity	xsd:string	
+1	0	graph	obo:ZFA_0000666	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000667"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005015	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000211"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001512	rdfs:label	anatomical group	xsd:string	
+1	0	graph	obo:ZFA_0001439	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000202	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005012	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000716"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001512	rdfs:subClassOf	obo:ZFA_0000037	_IRI	
+1	0	graph	obo:ZFA_0000496	rdfs:subClassOf	obo:ZFA_0000037	_IRI	
+1	0	graph	obo:ZFA_0005018	rdfs:label	efferent filamental artery	xsd:string	
+1	0	graph	obo:ZFA_0005018	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000202"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005019	rdfs:label	efferent lamellar arteriole	xsd:string	
+1	0	graph	obo:ZFA_0001608	rdfs:subClassOf	obo:ZFA_0001613	_IRI	
+1	0	graph	obo:ZFA_0000172	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001613"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000496	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000667	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005015	rdfs:label	afferent lamellar arteriole	xsd:string	
+1	0	graph	obo:ZFA_0005012	rdfs:label	afferent filamental artery	xsd:string	
+1	0	graph	obo:ZFA_0000272	rdfs:label	respiratory system	xsd:string	
+1	0	graph	obo:ZFA_0001606	rdfs:label	pharyngeal arch 3	xsd:string	
+1	0	graph	obo:ZFA_0000272	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005324	rdfs:label	gill ionocyte	xsd:string	
+1	0	graph	obo:ZFA_0001439	rdfs:subClassOf	obo:ZFA_0001512	_IRI	
+1	0	graph	obo:ZFA_0001439	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001094"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001094	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000272	rdfs:subClassOf	obo:ZFA_0001439	_IRI	
+1	0	graph	obo:ZFA_0001094	rdfs:subClassOf	obo:ZFA_0000037	_IRI	
+1	0	graph	obo:ZFA_0005390	rdfs:label	gill ray	xsd:string	
+1	0	graph	obo:ZFA_0000211	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005019	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000211"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001439	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000037	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000001"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005014	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000716"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000095	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001613"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000211	rdfs:label	gill lamella	xsd:string	
+1	0	graph	obo:ZFA_0001512	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001606	rdfs:subClassOf	obo:ZFA_0001613	_IRI	
+1	0	graph	obo:ZFA_0001610	rdfs:subClassOf	obo:ZFA_0001613	_IRI	
+1	0	graph	obo:ZFA_0000037	rdfs:subClassOf	obo:ZFA_0100000	_IRI	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000272"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001613	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000354"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0001608	rdfs:label	pharyngeal arch 5	xsd:string	
+1	0	graph	obo:ZFA_0005013	rdfs:label	concurrent branch afferent branchial artery	xsd:string	
+1	0	graph	obo:ZFA_0001613	rdfs:label	pharyngeal arch 3-7	xsd:string	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	obo:ZFA_0000496	_IRI	
+1	0	graph	obo:ZFA_0000496	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0005013	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000716"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000065	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001398	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009122	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000129	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000103	rdfs:label	embryo	xsd:string	
+1	0	graph	obo:ZFA_0000820	rdfs:label	presumptive neuron neural tube	xsd:string	
+1	0	graph	obo:ZFA_0000224	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001476	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001380	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001476	rdfs:label	presumptive organ system	xsd:string	
+1	0	graph	obo:ZFA_0000214	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000625	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000103	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000025	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000367	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001253	rdfs:label	pharyngobranchial 2+3	xsd:string	
+1	0	graph	obo:ZFA_0100000	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000562	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001090	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001253	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000378	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000911	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001545	rdfs:label	cranial bone	xsd:string	
+1	0	graph	obo:ZFS_0100000	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000348	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001002	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000171	rdfs:label	basisphenoid	xsd:string	
+1	0	graph	obo:ZFA_0001553	rdfs:label	fin bone	xsd:string	
+1	0	graph	obo:ZFA_0001333	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0005318	rdfs:label	lymph node	xsd:string	
+1	0	graph	obo:ZFA_0000437	rdfs:label	stomach	xsd:string	
+1	0	graph	obo:ZFA_0000002	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009381	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000147	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000055	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000289	rdfs:label	supramaxillae	xsd:string	
+1	0	graph	obo:ZFA_0001254	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001532	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001548	rdfs:label	axial fin bone	xsd:string	
+1	0	graph	obo:ZFA_0001275	rdfs:label	mentomeckelian	xsd:string	
+1	0	graph	obo:ZFA_0001549	rdfs:label	paired fin bone	xsd:string	
+1	0	graph	obo:ZFA_0005330	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001160	rdfs:label	adult	xsd:string	
+1	0	graph	obo:ZFA_0005493	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000911	rdfs:label	medial pterygiophores dorsal fin	xsd:string	
+1	0	graph	obo:ZFA_0009197	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009378	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000572	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000624	rdfs:label	brachium conjunctivum	xsd:string	
+1	0	graph	obo:ZFA_0000584	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000659	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009172	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000251	rdfs:label	opercular-branchiostegal series	xsd:string	
+1	0	graph	obo:ZFA_0005071	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000171	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001160	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000104	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000432	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001664	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000336	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000596	rdfs:label	supraorbital series	xsd:string	
+1	0	graph	obo:ZFA_0000348	rdfs:label	duodenum	xsd:string	
+1	0	graph	obo:ZFA_0000945	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001474	rdfs:label	presumptive cardinal organ	xsd:string	
+1	0	graph	obo:ZFA_0000875	rdfs:label	facial neural crest	xsd:string	
+1	0	graph	obo:ZFA_0000699	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000613	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009341	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000489	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000169	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009192	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001196	rdfs:label	pars tuberalis	xsd:string	
+1	0	graph	obo:ZFA_0000145	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0005228	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000644	rdfs:label	dental plate	xsd:string	
+1	0	graph	obo:ZFA_0009161	rdfs:label	metanephric mesenchyme stem cell	xsd:string	
+1	0	graph	obo:ZFA_0000203	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001092	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0005318	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000367	rdfs:label	infraorbital bridge	xsd:string	
+1	0	graph	obo:ZFA_0001549	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0100000	rdfs:label	zebrafish anatomical entity	xsd:string	
+1	0	graph	obo:ZFA_0000375	rdfs:label	last preural centrum	xsd:string	
+1	0	graph	obo:ZFA_0009172	rdfs:label	non-visual cell (sensu Vertebrata)	xsd:string	
+1	0	graph	obo:ZFA_0000437	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000214	rdfs:label	hypobranchial vessel	xsd:string	
+1	0	graph	obo:ZFA_0000942	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000644	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001475	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001248	rdfs:label	pharyngobranchial 1	xsd:string	
+1	0	graph	obo:ZFA_0009340	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000478	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000061	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000251	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001002	rdfs:label	peripheral motor axons	xsd:string	
+1	0	graph	obo:ZFA_0001337	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000187	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000139	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009122	rdfs:label	obsolete_auditory hair cell	xsd:string	
+1	0	graph	obo:ZFA_0001091	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001353	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000624	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001413	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000273	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009377	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFS_0100000	rdfs:label	Stages	xsd:string	
+1	0	graph	obo:ZFA_0000337	rdfs:label	dermopalatine	xsd:string	
+1	0	graph	obo:ZFA_0000015	rdfs:label	anatomical set	xsd:string	
+1	0	graph	obo:ZFA_0000070	rdfs:label	sensory axons peripheral	xsd:string	
+1	0	graph	obo:ZFA_0000057	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0007007	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009208	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000409	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001532	rdfs:label	axial bone	xsd:string	
+1	0	graph	obo:ZFA_0001474	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000127	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001352	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001544	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000070	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001547	rdfs:label	dermatocranium bone	xsd:string	
+1	0	graph	obo:ZFA_0000361	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001661	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000675	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001087	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001544	rdfs:label	chondrocranium bone	xsd:string	
+1	0	graph	obo:ZFA_0001333	rdfs:label	visceral organ	xsd:string	
+1	0	graph	obo:ZFA_0000373	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000375	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000544	rdfs:label	medial pterygiophores anal fin	xsd:string	
+1	0	graph	obo:ZFA_0000544	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000736	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001546	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000218	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001553	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001255	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001219	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001475	rdfs:label	presumptive organ	xsd:string	
+1	0	graph	obo:ZFA_0005182	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001618	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001546	rdfs:label	pharyngeal arch bone	xsd:string	
+1	0	graph	obo:ZFA_0001102	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000198	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001545	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000203	rdfs:label	epicentrals	xsd:string	
+1	0	graph	obo:ZFA_0000283	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000134	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000336	rdfs:label	hypural arches	xsd:string	
+1	0	graph	obo:ZFA_0000224	rdfs:label	larva	xsd:string	
+1	0	graph	obo:ZFA_0000460	rdfs:label	Mauthner axon	xsd:string	
+1	0	graph	obo:ZFA_0000699	rdfs:label	ural ossification	xsd:string	
+1	0	graph	obo:ZFA_0001196	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000015	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001254	rdfs:label	cranial motoneurons	xsd:string	
+1	0	graph	obo:ZFA_0001618	rdfs:label	pons	xsd:string	
+1	0	graph	obo:ZFA_0009008	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000377	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000820	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000127	rdfs:label	mesenchyme condensations	xsd:string	
+1	0	graph	obo:ZFA_0000289	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000169	rdfs:label	antorbital	xsd:string	
+1	0	graph	obo:ZFA_0001248	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001354	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000875	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001547	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001548	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009373	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009382	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000373	rdfs:label	juvenile	xsd:string	
+1	0	graph	obo:ZFA_0000460	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001088	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000104	rdfs:label	lateral cells	xsd:string	
+1	0	graph	obo:ZFA_0000337	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000483	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0005071	rdfs:label	distal conduction system	xsd:string	
+1	0	graph	obo:ZFA_0001103	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0001275	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000596	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0009161	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000021	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000087	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000515	rdf:type	owl:Class	_IRI	
