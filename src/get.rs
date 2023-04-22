@@ -8,7 +8,8 @@ use minijinja::Environment;
 use ontodev_sqlrest::{Filter, Select};
 use regex::Regex;
 use serde_json::{json, Map, Value};
-use sqlx::any::AnyPool;
+use sqlx::any::{AnyKind, AnyPool};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
@@ -54,10 +55,11 @@ pub async fn get_table(
     table: &str,
     shape: &str,
     format: &str,
+    show_messages: bool,
 ) -> Result<String, GetError> {
     let mut select = Select::new(table);
     select.limit(LIMIT_DEFAULT);
-    get_rows(config, &select, shape, format).await
+    get_rows(config, &select, shape, format, show_messages).await
 }
 
 pub async fn get_rows(
@@ -65,6 +67,7 @@ pub async fn get_rows(
     base_select: &Select,
     shape: &str,
     format: &str,
+    show_messages: bool,
 ) -> Result<String, GetError> {
     // Get all the tables
     let mut select = Select::new("\"table\"");
@@ -138,7 +141,8 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page: Value = get_page(&pool, &select, &table_map, &column_rows).await?;
+            let page: Value =
+                get_page(&pool, &select, &table_map, &column_rows, show_messages).await?;
             match format {
                 "json" => Ok(page.to_string()),
                 "pretty.json" => Ok(serde_json::to_string_pretty(&page).unwrap()),
@@ -158,6 +162,7 @@ async fn get_page(
     select: &Select,
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
+    filter_messages: bool,
 ) -> Result<Value, GetError> {
     // Annotate columns with filters and sorting
     let mut column_map = Map::new();
@@ -188,84 +193,41 @@ async fn get_page(
         column_map.insert(key, Value::Object(r));
     }
 
-    // get the data and the messages
+    let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
     let start = std::time::Instant::now();
-    let view_select = Select {
-        table: format!("{}_view", unquote(&select.table).unwrap_or(select.table.to_string())),
-        ..select.clone()
-    };
+    // Query the table view instead of the base table, which includes conflict rows and the
+    // message column:
+    let mut view_select = Select { table: format!("{}_view", unquoted_table), ..select.clone() };
+    view_select.select_all(pool).unwrap();
 
-    // If we're filtering for rows with messages
-    // if select.message != "" {
-    //     let sql = format!(
-    //         r#"
-    //         SELECT json_object('row', row) AS json_result
-    //         FROM (
-    //           SELECT DISTINCT row
-    //           FROM message
-    //           WHERE "table" = '{}'
-    //           ORDER BY row
-    //           LIMIT {}
-    //           OFFSET {}
-    //         )
-    //     "#,
-    //         select.table, select.limit, select.offset
-    //     );
-    //     // TODO: Use one of the sqlrest.rs library functions to do this instead of the
-    //     // get_rows_from_pool() function which has been deleted.
-    //     let result = get_rows_from_pool(&pool, &sql).await?;
-    //     let row_numbers: Vec<Value> = result
-    //         .clone()
-    //         .into_iter()
-    //         .map(|r| r.get("row").unwrap().clone())
-    //         .collect();
-    //     view_select = Select {
-    //         filter: vec![(
-    //             "row_number".to_string(),
-    //             Operator::In,
-    //             format!(
-    //                 "({})",
-    //                 row_numbers
-    //                     .iter()
-    //                     .map(|x| x.to_string())
-    //                     .collect::<Vec<String>>()
-    //                     .join(",")
-    //             ),
-    //         )],
-    //         offset: 0,
-    //         ..view_select
-    //     };
-    // }
+    // If we're filtering for rows with messages:
+    if filter_messages {
+        view_select
+            .add_filter(
+                Filter::new("message", "not_is", {
+                    if pool.any_kind() == AnyKind::Postgres {
+                        "null".into()
+                    } else {
+                        "'[]'".into()
+                    }
+                })
+                .unwrap(),
+            )
+            .limit(1000);
+    }
 
     // Use the view to select the data
     let value_rows = get_table_from_pool(&pool, &view_select).await?;
-    let row_numbers: Vec<Value> =
-        value_rows.clone().into_iter().map(|r| r.get("row_number").unwrap().clone()).collect();
-    let mut select_messages = Select::new("message");
-    select_messages
-        .table("message")
-        .select(vec!["\"table\"", "\"row\"", "\"column\"", "\"level\"", "\"rule\"", "\"message\""])
-        .filter(vec![
-            match Filter::new("\"table\"", "eq", json!(select.table.clone())) {
-                Ok(f) => f,
-                Err(e) => return Err(GetError::new(e)),
-            },
-            match Filter::new("row", "in", json!(row_numbers)) {
-                Ok(f) => f,
-                Err(e) => return Err(GetError::new(e)),
-            },
-        ])
-        .limit(1000);
-
-    let message_rows = get_table_from_pool(&pool, &select_messages).await?;
-    let message_counts = get_message_counts_from_pool(&pool, &select.table.clone()).await?;
+    let message_counts = get_message_counts_from_pool(&pool, &unquoted_table).await?;
 
     // convert value_rows to cell_rows
     let mut cell_rows: Vec<Map<String, Value>> = vec![];
     for row in &value_rows {
         let mut crow: Map<String, Value> = Map::new();
-        let row_number = row.get("row_number").unwrap();
         for (k, v) in row.iter() {
+            if k == "message" {
+                continue;
+            }
             let mut cell: Map<String, Value> = Map::new();
             let mut classes: Vec<String> = vec![];
 
@@ -296,69 +258,80 @@ async fn get_page(
             if structure == "from(table.table)" {
                 let href = format!("/table?table=eq.{}", v.as_str().unwrap().to_string());
                 cell.insert("href".to_string(), Value::String(href));
-            } else if k == "table" && select.table == "table" {
+            } else if k == "table" && unquoted_table == "table" {
                 // In the 'table' table, link to the other tables
                 let href = format!("/{}", v.as_str().unwrap().to_string());
                 cell.insert("href".to_string(), Value::String(href));
             }
 
-            // collect messages
-            let mut messages: Vec<Map<String, Value>> = vec![];
-            let mut max_level: usize = 0;
-            let mut message_level = "info".to_string();
-            for message in &message_rows {
-                if row_number == message.get("row").unwrap() && k == message.get("column").unwrap()
-                {
-                    let mut m = Map::new();
-                    for (key, value) in message {
-                        if key == "table" || key == "row" || key == "column" {
-                            continue;
-                        }
-                        m.insert(key.clone(), value.clone());
-                    }
-                    messages.push(m);
-                    let level = message.get("level").unwrap().as_str().unwrap().to_string();
-                    let lvl = level_to_int(&level);
-                    if lvl > max_level {
-                        max_level = lvl;
-                        message_level = level;
-                    }
-                }
-            }
-            if messages.len() > 0 {
-                cell.insert("message_level".to_string(), json!(message_level));
-                cell.insert("messages".to_string(), json!(messages));
-            }
             if classes.len() > 0 {
                 cell.insert("classes".to_string(), json!(classes));
             }
 
             crow.insert(k.to_string(), Value::Object(cell));
         }
+
+        let mut error_values = HashMap::new();
+        if let Some(input_messages) = row.get("message") {
+            let mut output_messages: HashMap<&str, Vec<Map<String, Value>>> = HashMap::new();
+            let mut max_level: usize = 0;
+            let mut message_level = "info".to_string();
+            for message in input_messages.as_array().unwrap() {
+                let mut m = Map::new();
+                for (key, value) in message.as_object().unwrap() {
+                    if key != "column" && key != "value" {
+                        m.insert(key.clone(), value.clone());
+                    }
+                }
+                let column = message.as_object().unwrap().get("column").unwrap().as_str().unwrap();
+                let value = message.get("value").unwrap().as_str().unwrap();
+                error_values.insert(column.clone(), value);
+                if let Some(mut v) = output_messages.get_mut(&column) {
+                    v.push(m);
+                } else {
+                    output_messages.insert(column, vec![m]);
+                }
+
+                let level = message.get("level").unwrap().as_str().unwrap().to_string();
+                let lvl = level_to_int(&level);
+                if lvl > max_level {
+                    max_level = lvl;
+                    message_level = level;
+                }
+            }
+
+            for (column, messages) in &output_messages {
+                if let Some(mut cell) = crow.get_mut(column.clone()) {
+                    if let Some(mut cell) = cell.as_object_mut() {
+                        let value = error_values.get(column).unwrap();
+                        cell.insert("value".to_string(), json!(value));
+                        cell.insert("message_level".to_string(), json!(message_level));
+                        cell.insert("messages".to_string(), json!(messages));
+                    }
+                }
+            }
+        }
+
         cell_rows.push(crow);
     }
 
     let mut counts = Map::new();
-    let count = get_count_from_pool(&pool, &select).await?;
-    // if select.message != "" {
-    //     count = message_counts
-    //         .get("message_row")
-    //         .unwrap()
-    //         .as_u64()
-    //         .unwrap()
-    //         .clone() as usize;
-    // }
+    let count = {
+        if filter_messages {
+            message_counts.get("message_row").unwrap().as_u64().unwrap().clone() as usize
+        } else {
+            get_count_from_pool(&pool, &select).await?
+        }
+    };
     counts.insert("count".to_string(), json!(count));
 
-    let total = get_total_from_pool(&pool, &select.table).await?;
+    let total = get_total_from_pool(&pool, &unquoted_table).await?;
     counts.insert("total".to_string(), json!(total));
     for (k, v) in message_counts {
-        counts.insert(k, v);
+        counts.insert(k, v.into());
     }
 
     let end = select.offset.unwrap_or(0) + cell_rows.len();
-
-    let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
 
     let mut this_table = table_map.get(&unquoted_table).unwrap().as_object().unwrap().clone();
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));

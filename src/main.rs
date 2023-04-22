@@ -81,7 +81,7 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result = match get::get_table(config.start_pool().await, table, shape, format).await
+            let result = match get::get_table(config.start_pool().await, table, shape, format, false).await
             {
                 Ok(x) => x,
                 Err(x) => format!("ERROR: {:?}", x),
