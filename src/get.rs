@@ -303,8 +303,18 @@ async fn get_page(
             for (column, messages) in &output_messages {
                 if let Some(mut cell) = crow.get_mut(column.clone()) {
                     if let Some(mut cell) = cell.as_object_mut() {
+                        cell.remove("nulltype");
+                        let mut new_classes = vec![];
+                        if let Some(mut classes) = cell.get_mut("classes") {
+                            for class in classes.as_array().unwrap() {
+                                if class.as_str().unwrap().to_string() != "bg-null" {
+                                    new_classes.push(class.clone());
+                                }
+                            }
+                        }
                         let value = error_values.get(column).unwrap();
                         cell.insert("value".to_string(), json!(value));
+                        cell.insert("classes".to_string(), json!(new_classes));
                         cell.insert("message_level".to_string(), json!(message_level));
                         cell.insert("messages".to_string(), json!(messages));
                     }
@@ -400,6 +410,7 @@ async fn get_page(
         "column": column_map,
         "row": cell_rows,
     });
+    //tracing::info!("RESULT: {:#?}", result);
     Ok(result)
 }
 
