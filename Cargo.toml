@@ -26,7 +26,7 @@ tree-sitter = "0.20.6"
 tree-sitter-sqlrest = { path = "../tree-sitter-sqlrest" }
 urlencoding = "2.1.2"
 wiring_rs = { git = "https://github.com/ontodev/wiring.rs" }
-hiccupriir = { git = "https://github.com/ckindermann/hiccupriir" }
+ontodev_hiccup = { git = "https://github.com/ontodev/hiccup.rs" }
 itertools = "0.10.5"
 
 [build-dependencies]

@@ -1,4 +1,4 @@
-use hiccupriir::hiccup;
+use ontodev_hiccup::hiccup;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
