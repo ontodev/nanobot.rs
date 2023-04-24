@@ -1581,8 +1581,9 @@ pub async fn get_direct_sub_parts(
 
     //RDF representation of an OWL existential restriction
     //using the property part-of (obo:BFO_0000050)
-    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
+    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"relation"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
     let part_of = part_of.replace("entity", entity);
+    let part_of = part_of.replace("relation", PART_OF);
 
     let query = format!(
         "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'",
