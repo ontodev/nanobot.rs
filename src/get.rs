@@ -8,12 +8,13 @@ use minijinja::Environment;
 use ontodev_sqlrest::{Filter, Select};
 use regex::Regex;
 use serde_json::{json, Map, Value};
-use sqlx::any::{AnyKind, AnyPool};
+use sqlx::any::AnyPool;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
 use tabwriter::TabWriter;
+use urlencoding::decode;
 
 #[derive(Debug)]
 pub struct GetError {
@@ -164,6 +165,7 @@ async fn get_page(
     column_rows: &Vec<Map<String, Value>>,
     filter_messages: bool,
 ) -> Result<Value, GetError> {
+    //tracing::info!("SELECT: {:#?}", select);
     // Annotate columns with filters and sorting
     let mut column_map = Map::new();
     for row in column_rows.iter() {
@@ -203,22 +205,15 @@ async fn get_page(
     // If we're filtering for rows with messages:
     if filter_messages {
         view_select
-            .add_filter(
-                Filter::new("message", "not_is", {
-                    if pool.any_kind() == AnyKind::Postgres {
-                        "null".into()
-                    } else {
-                        "'[]'".into()
-                    }
-                })
-                .unwrap(),
-            )
-            .limit(1000);
+            .add_filter(Filter::new("message", "not_is", "null".into()).unwrap())
+            .limit(select.limit.unwrap());
     }
 
     // Use the view to select the data
     let value_rows = get_table_from_pool(&pool, &view_select).await?;
     let message_counts = get_message_counts_from_pool(&pool, &unquoted_table).await?;
+    //tracing::info!("MESSAGE COUNTS: {:#?}", message_counts);
+    //tracing::info!("VALUE ROWS: {:#?}\nTOTAL: {}", value_rows, value_rows.len());
 
     // convert value_rows to cell_rows
     let mut cell_rows: Vec<Map<String, Value>> = vec![];
@@ -286,7 +281,7 @@ async fn get_page(
                 let column = message.as_object().unwrap().get("column").unwrap().as_str().unwrap();
                 let value = message.get("value").unwrap().as_str().unwrap();
                 error_values.insert(column.clone(), value);
-                if let Some(mut v) = output_messages.get_mut(&column) {
+                if let Some(v) = output_messages.get_mut(&column) {
                     v.push(m);
                 } else {
                     output_messages.insert(column, vec![m]);
@@ -301,11 +296,11 @@ async fn get_page(
             }
 
             for (column, messages) in &output_messages {
-                if let Some(mut cell) = crow.get_mut(column.clone()) {
-                    if let Some(mut cell) = cell.as_object_mut() {
+                if let Some(cell) = crow.get_mut(column.clone()) {
+                    if let Some(cell) = cell.as_object_mut() {
                         cell.remove("nulltype");
                         let mut new_classes = vec![];
-                        if let Some(mut classes) = cell.get_mut("classes") {
+                        if let Some(classes) = cell.get_mut("classes") {
                             for class in classes.as_array().unwrap() {
                                 if class.as_str().unwrap().to_string() != "bg-null" {
                                     new_classes.push(class.clone());
@@ -355,11 +350,13 @@ async fn get_page(
     let mut select_format = Select::clone(select);
     select_format.table(format!("\"{}.json\"", unquoted_table));
 
-    let href = select_format.to_url();
+    let href = select_format.to_url().unwrap();
+    let href = decode(&href).unwrap();
     formats.insert("JSON".to_string(), json!(href));
 
     select_format.table(format!("\"{}.pretty.json\"", unquoted_table));
-    let href = select_format.to_url();
+    let href = select_format.to_url().unwrap();
+    let href = decode(&href).unwrap();
 
     formats.insert("JSON (Pretty)".to_string(), json!(href));
     this_table.insert("formats".to_string(), json!(formats));
@@ -368,10 +365,13 @@ async fn get_page(
     let mut select_offset = Select::clone(select);
     match select.offset {
         Some(offset) if offset > 0 => {
-            let href = select_offset.offset(0).to_url();
+            let href = select_offset.offset(0).to_url().unwrap();
+            let href = decode(&href).unwrap();
             this_table.insert("first".to_string(), json!(href));
             if offset > select.limit.unwrap_or(0) {
-                let href = select_offset.offset(offset - select.limit.unwrap_or(0)).to_url();
+                let href =
+                    select_offset.offset(offset - select.limit.unwrap_or(0)).to_url().unwrap();
+                let href = decode(&href).unwrap();
                 this_table.insert("previous".to_string(), json!(href));
             } else {
                 this_table.insert("previous".to_string(), json!(href));
@@ -380,8 +380,11 @@ async fn get_page(
         _ => (),
     };
     if end < count {
-        let href =
-            select_offset.offset(select.offset.unwrap_or(0) + select.limit.unwrap_or(0)).to_url();
+        let href = select_offset
+            .offset(select.offset.unwrap_or(0) + select.limit.unwrap_or(0))
+            .to_url()
+            .unwrap();
+        let href = decode(&href).unwrap();
         this_table.insert("next".to_string(), json!(href));
         let remainder = count % select.limit.unwrap_or(0);
         let last = if remainder == 0 {
@@ -389,7 +392,8 @@ async fn get_page(
         } else {
             count - (count % select.limit.unwrap_or(0))
         };
-        let href = select_offset.offset(last).to_url();
+        let href = select_offset.offset(last).to_url().unwrap();
+        let href = decode(&href).unwrap();
         this_table.insert("last".to_string(), json!(href));
     }
 
@@ -398,19 +402,20 @@ async fn get_page(
         tables.insert(key.clone(), Value::String(format!("/{}", key)));
     }
 
+    let elapsed = start.elapsed().as_millis() as usize;
     let result: Value = json!({
         "page": {
             "project_name": "Nanobot",
             "tables": tables,
             "title": unquoted_table,
             "select": select,
-            "elapsed": start.elapsed().as_millis() as usize,
+            "elapsed": elapsed,
         },
         "table": this_table,
         "column": column_map,
         "row": cell_rows,
     });
-    //tracing::info!("RESULT: {:#?}", result);
+    tracing::info!("ELAPSED: {}", elapsed);
     Ok(result)
 }
 
