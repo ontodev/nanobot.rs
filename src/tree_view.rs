@@ -4,12 +4,7 @@ use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::util::signature;
 
-static CONFERS_ADVANTAGE_IN: &'static str = "obo:RO_0002322";
-static PART_OF: &'static str = "obo:BFO_0000050";
 static IS_A: &'static str = "rdfs:subClassOf";
-
-#[derive(Debug)]
-pub struct LabelNotFound;
 
 /// Convert LDTab strings to serde Values.
 /// LDTab makes use of both strings and JSON strings.
@@ -33,10 +28,6 @@ pub fn ldtab_2_value(string: &str) -> Value {
 
     serde_value
 }
-
-// ################################################
-// ######## build label map ######################
-// ################################################
 
 /// Given a set of CURIEs/IRIs, return a query string for an LDTab database
 /// that yields a map from CURIEs/IRIs to their respective rdfs:labels.
@@ -63,11 +54,11 @@ pub fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
 /// # Example
 ///
 /// Let S = {obo:ZFA_0000354, rdfs:label} be a set of CURIEs
-/// and Ldb an LDTab database.
-/// Then get_label_hash_map(S, table, Ldb) returns the map
+/// and ldb an LDTab database.
+/// Then get_label_hash_map(S, table, ldb) returns the map
 /// {"obo:ZFA_0000354": "gill",
 ///  "rdfs:label": "label"}
-/// extracted from a given table in Ldb.  
+/// extracted from a given table in ldb.  
 pub async fn get_label_hash_map(
     curies: &HashSet<String>,
     table: &str,
@@ -161,9 +152,129 @@ pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
     iris
 }
 
-// ################################################
-// ######## build tree view #######################
-// ################################################
+/// Given maps for hierarchical relations,
+/// identify root classes, i.e., classes without parents.
+///
+/// # Examples
+///
+/// Consider the map
+///
+/// {
+///   rdfs:subClassOf = { a : {b,c,d,e},
+///                       e : {f, g},
+///                       h : {d},
+///                     }
+/// }
+///
+/// then identify_roots identifies a and h as roots.  
+pub fn identify_roots(
+    class_2_relations: &HashMap<String, HashMap<String, HashSet<String>>>,
+) -> HashSet<String> {
+    let mut roots = HashSet::new();
+
+    //collect all keys and values from both maps
+    let mut keys = HashSet::new();
+    let mut values = HashSet::new();
+
+    for map in class_2_relations.values() {
+        for (k, v) in map {
+            keys.insert(k);
+            values.extend(v);
+        }
+    }
+
+    //check which keys do not occur in any value of any map
+    for k in keys {
+        if !values.contains(k) {
+            roots.insert(k.clone());
+        }
+    }
+    roots
+}
+
+/// Given a map from classes to (direct) subclasses in LDTab format,
+/// identify anonymous class expressions.
+/// (These anonymous class expressions are unwanted for the HTML view.)
+///
+/// # Examples
+///
+/// Consider the class expression "p some f" and the map
+///
+/// m = { a : {b,c,p some f},
+///       p some f : { d, e },
+///       e : {f g},
+///       h : {d, r some g},
+///     }
+///
+/// Then the set {p some f, r some g} is returned
+///  as the set of identified invalid classes.
+pub fn identify_invalid_classes(
+    class_2_subclasses: &HashMap<String, HashSet<String>>,
+) -> HashSet<String> {
+    let mut invalid: HashSet<String> = HashSet::new();
+    for (k, v) in class_2_subclasses {
+        let key_value = ldtab_2_value(k);
+
+        let valid = match key_value {
+            Value::String(_x) => true,
+            _ => false,
+        };
+
+        if !valid {
+            //collect keys to remove
+            invalid.insert(k.clone());
+        } else {
+            for sub in v.clone() {
+                //TODO: is it necessary to clone the set here?
+                let sub_value = ldtab_2_value(&sub);
+                let valid = match sub_value {
+                    Value::String(_x) => true,
+                    _ => false,
+                };
+                if !valid {
+                    invalid.insert(String::from(sub));
+                }
+            }
+        }
+    }
+    invalid
+}
+
+/// Given a map from class expression (in LDTab format) to their subclasses
+/// and a set of target class expressions,
+/// remove any occurrence of the target class epxressions from the map
+/// (without maintaining transitive relationships) .
+///
+/// # Examples
+///
+/// Consider the map
+///
+/// m = { a : {b,c,p some f},
+///       p some f : { d, e },
+///       e : {f g},
+///       h : {d, p some f},
+///     }
+///
+/// then remove_invalid_classes(m) returns the map
+///
+/// m = { a : {b,c},
+///       e : {f g},
+///       h : {d},
+///     }
+pub fn remove_invalid_classes(class_2_subclasses: &mut HashMap<String, HashSet<String>>) {
+    let invalid = identify_invalid_classes(class_2_subclasses);
+
+    //remove invalid keys
+    for i in &invalid {
+        class_2_subclasses.remove(i);
+    }
+    //remove invalid parts in values
+    for (_k, v) in class_2_subclasses.iter_mut() {
+        for i in &invalid {
+            v.remove(i);
+        }
+    }
+}
 
 /// Given an LDTab predicate map encoded as a Serde Value, return true
 /// if the Value represents the 'part-of' relation (obo:BFO_0000050).
@@ -216,15 +327,15 @@ pub fn check_filler(value: &Value) -> bool {
 }
 
 /// Given an LDTab predicate map encoded, return true
-/// if the Map encodes an existential restriction using the 'part-of' property
+/// if the Map encodes an existential restriction using a given property.
 ///
 /// Consider the value
 /// v = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],
 ///      "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000040"}],
 ///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
 ///
-/// then check_part_of_restriction(v) returns true
-pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
+/// then check_part_of_restriction(v,"obo:BFO_0000050") returns true
+pub fn check_restriction(value: &Map<String, Value>, relation: &str) -> bool {
     if value.contains_key("owl:onProperty")
         & value.contains_key("owl:someValuesFrom")
         & value.contains_key("rdf:type")
@@ -233,137 +344,88 @@ pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
         let filler = value.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
         //let rdf_type = value.get("rdf:type").unwrap().as_array().unwrap()[0]; //not necessary
 
-        check_property(&property, PART_OF) & check_filler(&filler)
+        check_property(&property, relation) & check_filler(&filler)
     } else {
         false
     }
 }
 
-/// Given a class expression and
-/// a mutable map from class expression (in LDTab format) to their subclasses,
-/// remove any occurrence of the target class epxression from the map
-/// while maintaining transitive subclass relationships.
+/// Given a mapping from classes to sets of their subclasses,
+/// extract and return a mapping from classes to sets of hierarchical relationships
+/// for a given relation.
+/// Such relations are expressed in OWL via an axiom of the form
 ///
-/// # Examples
+/// 'entity' is-a 'part-of' some 'filler'
 ///
-/// Consider the class expression "p some f" and the map
-/// m = { a : {b,c,p some f},
-///       p some f : { d, e },
-///       e : {f g},
-///       h : {d, p some f},
-///     }
+/// This information is represented via the mapping: {filler : entity}
 ///
-/// then remove_invalid_class('p some f', m) returns the map
+/// Examples
 ///
-/// m = { a : {b,c,d,e},
-///       e : {f g},
-///       h : {d},
-///     }
-/// TODO: this is not used?
-pub fn remove_invalid_class(
-    target: &str,
-    class_2_subclasses: &mut HashMap<String, HashSet<String>>,
-) {
-    //remove mapping [target : {subclass_1, subclass_2, ..., subclass_n}]
-    let values = match class_2_subclasses.remove(target) {
-        Some(x) => x,
-        None => HashSet::new(), //return empty set
-    };
+/// Consider the axioms
 
-    for (_key, value) in class_2_subclasses {
-        if value.contains(target) {
-            //replace 'target' with {subclass_1, subclass_2, ..., subclass_n}
-            value.remove(target);
-            for v in &values {
-                value.insert(v.clone());
-            }
-        }
-    }
-}
-
-/// Given a map from class expression (in LDTab format) to their subclasses
-/// and a set of target class expressions,
-/// remove any occurrence of the target class epxressions from the map
-/// (without maintaining transitive relationships) .
+/// axiom 1: 'gill' is-a 'part-of' some 'compound organ'
+/// axiom 2: 'gill' is-a 'part-of' some 'respiratory system'
+/// axiom 2: 'anatomical system' is-a 'part-of' some 'whole organism'
 ///
-/// # Examples
+/// represented in class_2_subclasses via the following map:
 ///
-/// Consider the class expression "p some f" and the map
+/// {
+///   'part-of' some 'compound organ' : {'gill'},
+///   'part-of' some 'respiratory system' : {'gill'},
+///   'part-of' some 'whole organism' : {'anatomical system'},
+/// }.
 ///
-/// m = { a : {b,c,p some f},
-///       p some f : { d, e },
-///       e : {f g},
-///       h : {d, p some f},
-///     }
+/// The function get_part_of_information then returns the following map:
 ///
-/// then remove_invalid_classes('p some f', m) returns the map
-///
-/// m = { a : {b,c},
-///       e : {f g},
-///       h : {d},
-///     }
-pub fn remove_invalid_classes(
-    class_2_subclasses: &mut HashMap<String, HashSet<String>>,
-    invalid: &HashSet<String>,
-) {
-    //remove invalid keys
-    for i in invalid {
-        class_2_subclasses.remove(i);
-    }
-    //remove invalid parts in values
-    for (_k, v) in class_2_subclasses.iter_mut() {
-        for i in invalid {
-            v.remove(i);
-        }
-    }
-}
-
-/// Given a map from classes to (direct) subclasses in LDTab format,
-/// identify anonymous class expressions.
-/// (These anonymous class expressions are unwanted for the HTML view.)
-///
-/// # Examples
-///
-/// Consider the class expression "p some f" and the map
-///
-/// m = { a : {b,c,p some f},
-///       p some f : { d, e },
-///       e : {f g},
-///       h : {d, r some g},
-///     }
-///
-/// Then the set {p some f, r some g} is returned
-///  as the set of identified invalid classes.
-pub fn identify_invalid_classes(
+/// {
+///    'compound organ', : {'gill'}
+///    'respiratory system: {'gill'}
+///    'whole organism' : {'anatomical system'},
+/// }.  
+pub fn get_relation_information(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
-) -> HashSet<String> {
-    let mut invalid: HashSet<String> = HashSet::new();
-    for (k, v) in class_2_subclasses {
-        let key_value = ldtab_2_value(k);
+    relation: &str,
+) -> HashMap<String, HashSet<String>> {
+    let mut class_2_relation: HashMap<String, HashSet<String>> = HashMap::new();
 
-        let valid = match key_value {
-            Value::String(_x) => true,
+    //original axiom: S is-a part-of some filler
+    //class_2_subclass map will contain: filler -> S
+    for (class, subclasses) in class_2_subclasses {
+        let class_value = ldtab_2_value(class);
+
+        //check whether there is an existential restriction
+        let part_of_restriction = match class_value.clone() {
+            Value::Object(x) => check_restriction(&x, relation),
             _ => false,
         };
 
-        if !valid {
-            //collect keys to remove
-            invalid.insert(k.clone());
-        } else {
-            for sub in v.clone() {
-                //TODO: is it necessary to clone the set here?
-                let sub_value = ldtab_2_value(&sub);
-                let valid = match sub_value {
-                    Value::String(_x) => true,
-                    _ => false,
-                };
-                if !valid {
-                    invalid.insert(String::from(sub));
+        if part_of_restriction {
+            //encode information in class_2_relation
+            let part_of_filler = class_value
+                .get("owl:someValuesFrom")
+                .unwrap()
+                .as_array()
+                .unwrap()[0]
+                .clone();
+
+            let part_of_filler = part_of_filler.get("object").unwrap();
+            let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
+
+            for subclass in subclasses {
+                match class_2_relation.get_mut(part_of_filler.as_str().unwrap()) {
+                    Some(x) => {
+                        x.insert(subclass.clone());
+                    }
+                    None => {
+                        let mut subclasses = HashSet::new();
+                        subclasses.insert(subclass.clone());
+                        class_2_relation.insert(part_of_filler_string.clone(), subclasses);
+                    }
                 }
             }
         }
     }
-    invalid
+    class_2_relation
 }
 
 /// Given two maps from classes to subclasses,
@@ -410,149 +472,6 @@ pub fn update_hierarchy_map(
             }
         }
     }
-}
-
-/// Given two maps for subclass and parthood relations,
-/// identify root classes, i.e., classes without parents.
-///
-/// # Examples
-///
-/// Consider the map
-///
-/// m = { a : {b,c,d,e},
-///       e : {f, g},
-///       h : {d},
-///     }
-///
-/// then identify_roots identifies a and h as roots.  
-pub fn identify_roots(
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    class_2_parts: &HashMap<String, HashSet<String>>,
-) -> HashSet<String> {
-    let mut roots = HashSet::new();
-
-    //collect all keys and values from both maps
-    let mut keys = HashSet::new();
-    let mut values = HashSet::new();
-
-    for (k, v) in class_2_subclasses {
-        keys.insert(k);
-        values.extend(v);
-    }
-    for (k, v) in class_2_parts {
-        keys.insert(k);
-        values.extend(v);
-    }
-
-    //check which keys do not occur in any value of any map
-    for k in keys {
-        if !values.contains(k) {
-            roots.insert(k.clone());
-        }
-    }
-    roots
-}
-
-/// Given a CURIE for an entity and a connection to an LDTab database,
-/// return maps capturing information about the relationships 'is-a' and 'part-of'.
-/// The mappings are structured in a hierarchical descending manner in which
-/// a key-value pair consists of an entity (the key) and a set (the value) of all
-/// its immediate subclasses ('is-a' relationship) or its parthoods ('part-of' relationship).
-///
-/// The two relationships are defined as follows:
-///  - is-a is a relationship for (transitive) ancestors of the input entity
-///  - part-of is a relationship defined via an OWL axiom of the form: "part 'is-a' 'part-of' some filler"
-///
-/// Example:
-///
-/// The axioms
-///
-/// axiom 1: 'gill' is-a 'compound organ'
-/// axiom 2: 'gill' is-a 'part-of' some 'compound organ'
-/// axiom 3: 'gill' is-a 'part-of' some 'respiratory system'
-/// axiom 4: 'respiratory system' is-a 'anatomical system'
-/// axiom 5: 'anatomical system' is-a 'part-of' some 'whole organism'
-///
-/// Would be turned into the following maps:
-///
-///  class_2_subclass:
-///  {
-///    'compound organ' : {'gill'},
-///    'anatomical system' : {'respiratory system'},
-///  }
-///
-///  class_2_parts:
-///  {
-///    'whole organism' : {'anatomical system'},
-///    'respiratory system' : {'gill'},
-///    'compound organ' : {'gill'},
-///  }
-pub async fn get_hierarchy_maps(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool, //
-) -> Result<
-    (
-        HashMap<String, HashSet<String>>,
-        HashMap<String, HashSet<String>>, //
-    ),
-    sqlx::Error,
-> {
-    //both maps are build by iteratively querying for
-    //combinations of is-a and part-of relationships.
-    //In particular, this means querying for is-a relations
-    //w.r.t. classes that are used as fillers in axioms for part-of relations.
-    let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
-    let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
-
-    //We assume the 'is-a' and 'part-of' relations to be acyclic.
-    //Since both relations can be interpreted in terms of a partial order,
-    //we can collect information about both relationships via a
-    //breadth-first traversal according to the partial order.
-    //(this removes the necessity for recursive function calls.)
-
-    //start the search with the target entity
-    let mut updates = HashSet::new();
-    updates.insert(String::from(entity));
-
-    //breadth-first traversal (from bottom to top)
-    while !updates.is_empty() {
-        let mut new_parts: HashSet<String> = HashSet::new();
-
-        for update in &updates {
-            //query database to get all 'is-a' ancestors
-            let subclasses_updates = get_class_2_subclass_map(&update, table, pool).await?;
-            update_hierarchy_map(&mut class_2_subclasses, &subclasses_updates);
-
-            //extract information about 'part-of' relationships
-            let parts_updates = get_part_of_information(&subclasses_updates);
-            update_hierarchy_map(&mut class_2_parts, &parts_updates);
-
-            //collect fillers of 'part-of' restrictions
-            //with which we will continue the breadth-first search,i.e.
-            //querying for all 'is-a' relationships,
-            //extracting 'part-of' relations, etc.
-            //until no 'part-of' relations are found.
-            for part in parts_updates.keys() {
-                if !class_2_subclasses.contains_key(part) {
-                    new_parts.insert(part.clone());
-                }
-            }
-        }
-
-        //prepare filler of part-of relations for next iteration
-        updates.clear();
-        for new in new_parts {
-            updates.insert(new.clone());
-        }
-    }
-
-    //We only want to return information about named entities.
-    //So, we filter out 'invalid' entities, e.g., anonymous class expressions
-    let invalid = identify_invalid_classes(&class_2_subclasses);
-    remove_invalid_classes(&mut class_2_subclasses, &invalid);
-
-    Ok((class_2_subclasses, class_2_parts))
 }
 
 /// Given a CURIE for an entity and a connection to an LDTab database,
@@ -618,174 +537,95 @@ pub async fn get_class_2_subclass_map(
     Ok(class_2_subclasses)
 }
 
-/// Given a mapping from classes to sets of their subclasses,
-/// extract and return a mapping from classes to sets of their parthoods.
-/// In particular, a part-of relation expressed via an OWL axiom of the form
+/// Given a CURIE for an entity and a connection to an LDTab database,
+/// return maps capturing information about the relationships 'is-a' and 'part-of'.
+/// The mappings are structured in a hierarchical descending manner in which
+/// a key-value pair consists of an entity (the key) and a set (the value) of all
+/// its immediate subclasses ('is-a' relationship) or its parthoods ('part-of' relationship).
 ///
-/// 'entity' is-a 'part-of' some 'filler'
+/// The two relationships are defined as follows:
+///  - is-a is a relationship for (transitive) ancestors of the input entity
+///  - part-of is a relationship defined via an OWL axiom of the form: "part 'is-a' 'part-of' some filler"
 ///
-/// then this information is represented via the following mapping:
+/// Example:
 ///
-/// {filler : entity}
+/// The axioms
 ///
-/// Examples
+/// axiom 1: 'gill' is-a 'compound organ'
+/// axiom 2: 'gill' is-a 'part-of' some 'compound organ'
+/// axiom 3: 'gill' is-a 'part-of' some 'respiratory system'
+/// axiom 4: 'respiratory system' is-a 'anatomical system'
+/// axiom 5: 'anatomical system' is-a 'part-of' some 'whole organism'
 ///
-/// Consider the axioms
-
-/// axiom 1: 'gill' is-a 'part-of' some 'compound organ'
-/// axiom 2: 'gill' is-a 'part-of' some 'respiratory system'
-/// axiom 2: 'anatomical system' is-a 'part-of' some 'whole organism'
+/// Would be turned into the following maps:
 ///
-/// represented in class_2_subclasses via the following map:
+///  class_2_subclass:
+///  {
+///    'compound organ' : {'gill'},
+///    'anatomical system' : {'respiratory system'},
+///  }
 ///
-/// {
-///   'part-of' some 'compound organ' : {'gill'},
-///   'part-of' some 'respiratory system' : {'gill'},
-///   'part-of' some 'whole organism' : {'anatomical system'},
-/// }.
-///
-/// The function get_part_of_information then returns the following map:
-///
-/// {
-///    'compound organ', : {'gill'}
-///    'respiratory system: {'gill'}
+///  class_2_parts:
+///  {
 ///    'whole organism' : {'anatomical system'},
-/// }.  
-pub fn get_part_of_information(
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-) -> HashMap<String, HashSet<String>> {
-    let mut class_2_parts: HashMap<String, HashSet<String>> = HashMap::new();
+///    'respiratory system' : {'gill'},
+///    'compound organ' : {'gill'},
+///  }
+pub async fn get_hierarchy_maps(
+    entity: &str,
+    relations: &Vec<&str>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashMap<String, HashMap<String, HashSet<String>>>, sqlx::Error> {
+    //init map from relations to associated entity hierarchies
+    let mut class_2_subrelations = HashMap::new();
 
-    //original axiom: S is-a part-of some filler
-    //class_2_subclass map will contain: filler -> S
-    for (class, subclasses) in class_2_subclasses {
-        let class_value = ldtab_2_value(class);
+    //is-a relations are initialised by default
+    let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
+    class_2_subrelations.insert(String::from(IS_A), class_2_subclasses);
 
-        //check whether there is an existential restriction
-        let part_of_restriction = match class_value.clone() {
-            Value::Object(x) => check_part_of_restriction(&x),
-            _ => false,
-        };
+    //initialise input relations
+    for rel in relations {
+        let mut class_2_subrelation: HashMap<String, HashSet<String>> = HashMap::new();
+        class_2_subrelations.insert(String::from(rel.clone()), class_2_subrelation);
+    }
 
-        if part_of_restriction {
-            //encode information in class_2_parts
-            let part_of_filler = class_value
-                .get("owl:someValuesFrom")
-                .unwrap()
-                .as_array()
-                .unwrap()[0]
-                .clone();
+    //start the search with the target entity
+    let mut updates = HashSet::new();
+    updates.insert(String::from(entity));
 
-            let part_of_filler = part_of_filler.get("object").unwrap();
-            let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
+    while !updates.is_empty() {
+        let mut new_relations: HashSet<String> = HashSet::new();
+        for update in &updates {
+            let subclasses_updates = get_class_2_subclass_map(&update, table, pool).await?;
+            let mut subclassof_map = class_2_subrelations.get_mut(IS_A).unwrap();
+            update_hierarchy_map(&mut subclassof_map, &subclasses_updates);
 
-            for subclass in subclasses {
-                match class_2_parts.get_mut(part_of_filler.as_str().unwrap()) {
-                    Some(x) => {
-                        x.insert(subclass.clone());
-                    }
-                    None => {
-                        let mut subclasses = HashSet::new();
-                        subclasses.insert(subclass.clone());
-                        class_2_parts.insert(part_of_filler_string.clone(), subclasses);
+            //for i in 1..class_2_subrelations.len() {
+            for rel in relations {
+                let relation_updates = get_relation_information(&subclasses_updates, rel);
+                let mut rel_map = class_2_subrelations.get_mut(rel.clone()).unwrap();
+                update_hierarchy_map(&mut rel_map, &relation_updates);
+
+                for relation_update in relation_updates.keys() {
+                    let subclassof_map = class_2_subrelations.get(IS_A).unwrap();
+                    if !subclassof_map.contains_key(relation_update) {
+                        new_relations.insert(relation_update.clone());
                     }
                 }
             }
         }
-    }
-    class_2_parts
-}
 
-//#######################                   #######################
-//#######################  Rich JSON format #######################
-//#######################                   #######################
-
-/// Given a set (root) entities,
-/// a map from entities to superclasses,
-/// a map from entities to part-of ancestors,
-/// a map from entities to labels,
-/// return a term tree (encoded in JSON)
-/// representing information about its subsumption and parthood relations
-/// that is related via the 'is-a' relationship to some ancestor.
-///
-/// # Examples
-///
-/// Consider the tree
-///
-/// [{
-///   "curie": "obo:ZFA_0100000",
-///   "label": "zebrafish anatomical entity",         
-///   "property": "rdfs:subClassOf",               
-///   "children": [
-///     {
-///       "curie": "obo:ZFA_0000272",
-///       "label": "respiratory system",               
-///       "property": "rdfs:subClassOf",              <= this is an 'is-a' branch for
-///       "children": [                                  the ancestor "obo:ZFA_0100000"
-///         {                                            ("zebrafish anatomical entity")
-///           "curie": "obo:ZFA_0000354",
-///           "label": "gill",
-///           "property": "obo:BFO_0000050",      
-///           "children": [ ]                        
-///          }]
-///      }]
-/// }]
-pub fn build_rich_is_a_branch(
-    to_insert: &str,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    class_2_parts: &HashMap<String, HashSet<String>>,
-    curie_2_label: &HashMap<String, String>,
-) -> Value {
-    let mut children_vec: Vec<Value> = Vec::new();
-
-    match class_2_subclasses.get(to_insert) {
-        Some(is_a_children) => {
-            for c in is_a_children {
-                match build_rich_is_a_branch(c, class_2_subclasses, class_2_parts, curie_2_label) {
-                    Value::Object(x) => {
-                        //json_map.extend(x);
-                        children_vec.push(Value::Object(x));
-                    }
-                    _ => {}
-                }
-            }
+        updates.clear();
+        for new in new_relations {
+            updates.insert(new.clone());
         }
-        None => {}
-    }
-    match class_2_parts.get(to_insert) {
-        Some(part_of_children) => {
-            for c in part_of_children {
-                match build_rich_part_of_branch(
-                    c,
-                    class_2_subclasses,
-                    class_2_parts,
-                    curie_2_label,
-                    PART_OF,
-                ) {
-                    Value::Object(x) => {
-                        //json_map.extend(x);
-                        children_vec.push(Value::Object(x));
-                    }
-                    _ => {}
-                }
-            }
-        }
-        None => {}
     }
 
-    //leaf case
-    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
+    let mut subclassof_map = class_2_subrelations.get_mut(IS_A).unwrap();
+    remove_invalid_classes(&mut subclassof_map);
 
-        //children_vec.push(json!("owl:Nothing"));
-        //
-        //json_map.insert(
-        //    String::from(to_insert),
-        //    Value::String(String::from("owl:Nothing")),
-        //);
-        //Value::Object(json_map)
-    }
-
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : IS_A, "children" : children_vec})
+    Ok(class_2_subrelations)
 }
 
 /// Given a set (root) entities,
@@ -818,61 +658,100 @@ pub fn build_rich_is_a_branch(
 ///          }]                                          ("respiratory system")
 ///      }]
 /// }]
-pub fn build_rich_part_of_branch(
+pub fn build_rich_tree_branch(
     to_insert: &str,
-    class_2_subclasses: &HashMap<String, HashSet<String>>, //these will also be a vector
-    class_2_parts: &HashMap<String, HashSet<String>>,
+    relation: &str,
+    //relations: &Vec<&str>,
+    relation_maps: &HashMap<String, HashMap<String, HashSet<String>>>,
     curie_2_label: &HashMap<String, String>,
-    relation: &str, //TODO: this will be a vector
 ) -> Value {
     let mut children_vec: Vec<Value> = Vec::new();
 
-    match class_2_subclasses.get(to_insert) {
-        Some(is_a_children) => {
-            for c in is_a_children {
-                match build_rich_is_a_branch(c, class_2_subclasses, class_2_parts, curie_2_label) {
-                    Value::Object(x) => {
-                        //json_map.extend(x);
-                        children_vec.push(Value::Object(x));
+    //for i in 0..relations.len() {
+    for (rel, map) in relation_maps {
+        //match relation_maps[i].get(to_insert) {
+        match map.get(to_insert) {
+            Some(children) => {
+                for c in children {
+                    match build_rich_tree_branch(c, rel, relation_maps, curie_2_label) {
+                        Value::Object(x) => {
+                            //json_map.extend(x);
+                            children_vec.push(Value::Object(x));
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
+            None => {}
         }
-        None => {}
-    }
-    match class_2_parts.get(to_insert) {
-        Some(part_of_children) => {
-            for c in part_of_children {
-                match build_rich_part_of_branch(
-                    c,
-                    class_2_subclasses,
-                    class_2_parts,
-                    curie_2_label,
-                    relation,
-                ) {
-                    Value::Object(x) => {
-                        //json_map.extend(x);
-                        children_vec.push(Value::Object(x));
-                    }
-                    _ => {}
-                }
-            }
-        }
-        None => {}
-    }
-
-    //leaf case
-    if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        //children_vec.push(json!("owl:Nothing"));
-        //json_map.insert(
-        //    format!("partOf {}", to_insert),
-        //    Value::String(String::from("owl:Nothing")),
-        //);
-        //Value::Object(json_map);
     }
 
     json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : relation, "children" : children_vec})
+}
+
+/// Given a set (root) entities,
+/// a map from entities to superclasses,
+/// a map from entities to part-of ancestors,
+/// a map from entities to labels,
+/// return a term tree (encoded in JSON) representing information about its subsumption and parthood relations.
+///
+/// # Examples
+///
+/// Consider the entity obo:ZFA_0000354 (gill),
+/// a map for subclasses {obo:ZFA_0100000 : {obo:ZFA_0000272}},
+/// a map for part-of relations {obo:ZFA_0000272 : {obo:ZFA_0000354}},
+/// a map for labels {obo:ZFA_0100000 : zebrafish anatomical entity,
+///                   obo:ZFA_0000272 : respiratory system,
+///                   obo:ZFA_0000354 : gill },
+///
+/// Then the function get_rich_json_tree_view returns a tree of the form:
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
+///   "property": "rdfs:subClassOf",               (related to ancestor via subclass-of by default)
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",              <= ancestor of obo:ZFA_0000354 (gill)
+///       "property": "rdfs:subClassOf",                 (related to ancestor via subclass-of)
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",      <= obo:ZFA_0000354 (gill)
+///           "children": [ ]                        (related to ancestor via part-of)
+///          }]
+///      }]
+/// }]
+pub fn build_rich_tree(
+    to_insert: &HashSet<String>,
+    //relations: &Vec<&str>,
+    relation_maps: &HashMap<String, HashMap<String, HashSet<String>>>,
+    curie_2_label: &HashMap<String, String>,
+) -> Value {
+    let mut json_vec: Vec<Value> = Vec::new();
+
+    for i in to_insert {
+        let mut inserted = false;
+        //for n in 0..relations.len() {
+        for (rel, map) in relation_maps {
+            if map.contains_key(i) {
+                inserted = true;
+                match build_rich_tree_branch(i, rel, relation_maps, curie_2_label) {
+                    Value::Object(x) => {
+                        json_vec.push(Value::Object(x));
+                    }
+                    _ => {} //TODO: should be an error
+                }
+            }
+        }
+
+        if !inserted {
+            json_vec.push(json!(String::from(i)));
+        }
+    }
+    Value::Array(json_vec)
 }
 
 /// Given a node in a term tree, return its associated label.
@@ -1046,81 +925,195 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
     }
 }
 
-/// Given a set (root) entities,
-/// a map from entities to superclasses,
-/// a map from entities to part-of ancestors,
-/// a map from entities to labels,
-/// return a term tree (encoded in JSON) representing information about its subsumption and parthood relations.
+/// Given an entity and a connection to an LDTab database,
+/// return the set of immediate descendants w.r.t. the subsumption relation
 ///
 /// # Examples
 ///
-/// Consider the entity obo:ZFA_0000354 (gill),
-/// a map for subclasses {obo:ZFA_0100000 : {obo:ZFA_0000272}},
-/// a map for part-of relations {obo:ZFA_0000272 : {obo:ZFA_0000354}},
-/// a map for labels {obo:ZFA_0100000 : zebrafish anatomical entity,
-///                   obo:ZFA_0000272 : respiratory system,
-///                   obo:ZFA_0000354 : gill },
+/// Consider the (simplified) LDTab database with the following rows:
 ///
-/// Then the function get_rich_json_tree_view returns a tree of the form:
+/// subject|predicate|object
+/// b|rdfs:subClassOf|a
+/// c|rdfs:subClassOf|a
+/// r some d|rdfs:subClassOf|a
 ///
-/// [{
-///   "curie": "obo:ZFA_0100000",
-///   "label": "zebrafish anatomical entity",         <= ancestor of obo:ZFA_0000354 (gill)
-///   "property": "rdfs:subClassOf",               (related to ancestor via subclass-of by default)
-///   "children": [
-///     {
-///       "curie": "obo:ZFA_0000272",
-///       "label": "respiratory system",              <= ancestor of obo:ZFA_0000354 (gill)
-///       "property": "rdfs:subClassOf",                 (related to ancestor via subclass-of)
-///       "children": [
-///         {
-///           "curie": "obo:ZFA_0000354",
-///           "label": "gill",
-///           "property": "obo:BFO_0000050",      <= obo:ZFA_0000354 (gill)
-///           "children": [ ]                        (related to ancestor via part-of)
-///          }]
-///      }]
-/// }]
-pub fn build_rich_tree(
-    to_insert: &HashSet<String>,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
-    class_2_parts: &HashMap<String, HashSet<String>>,
-    curie_2_label: &HashMap<String, String>,
-) -> Value {
-    let mut json_vec: Vec<Value> = Vec::new();
+/// then get_direct_named_subclasses returns the set {b,c,r some d}.
+pub async fn get_direct_subclasses(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, sqlx::Error> {
+    let mut subclasses = HashSet::new();
 
-    //iterate over starting entities in which the tree will be rooted ...
-    for i in to_insert {
-        //... and build branches w.r.t. is-a and part-of relationships
-        if class_2_subclasses.contains_key(i) {
-            match build_rich_is_a_branch(i, class_2_subclasses, class_2_parts, curie_2_label) {
-                Value::Object(x) => {
-                    json_vec.push(Value::Object(x));
-                }
-                _ => {} //TODO: should be an error
-            }
-        }
-        if class_2_parts.contains_key(i) {
-            match build_rich_part_of_branch(
-                i,
-                class_2_subclasses,
-                class_2_parts,
-                curie_2_label,
-                PART_OF,
-            ) {
-                Value::Object(x) => {
-                    json_vec.push(Value::Object(x));
-                }
-                _ => {} //TODO: should be an error
-            }
-        }
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'",
+        table = table,
+        entity = entity,
+    );
 
-        //... or insert entity as a leaf node
-        if !class_2_subclasses.contains_key(i) & !class_2_parts.contains_key(i) {
-            json_vec.push(json!(String::from(i)));
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+        subclasses.insert(String::from(subject));
+    }
+
+    Ok(subclasses)
+}
+
+/// Given an entity and a connection to an LDTab database,
+/// return the set of immediate (named) descendants w.r.t. its subsumption.
+///
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|rdfs:subClassOf|a
+/// c|rdfs:subClassOf|a
+/// r some d|rdfs:subClassOf|a
+///
+/// then get_direct_named_subclasses returns the set {b,c}.
+pub async fn get_direct_named_subclasses(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, sqlx::Error> {
+    let subclasses = get_direct_subclasses(entity, table, pool).await?;
+
+    let mut is_a: HashSet<String> = HashSet::new();
+
+    for s in subclasses {
+        //filter for named classes
+        match ldtab_2_value(&s) {
+            Value::String(_x) => {
+                is_a.insert(s.clone());
+            }
+            _ => {}
+        };
+    }
+    Ok(is_a)
+}
+
+/// Given an entity and a connection to an LDTab database,
+/// return the set of immediate (named) descendants w.r.t. the parthood relation
+///
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|rdfs:subClassOf|part-of some a
+/// c|rdfs:subClassOf|a
+/// r some d|rdfs:subClassOf|part-of some a
+///
+/// then get_direct_sub_parts returns the set {b}.
+pub async fn get_direct_sub_relations(
+    entity: &str,
+    relation: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashSet<String>, sqlx::Error> {
+    let mut sub_relations = HashSet::new();
+
+    //RDF representation of an OWL existential restriction
+    let restriction = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"relation"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
+    let restriction = restriction.replace("entity", entity);
+    let restriction = restriction.replace("relation", relation);
+
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{restriction}' AND predicate='rdfs:subClassOf'",
+        table = table,
+        restriction = restriction,
+    );
+
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+
+        //filter for named classes
+        match ldtab_2_value(&subject) {
+            Value::String(_x) => {
+                sub_relations.insert(String::from(subject));
+            }
+            _ => {}
+        };
+    }
+    Ok(sub_relations)
+}
+
+/// Given an entity and a connection to an LDTab database,
+/// return the immediate children of the entity w.r.t. the relationships is-a and part-of.
+/// as rich JSON term tree nodes.
+///
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|is-a|a
+/// c|is-a|a
+/// d|is-a|'part-of' some a
+/// (... rdfs:label information for a,b,c, ...)
+///
+///   then get_immediate_children_tree for a returns
+///
+///  [{
+///    "curie": "b",
+///    "label": "b_label",
+///    "property": "rdfs:subClassOf",
+///    "children": []
+///    },
+///    {
+///     "curie": "c",
+///     "label": "c_label",
+///     "property": "rdfs:subClassOf",
+///     "children": []
+///    },
+///    {
+///     "curie": "d",
+///     "label": "d_label",
+///     "property": "obo:BFO_0000050",
+///     "children": []
+///    }]
+pub async fn get_immediate_children_tree(
+    entity: &str,
+    relations: &Vec<&str>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, sqlx::Error> {
+    let mut direct_sub_relations = Vec::new();
+
+    let mut iris = HashSet::new();
+
+    let direct_subclasses = get_direct_named_subclasses(entity, table, pool).await?;
+    iris.extend(get_iris_from_set(&direct_subclasses));
+
+    for n in 0..relations.len() {
+        let direct_sub = get_direct_sub_relations(entity, relations[n], table, pool).await?;
+        iris.extend(get_iris_from_set(&direct_sub));
+        direct_sub_relations.push(direct_sub);
+    }
+
+    //get labels for curies
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
+
+    let mut children = Vec::new();
+    for sub in direct_subclasses {
+        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : IS_A, "children" : []});
+        children.push(element);
+    }
+
+    for n in 0..relations.len() {
+        for sub in &direct_sub_relations[n] {
+            let element = json!({"curie" : sub, "label" : curie_2_label.get(sub).unwrap(), "property" : relations[n], "children" : []});
+            children.push(element);
         }
     }
-    Value::Array(json_vec)
+
+    let children_tree = Value::Array(children);
+
+    let sorted: Value = sort_rich_tree_by_label(&children_tree);
+    Ok(sorted)
 }
 
 /// Given a rich term tree,
@@ -1247,74 +1240,6 @@ pub fn add_children(tree: &mut Value, children: &Value) {
     }
 }
 
-/// Given an entity and a connection to an LDTab database,
-/// return the immediate children of the entity w.r.t. the relationships is-a and part-of.
-/// as rich JSON term tree nodes.
-///
-/// # Examples
-///
-/// Consider the (simplified) LDTab database with the following rows:
-///
-/// subject|predicate|object
-/// b|is-a|a
-/// c|is-a|a
-/// d|is-a|'part-of' some a
-/// (... rdfs:label information for a,b,c, ...)
-///
-///   then get_immediate_children_tree for a returns
-///
-///  [{
-///    "curie": "b",
-///    "label": "b_label",
-///    "property": "rdfs:subClassOf",
-///    "children": []
-///    },
-///    {
-///     "curie": "c",
-///     "label": "c_label",
-///     "property": "rdfs:subClassOf",
-///     "children": []
-///    },
-///    {
-///     "curie": "d",
-///     "label": "d_label",
-///     "property": "obo:BFO_0000050",
-///     "children": []
-///    }]
-pub async fn get_immediate_children_tree(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<Value, sqlx::Error> {
-    //get the entity's immediate descendents w.r.t. subsumption and parthood relations
-    let direct_subclasses = get_direct_named_subclasses(entity, table, pool).await?;
-    let direct_part_ofs = get_direct_sub_parts(entity, table, pool).await?;
-
-    //get labels
-    let mut iris = HashSet::new();
-    iris.extend(get_iris_from_set(&direct_subclasses));
-    iris.extend(get_iris_from_set(&direct_part_ofs));
-
-    //get labels for curies
-    let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
-
-    let mut children = Vec::new();
-    for sub in direct_subclasses {
-        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : IS_A, "children" : []});
-        children.push(element);
-    }
-
-    for sub in direct_part_ofs {
-        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : PART_OF, "children" : []});
-        children.push(element);
-    }
-
-    let children_tree = Value::Array(children);
-
-    let sorted: Value = sort_rich_tree_by_label(&children_tree);
-    Ok(sorted)
-}
-
 /// Given an LDTab database,
 /// return the set of preferred root terms in the database
 ///
@@ -1364,8 +1289,7 @@ pub async fn get_preferred_roots(
 /// m = {d : {e,f},
 ///      f : {g}}
 pub async fn get_preferred_roots_hierarchy_maps(
-    class_2_subclasses: &mut HashMap<String, HashSet<String>>,
-    class_2_parts: &mut HashMap<String, HashSet<String>>,
+    relation_maps: &mut HashMap<String, HashMap<String, HashSet<String>>>,
     table: &str,
     pool: &SqlitePool,
 ) {
@@ -1379,20 +1303,13 @@ pub async fn get_preferred_roots_hierarchy_maps(
     let mut next = HashSet::new();
     while !current.is_empty() {
         for preferred in &current {
-            if class_2_subclasses.contains_key(preferred) {
-                for (key, value) in &mut *class_2_subclasses {
-                    if value.contains(preferred) {
-                        preferred_root_ancestor.insert(key.clone());
-                        next.insert(key.clone());
-                    }
-                }
-            }
-
-            if class_2_parts.contains_key(preferred) {
-                for (key, value) in &mut *class_2_parts {
-                    if value.contains(preferred) {
-                        preferred_root_ancestor.insert(key.clone());
-                        next.insert(key.clone());
+            for (rel, map) in relation_maps.iter() {
+                if map.contains_key(preferred) {
+                    for (key, value) in map {
+                        if value.contains(preferred) {
+                            preferred_root_ancestor.insert(key.clone());
+                            next.insert(key.clone());
+                        }
                     }
                 }
             }
@@ -1406,8 +1323,9 @@ pub async fn get_preferred_roots_hierarchy_maps(
 
     //remove ancestors for preferred root terms
     for ancestor in preferred_root_ancestor {
-        class_2_subclasses.remove(&ancestor);
-        class_2_parts.remove(&ancestor);
+        for (rel, map) in relation_maps.iter_mut() {
+            map.remove(&ancestor);
+        }
     }
 }
 
@@ -1455,173 +1373,45 @@ pub async fn get_preferred_roots_hierarchy_maps(
 /// }]
 pub async fn get_rich_json_tree_view(
     entity: &str,
+    relations: &Vec<&str>,
     preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, sqlx::Error> {
     //get the entity's ancestor information w.r.t. subsumption and parthood relations
-    let (mut class_2_subclasses, mut class_2_parts) =
-        get_hierarchy_maps(entity, table, &pool).await?;
+
+    let mut relation_maps = get_hierarchy_maps(entity, &relations, table, &pool).await?;
 
     //modify ancestor information w.r.t. preferred root terms
     if preferred_roots {
-        get_preferred_roots_hierarchy_maps(
-            &mut class_2_subclasses,
-            &mut class_2_parts,
-            table,
-            pool,
-        )
-        .await;
+        get_preferred_roots_hierarchy_maps(&mut relation_maps, table, pool).await;
     }
 
-    //get elements with no ancestors (i.e., roots)
-    let roots = identify_roots(&class_2_subclasses, &class_2_parts);
+    let roots = identify_roots(&relation_maps);
 
-    //extract CURIEs/IRIs
     let mut iris = HashSet::new();
-    iris.extend(get_iris_from_subclass_map(&class_2_subclasses));
-    iris.extend(get_iris_from_subclass_map(&class_2_parts));
-
-    //get labels for CURIEs/IRIs
+    for map in relation_maps.values() {
+        iris.extend(get_iris_from_subclass_map(&map));
+    }
     let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
 
-    //build JSON tree
-    let tree = build_rich_tree(&roots, &class_2_subclasses, &class_2_parts, &curie_2_label);
+    let tree = build_rich_tree(&roots, &relation_maps, &curie_2_label);
 
     //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree);
 
-    //get immediate children of leaf entities in the ancestor tree
-    //NB: sorting the tree first ensures that the tree with added children is deterministic
-    let mut children = get_immediate_children_tree(entity, table, pool).await?;
+    let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
 
-    //add childrens of children to children
     for child in children.as_array_mut().unwrap() {
         let child_iri = child["curie"].as_str().unwrap();
-        let grand_children = get_immediate_children_tree(child_iri, table, pool).await?;
+        let grand_children =
+            get_immediate_children_tree(child_iri, &relations, table, pool).await?;
         child["children"] = grand_children;
     }
 
-    //add children to the first occurrence of their respective parents in the (sorted) JSON tree
     add_children(&mut sorted, &children);
 
     Ok(sorted)
-}
-
-/// Given an entity and a connection to an LDTab database,
-/// return the set of immediate (named) descendants w.r.t. its subsumption.
-///
-/// # Examples
-///
-/// Consider the (simplified) LDTab database with the following rows:
-///
-/// subject|predicate|object
-/// b|rdfs:subClassOf|a
-/// c|rdfs:subClassOf|a
-/// r some d|rdfs:subClassOf|a
-///
-/// then get_direct_named_subclasses returns the set {b,c}.
-pub async fn get_direct_named_subclasses(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
-    let subclasses = get_direct_subclasses(entity, table, pool).await?;
-
-    let mut is_a: HashSet<String> = HashSet::new();
-
-    for s in subclasses {
-        //filter for named classes
-        match ldtab_2_value(&s) {
-            Value::String(_x) => {
-                is_a.insert(s.clone());
-            }
-            _ => {}
-        };
-    }
-    Ok(is_a)
-}
-
-/// Given an entity and a connection to an LDTab database,
-/// return the set of immediate descendants w.r.t. the subsumption relation
-///
-/// # Examples
-///
-/// Consider the (simplified) LDTab database with the following rows:
-///
-/// subject|predicate|object
-/// b|rdfs:subClassOf|a
-/// c|rdfs:subClassOf|a
-/// r some d|rdfs:subClassOf|a
-///
-/// then get_direct_named_subclasses returns the set {b,c,r some d}.
-pub async fn get_direct_subclasses(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
-    let mut subclasses = HashSet::new();
-
-    let query = format!(
-        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subClassOf'",
-        table = table,
-        entity = entity,
-    );
-
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-    for row in rows {
-        let subject: &str = row.get("subject");
-        subclasses.insert(String::from(subject));
-    }
-
-    Ok(subclasses)
-}
-
-/// Given an entity and a connection to an LDTab database,
-/// return the set of immediate (named) descendants w.r.t. the parthood relation
-///
-/// # Examples
-///
-/// Consider the (simplified) LDTab database with the following rows:
-///
-/// subject|predicate|object
-/// b|rdfs:subClassOf|part-of some a
-/// c|rdfs:subClassOf|a
-/// r some d|rdfs:subClassOf|part-of some a
-///
-/// then get_direct_sub_parts returns the set {b}.
-pub async fn get_direct_sub_parts(
-    entity: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
-    let mut sub_parts = HashSet::new();
-
-    //RDF representation of an OWL existential restriction
-    //using the property part-of (obo:BFO_0000050)
-    let part_of = r#"{"owl:onProperty":[{"datatype":"_IRI","object":"relation"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"entity"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}"#;
-    let part_of = part_of.replace("entity", entity);
-    let part_of = part_of.replace("relation", PART_OF);
-
-    let query = format!(
-        "SELECT subject FROM {table} WHERE object='{part_of}' AND predicate='rdfs:subClassOf'",
-        table = table,
-        part_of = part_of,
-    );
-
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
-    for row in rows {
-        let subject: &str = row.get("subject");
-
-        //filter for named classes
-        match ldtab_2_value(&subject) {
-            Value::String(_x) => {
-                sub_parts.insert(String::from(subject));
-            }
-            _ => {}
-        };
-    }
-    Ok(sub_parts)
 }
 
 //#################################################################
@@ -1888,11 +1678,12 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
 ///             ...  
 pub async fn get_hiccup_term_tree(
     entity: &str,
+    relations: &Vec<&str>,
     preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, sqlx::Error> {
-    let tree = get_rich_json_tree_view(entity, preferred_roots, table, pool).await?;
+    let tree = get_rich_json_tree_view(entity, relations, preferred_roots, table, pool).await?;
 
     let roots = tree_2_hiccup(entity, &tree);
 
