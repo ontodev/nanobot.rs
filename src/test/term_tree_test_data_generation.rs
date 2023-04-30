@@ -1,6 +1,6 @@
 //NB: This is a copy of tree_view.rs.
 //The only difference is that it collects the results of all executed SQL queries and writes them to a file.
-use crate::tree_view::{
+use crate::test::part_of_term_tree::{
     add_children, build_rich_tree, check_part_of_restriction, get_iris_from_set,
     get_iris_from_subclass_map, get_part_of_information, identify_invalid_classes, identify_roots,
     ldtab_2_value, remove_invalid_classes, sort_rich_tree_by_label, update_hierarchy_map,
