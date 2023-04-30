@@ -4,6 +4,7 @@ use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::util::signature;
 
+static CONFERS_ADVANTAGE_IN: &'static str = "obo:RO_0002322";
 static PART_OF: &'static str = "obo:BFO_0000050";
 static IS_A: &'static str = "rdfs:subClassOf";
 
@@ -173,12 +174,12 @@ pub fn get_iris_from_set(set: &HashSet<String>) -> HashSet<String> {
 /// v = {"datatype":"_IRI","object":"obo:BFO_0000050"}
 ///
 /// then check_part_of_property(v) returns true
-pub fn check_part_of_property(value: &Value) -> bool {
+pub fn check_property(value: &Value, relation: &str) -> bool {
     match value {
         Value::Object(x) => {
             let property = x.get("object").unwrap();
-            let part_of = json!(PART_OF); //'part of' relation
-            property.eq(&part_of)
+            let relation_json = json!(relation);
+            property.eq(&relation_json)
         }
         _ => false,
     }
@@ -232,7 +233,7 @@ pub fn check_part_of_restriction(value: &Map<String, Value>) -> bool {
         let filler = value.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
         //let rdf_type = value.get("rdf:type").unwrap().as_array().unwrap()[0]; //not necessary
 
-        check_part_of_property(&property) & check_filler(&filler)
+        check_property(&property, PART_OF) & check_filler(&filler)
     } else {
         false
     }
@@ -489,11 +490,11 @@ pub fn identify_roots(
 pub async fn get_hierarchy_maps(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &SqlitePool, //
 ) -> Result<
     (
         HashMap<String, HashSet<String>>,
-        HashMap<String, HashSet<String>>,
+        HashMap<String, HashSet<String>>, //
     ),
     sqlx::Error,
 > {
@@ -754,8 +755,13 @@ pub fn build_rich_is_a_branch(
     match class_2_parts.get(to_insert) {
         Some(part_of_children) => {
             for c in part_of_children {
-                match build_rich_part_of_branch(c, class_2_subclasses, class_2_parts, curie_2_label)
-                {
+                match build_rich_part_of_branch(
+                    c,
+                    class_2_subclasses,
+                    class_2_parts,
+                    curie_2_label,
+                    PART_OF,
+                ) {
                     Value::Object(x) => {
                         //json_map.extend(x);
                         children_vec.push(Value::Object(x));
@@ -814,9 +820,10 @@ pub fn build_rich_is_a_branch(
 /// }]
 pub fn build_rich_part_of_branch(
     to_insert: &str,
-    class_2_subclasses: &HashMap<String, HashSet<String>>,
+    class_2_subclasses: &HashMap<String, HashSet<String>>, //these will also be a vector
     class_2_parts: &HashMap<String, HashSet<String>>,
     curie_2_label: &HashMap<String, String>,
+    relation: &str, //TODO: this will be a vector
 ) -> Value {
     let mut children_vec: Vec<Value> = Vec::new();
 
@@ -837,8 +844,13 @@ pub fn build_rich_part_of_branch(
     match class_2_parts.get(to_insert) {
         Some(part_of_children) => {
             for c in part_of_children {
-                match build_rich_part_of_branch(c, class_2_subclasses, class_2_parts, curie_2_label)
-                {
+                match build_rich_part_of_branch(
+                    c,
+                    class_2_subclasses,
+                    class_2_parts,
+                    curie_2_label,
+                    relation,
+                ) {
                     Value::Object(x) => {
                         //json_map.extend(x);
                         children_vec.push(Value::Object(x));
@@ -860,7 +872,7 @@ pub fn build_rich_part_of_branch(
         //Value::Object(json_map);
     }
 
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : PART_OF, "children" : children_vec})
+    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : relation, "children" : children_vec})
 }
 
 /// Given a node in a term tree, return its associated label.
@@ -1089,7 +1101,13 @@ pub fn build_rich_tree(
             }
         }
         if class_2_parts.contains_key(i) {
-            match build_rich_part_of_branch(i, class_2_subclasses, class_2_parts, curie_2_label) {
+            match build_rich_part_of_branch(
+                i,
+                class_2_subclasses,
+                class_2_parts,
+                curie_2_label,
+                PART_OF,
+            ) {
                 Value::Object(x) => {
                     json_vec.push(Value::Object(x));
                 }
