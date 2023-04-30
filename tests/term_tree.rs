@@ -58,8 +58,10 @@ async fn test_get_rich_json_tree_view() {
 
     let table = "statement";
     let subject = "obo:ZFA_0000354";
+    let rels = vec!["obo:BFO_0000050"];
+
     //boolean flag is for preferred_roots
-    let rich_hierarchy = get_rich_json_tree_view(subject, false, table, &pool)
+    let rich_hierarchy = get_rich_json_tree_view(subject, &rels, false, table, &pool)
         .await
         .unwrap();
 
@@ -80,9 +82,10 @@ async fn test_get_hiccup_term_tree() {
 
     let table = "statement";
     let subject = "obo:ZFA_0000354";
+    let rels = vec!["obo:BFO_0000050"];
 
     //boolean is for preferred root terms
-    let hiccup = get_hiccup_term_tree(&subject, false, table, &pool)
+    let hiccup = get_hiccup_term_tree(&subject, &rels, false, table, &pool)
         .await
         .unwrap();
 
@@ -103,9 +106,10 @@ async fn test_get_hiccup_term_tree_with_preferred_roots() {
 
     let table = "statement";
     let subject = "obo:ZFA_0000354";
+    let rels = vec!["obo:BFO_0000050"];
 
     //boolean is for preferred root terms
-    let hiccup = get_hiccup_term_tree(&subject, true, table, &pool)
+    let hiccup = get_hiccup_term_tree(&subject, &rels, true, table, &pool)
         .await
         .unwrap();
 
