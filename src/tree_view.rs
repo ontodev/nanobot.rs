@@ -224,8 +224,7 @@ pub fn identify_invalid_classes(
             //collect keys to remove
             invalid.insert(k.clone());
         } else {
-            for sub in v.clone() {
-                //TODO: is it necessary to clone the set here?
+            for sub in v {
                 let sub_value = ldtab_2_value(&sub);
                 let valid = match sub_value {
                     Value::String(_x) => true,
@@ -362,7 +361,7 @@ pub fn check_restriction(value: &Map<String, Value>, relation: &str) -> bool {
 /// Examples
 ///
 /// Consider the axioms
-
+///
 /// axiom 1: 'gill' is-a 'part-of' some 'compound organ'
 /// axiom 2: 'gill' is-a 'part-of' some 'respiratory system'
 /// axiom 2: 'anatomical system' is-a 'part-of' some 'whole organism'
@@ -537,8 +536,9 @@ pub async fn get_class_2_subclass_map(
     Ok(class_2_subclasses)
 }
 
-/// Given an IRI/CURIE for an entity, a vector of relations, and a connection to an LDTab database,
-/// return maps capturing information about the entity's hierarchical relationships (in addition to 'is-a').
+/// Given an IRI/CURIE for an entity, a list of relations, and a connection to an LDTab database,
+/// return maps capturing information about the entity's hierarchical relationships
+/// (in addition to rdfs:subClassOf).
 /// The mappings are structured in a hierarchical descending manner in which
 /// a key-value pair consists of an entity (the key) and a set (the value) of all
 /// its immediate descendants.
@@ -557,20 +557,21 @@ pub async fn get_class_2_subclass_map(
 /// axiom 4: 'respiratory system' is-a 'anatomical system'
 /// axiom 5: 'anatomical system' is-a 'part-of' some 'whole organism'
 ///
-/// Would be turned into the following maps:
+/// Would be turned into the following map:
+/// {
+///  rdfs:subClassOf:
+///           {
+///             'compound organ' : {'gill'},
+///             'anatomical system' : {'respiratory system'},
+///           }
 ///
-///  class_2_subclass:
-///  {
-///    'compound organ' : {'gill'},
-///    'anatomical system' : {'respiratory system'},
-///  }
-///
-///  class_2_parts:
-///  {
-///    'whole organism' : {'anatomical system'},
-///    'respiratory system' : {'gill'},
-///    'compound organ' : {'gill'},
-///  }
+///  BFO_0000050:
+///           {
+///             'whole organism' : {'anatomical system'},
+///             'respiratory system' : {'gill'},
+///             'compound organ' : {'gill'},
+///           }
+/// }
 pub async fn get_hierarchy_maps(
     entity: &str,
     relations: &Vec<&str>,
@@ -1330,11 +1331,10 @@ pub async fn get_preferred_roots_hierarchy_maps(
     }
 }
 
-/// Given an entity, a list of relations (other than is-a),
-/// and a connection to an LDTab database, return a term tree (encoded in JSON)
-/// representing information about its subsumption and specified relations hierarchies.
-/// The tree displays ancestor (or preferred root terms) of the target entity
-/// as well as its immediate children and grandchildren.
+/// Given an IRI/CURIE for an entity, a list of relations (other than rdfs:subClassOf),
+/// and a connection to an LDTab database, return a tree (encoded in JSON)
+/// for the entity's ancestors and immediate children (and grandchildren) w.r.t.
+/// rdfs:subClassOf and the specified relations.  
 ///
 /// # Examples
 ///
@@ -1402,14 +1402,16 @@ pub async fn get_rich_json_tree_view(
     //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree);
 
-    //add children and grandchildren
+    //get direct children ...
     let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
+    //... and grandchildren ...
     for child in children.as_array_mut().unwrap() {
         let child_iri = child["curie"].as_str().unwrap();
         let grand_children =
             get_immediate_children_tree(child_iri, &relations, table, pool).await?;
         child["children"] = grand_children;
     }
+    //... and add these to the tree in the first occurrence of the input entity
     add_children(&mut sorted, &children);
 
     Ok(sorted)
