@@ -537,15 +537,15 @@ pub async fn get_class_2_subclass_map(
     Ok(class_2_subclasses)
 }
 
-/// Given a CURIE for an entity and a connection to an LDTab database,
-/// return maps capturing information about the relationships 'is-a' and 'part-of'.
+/// Given an IRI/CURIE for an entity, a vector of relations, and a connection to an LDTab database,
+/// return maps capturing information about the entity's hierarchical relationships (in addition to 'is-a').
 /// The mappings are structured in a hierarchical descending manner in which
 /// a key-value pair consists of an entity (the key) and a set (the value) of all
-/// its immediate subclasses ('is-a' relationship) or its parthoods ('part-of' relationship).
+/// its immediate descendants.
 ///
-/// The two relationships are defined as follows:
+/// The relationships are defined as follows:
 ///  - is-a is a relationship for (transitive) ancestors of the input entity
-///  - part-of is a relationship defined via an OWL axiom of the form: "part 'is-a' 'part-of' some filler"
+///  - otherwise, a relationship is defined via an OWL axiom of the form: "part 'is-a' 'relation' some 'filler'"
 ///
 /// Example:
 ///
@@ -594,6 +594,11 @@ pub async fn get_hierarchy_maps(
     let mut updates = HashSet::new();
     updates.insert(String::from(entity));
 
+    //breadth-first search w.r.t. hierarchical relations:
+    //- the search starts with is-a ancestors
+    //- then, information about other relations is extracted from is-a ancestors
+    //- and then is-a ancestors for extracted relation-ancestors are used in the next iteration
+    //- until no more ancestors are found (this terminates because there are finitely many ancestors)
     while !updates.is_empty() {
         let mut new_relations: HashSet<String> = HashSet::new();
         for update in &updates {
@@ -601,7 +606,6 @@ pub async fn get_hierarchy_maps(
             let mut subclassof_map = class_2_subrelations.get_mut(IS_A).unwrap();
             update_hierarchy_map(&mut subclassof_map, &subclasses_updates);
 
-            //for i in 1..class_2_subrelations.len() {
             for rel in relations {
                 let relation_updates = get_relation_information(&subclasses_updates, rel);
                 let mut rel_map = class_2_subrelations.get_mut(rel.clone()).unwrap();
@@ -616,6 +620,7 @@ pub async fn get_hierarchy_maps(
             }
         }
 
+        //prepare next iteration of the breadth-first search
         updates.clear();
         for new in new_relations {
             updates.insert(new.clone());
@@ -629,8 +634,8 @@ pub async fn get_hierarchy_maps(
 }
 
 /// Given a set (root) entities,
-/// a map from entities to superclasses,
-/// a map from entities to part-of ancestors,
+/// a map for hierarchical relations
+/// (which maps a relation to another map -- mapping entities to immediate descendants) ,
 /// a map from entities to labels,
 /// return a term tree (encoded in JSON)
 /// representing information about its subsumption and parthood relations
@@ -661,13 +666,11 @@ pub async fn get_hierarchy_maps(
 pub fn build_rich_tree_branch(
     to_insert: &str,
     relation: &str,
-    //relations: &Vec<&str>,
     relation_maps: &HashMap<String, HashMap<String, HashSet<String>>>,
     curie_2_label: &HashMap<String, String>,
 ) -> Value {
     let mut children_vec: Vec<Value> = Vec::new();
 
-    //for i in 0..relations.len() {
     for (rel, map) in relation_maps {
         //match relation_maps[i].get(to_insert) {
         match map.get(to_insert) {
@@ -726,7 +729,6 @@ pub fn build_rich_tree_branch(
 /// }]
 pub fn build_rich_tree(
     to_insert: &HashSet<String>,
-    //relations: &Vec<&str>,
     relation_maps: &HashMap<String, HashMap<String, HashSet<String>>>,
     curie_2_label: &HashMap<String, String>,
 ) -> Value {
@@ -734,7 +736,6 @@ pub fn build_rich_tree(
 
     for i in to_insert {
         let mut inserted = false;
-        //for n in 0..relations.len() {
         for (rel, map) in relation_maps {
             if map.contains_key(i) {
                 inserted = true;
@@ -994,8 +995,8 @@ pub async fn get_direct_named_subclasses(
     Ok(is_a)
 }
 
-/// Given an entity and a connection to an LDTab database,
-/// return the set of immediate (named) descendants w.r.t. the parthood relation
+/// Given an entity, a vector of relations, and a connection to an LDTab database,
+/// return the set of immediate (named) descendants w.r.t. the specified relations
 ///
 /// # Examples
 ///
@@ -1006,7 +1007,7 @@ pub async fn get_direct_named_subclasses(
 /// c|rdfs:subClassOf|a
 /// r some d|rdfs:subClassOf|part-of some a
 ///
-/// then get_direct_sub_parts returns the set {b}.
+/// then get_direct_sub_parts returns the set {b} for the part-of relation.
 pub async fn get_direct_sub_relations(
     entity: &str,
     relation: &str,
@@ -1041,8 +1042,8 @@ pub async fn get_direct_sub_relations(
     Ok(sub_relations)
 }
 
-/// Given an entity and a connection to an LDTab database,
-/// return the immediate children of the entity w.r.t. the relationships is-a and part-of.
+/// Given an entity, a vector of relations, and a connection to an LDTab database,
+/// return the immediate children of the entity w.r.t. the specified relationships (and is-a)
 /// as rich JSON term tree nodes.
 ///
 /// # Examples
@@ -1329,15 +1330,16 @@ pub async fn get_preferred_roots_hierarchy_maps(
     }
 }
 
-/// Given a CURIE of an entity and a connection to an LDTab database,
-/// return a term tree (encoded in JSON) representing information about its subsumption and parthood relations.
-/// The tree contains information about all available ancestor (or preferred root terms) of the target entity
+/// Given an entity, a list of relations (other than is-a),
+/// and a connection to an LDTab database, return a term tree (encoded in JSON)
+/// representing information about its subsumption and specified relations hierarchies.
+/// The tree displays ancestor (or preferred root terms) of the target entity
 /// as well as its immediate children and grandchildren.
 ///
 /// # Examples
 ///
 /// Consider the entity obo:ZFA_0000354 (gill) and an LDTab data base zfa.db for zebrafish.
-/// Then get_rich_json_tree_view(obo:ZFA_0000354, false, statement, zfa.db)
+/// Then get_rich_json_tree_view(obo:ZFA_0000354, ["obo:BFO_0000050"], false, statement, zfa.db)
 /// returns a tree of the form:
 ///
 /// [{
@@ -1378,8 +1380,7 @@ pub async fn get_rich_json_tree_view(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, sqlx::Error> {
-    //get the entity's ancestor information w.r.t. subsumption and parthood relations
-
+    //get the entity's ancestor information w.r.t. subsumption and relations
     let mut relation_maps = get_hierarchy_maps(entity, &relations, table, &pool).await?;
 
     //modify ancestor information w.r.t. preferred root terms
@@ -1389,6 +1390,7 @@ pub async fn get_rich_json_tree_view(
 
     let roots = identify_roots(&relation_maps);
 
+    //extract all IRI/CURIEs from the hierarchy maps (to query for their respective labels)
     let mut iris = HashSet::new();
     for map in relation_maps.values() {
         iris.extend(get_iris_from_subclass_map(&map));
@@ -1400,15 +1402,14 @@ pub async fn get_rich_json_tree_view(
     //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree);
 
+    //add children and grandchildren
     let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
-
     for child in children.as_array_mut().unwrap() {
         let child_iri = child["curie"].as_str().unwrap();
         let grand_children =
             get_immediate_children_tree(child_iri, &relations, table, pool).await?;
         child["children"] = grand_children;
     }
-
     add_children(&mut sorted, &children);
 
     Ok(sorted)
@@ -1641,14 +1642,14 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
     }
 }
 
-/// Given a CURIE/IRI of an entity and an LDTab database,
+/// Given a CURIE/IRI of an entity, a vector of relations, and an LDTab database,
 /// return a term tree for the entity.
 ///
 /// # Examples
 ///
 /// Consider the entity obo:ZFA_0000354 and an
 /// LDTab database with information about the ZFA ontology.
-/// Then, get_hiccup_term_tre(obo:ZFA_0000354, false, statement, zfa)
+/// Then, get_hiccup_term_tre(obo:ZFA_0000354, [], false, statement, zfa)
 /// will return a term tree of the following form (only an excerpt is shown):
 ///
 /// ["ul",
