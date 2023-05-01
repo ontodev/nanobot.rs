@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
-use sqlx::any::{AnyPool, AnyPoolOptions};
-use std::fs;
+use sqlx::{
+    any::{AnyConnectOptions, AnyKind, AnyPool, AnyPoolOptions},
+    query as sqlx_query,
+};
+use std::{fs, str::FromStr};
 use toml::map::Map;
 use toml::Value;
 
@@ -22,18 +25,37 @@ pub struct Config {
 }
 
 impl Config {
-    pub async fn new() -> Config {
+    pub async fn new() -> Result<Config, String> {
         let default_config_file = include_str!("resources/default_config.toml");
-        let default_config = default_config_file.parse::<Value>().unwrap();
+        let default_config = match default_config_file.parse::<Value>() {
+            Ok(d) => d,
+            Err(e) => return Err(e.to_string()),
+        };
         let default_values = &default_config["tool"];
 
-        let default_connection = String::from(".nanobot.db");
+        //let default_connection = String::from(".nanobot.db");
+        let default_connection = String::from("postgresql:///valve_postgres");
 
         let mut config = Config {
             //set in default_config.toml
-            name: String::from(default_values["name"].as_str().unwrap()),
-            version: String::from(default_values["version"].as_str().unwrap()),
-            edition: String::from(default_values["edition"].as_str().unwrap()),
+            name: String::from(match default_values["name"].as_str() {
+                Some(s) => s,
+                None => {
+                    return Err(format!("Could not convert '{}' to str", default_values["name"]))
+                }
+            }),
+            version: String::from(match default_values["version"].as_str() {
+                Some(s) => s,
+                None => {
+                    return Err(format!("Could not convert '{}' to str", default_values["version"]))
+                }
+            }),
+            edition: String::from(match default_values["edition"].as_str() {
+                Some(s) => s,
+                None => {
+                    return Err(format!("Could not convert '{}' to str", default_values["edition"]))
+                }
+            }),
             //not set in default_config.toml
             connection: default_connection,
             pool: None,
@@ -45,7 +67,10 @@ impl Config {
 
         match user_config_file {
             Ok(x) => {
-                let user_config = x.parse::<Value>().unwrap();
+                let user_config = match x.parse::<Value>() {
+                    Ok(u) => u,
+                    Err(e) => return Err(e.to_string()),
+                };
                 let user_values = &user_config["tool"]; //TODO: do we require 'tool' here?
                 if let Some(x) = user_values["name"].as_str() {
                     config.name = String::from(x);
@@ -59,15 +84,41 @@ impl Config {
             }
             Err(_x) => (),
         };
-        config
+        Ok(config)
     }
 
-    pub async fn start_pool(&mut self) -> &mut Config {
-        let connection_string = format!("sqlite://{}?mode=rwc", &self.connection);
-        let pool: AnyPool =
-            AnyPoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    pub async fn start_pool(&mut self) -> Result<&mut Config, String> {
+        let connection_options;
+        if self.connection.starts_with("postgresql://") {
+            connection_options = match AnyConnectOptions::from_str(&self.connection) {
+                Ok(o) => o,
+                Err(e) => return Err(e.to_string()),
+            };
+        } else {
+            let connection_string;
+            if !self.connection.starts_with("sqlite://") {
+                connection_string = format!("sqlite://{}?mode=rwc", self.connection);
+            } else {
+                connection_string = self.connection.to_string();
+            }
+            connection_options = match AnyConnectOptions::from_str(connection_string.as_str()) {
+                Ok(o) => o,
+                Err(e) => return Err(e.to_string()),
+            };
+        }
+
+        let pool =
+            match AnyPoolOptions::new().max_connections(5).connect_with(connection_options).await {
+                Ok(o) => o,
+                Err(e) => return Err(e.to_string()),
+            };
+        if pool.any_kind() == AnyKind::Sqlite {
+            if let Err(e) = sqlx_query("PRAGMA foreign_keys = ON").execute(&pool).await {
+                return Err(e.to_string());
+            }
+        }
         self.pool = Some(pool);
-        self
+        Ok(self)
     }
 
     pub fn name<S: Into<String>>(&mut self, name: S) -> &mut Config {
@@ -198,11 +249,23 @@ pub fn config(file_path: &str) -> Result<String, String> {
     let input_config =
         fs::read_to_string(file_path).expect("Should have been able to read the file");
 
-    let input_value = input_config.parse::<Value>().unwrap();
-    let default_value = default_config.parse::<Value>().unwrap();
+    let input_value = match input_config.parse::<Value>() {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
+    let default_value = match default_config.parse::<Value>() {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
 
-    let value_table = input_value.as_table().unwrap();
-    let default_table = default_value.as_table().unwrap();
+    let value_table = match input_value.as_table() {
+        Some(v) => v,
+        None => return Err(format!("'{}' is not a table", input_value)),
+    };
+    let default_table = match default_value.as_table() {
+        Some(v) => v,
+        None => return Err(format!("'{}' is not a table", default_value)),
+    };
 
     let mut merge_table = Map::new();
     merge_table.clone_from(&value_table);
@@ -218,7 +281,10 @@ pub fn config(file_path: &str) -> Result<String, String> {
     }
 
     let merge_value = Value::Table(merge_table);
-    let toml = toml::to_string(&merge_value).unwrap();
+    let toml = match toml::to_string(&merge_value) {
+        Ok(v) => v,
+        Err(e) => return Err(e.to_string()),
+    };
 
     Ok(toml)
 }

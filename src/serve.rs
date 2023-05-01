@@ -32,7 +32,9 @@ pub async fn app(config: &Config) -> Result<String, String> {
     // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr).serve(app.into_make_service()).await.unwrap();
+    if let Err(e) = axum::Server::bind(&addr).serve(app.into_make_service()).await {
+        return Err(e.to_string());
+    }
 
     let hello = String::from("Hello, world!");
     Ok(hello)
@@ -47,7 +49,7 @@ async fn table(
     Path(path): Path<String>,
     RawQuery(query): RawQuery,
     State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("request table {:?} {:?}", path, query);
     let mut table = path.clone();
     let mut format = "html";
@@ -64,7 +66,7 @@ async fn table(
     };
 
     tracing::info!("URL: {}", url);
-    let mut select = parse(&url).unwrap();
+    let mut select = parse(&url)?;
     tracing::info!("select {:?}", select);
     let mut msg_col_index = None;
     for (i, scol) in select.select.iter().enumerate() {
@@ -85,14 +87,16 @@ async fn table(
 
     match get::get_rows(&state.config, &select, "page", &format, show_messages).await {
         Ok(x) => match format {
-            "html" => Html(x).into_response(),
-            "json" => ([("content-type", "application/json; charset=utf-8")], x).into_response(),
-            "pretty.json" => x.into_response(),
+            "html" => Ok(Html(x).into_response()),
+            "json" => {
+                Ok(([("content-type", "application/json; charset=utf-8")], x).into_response())
+            }
+            "pretty.json" => Ok(x.into_response()),
             _ => unreachable!("Unsupported format"),
         },
         Err(x) => {
             tracing::info!("Get Error: {:?}", x);
-            (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response()
+            Ok((StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response())
         }
     }
 }

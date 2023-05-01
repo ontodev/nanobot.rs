@@ -8,7 +8,7 @@ pub mod sql;
 #[async_std::main]
 async fn main() {
     // initialize configuration
-    let mut config: config::Config = config::Config::new().await;
+    let mut config: config::Config = config::Config::new().await.unwrap();
 
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
@@ -81,14 +81,14 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result = match get::get_table(config.start_pool().await, table, shape, format, false).await
+            let result = match get::get_table(config.start_pool().await.unwrap(), table, shape, format, false).await
             {
                 Ok(x) => x,
                 Err(x) => format!("ERROR: {:?}", x),
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(config.start_pool().await),
+        Some(("serve", _sub_matches)) => serve::app(config.start_pool().await.unwrap()),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 

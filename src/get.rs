@@ -83,8 +83,14 @@ pub async fn get_rows(
         }
     };
 
-    let table_rows = get_table_from_pool(&pool, &select).await?;
-    let table_map = rows_to_map(table_rows, "table");
+    let table_rows = match get_table_from_pool(&pool, &select).await {
+        Ok(tr) => tr,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let table_map = match rows_to_map(table_rows, "table") {
+        Ok(tm) => tm,
+        Err(e) => return Err(GetError::new(e)),
+    };
     let unquoted_table = unquote(&base_select.table).unwrap_or(base_select.table.to_string());
     if !table_map.contains_key(&unquoted_table) {
         return Err(GetError::new(format!("Invalid table '{}'", &base_select.table)));
@@ -101,25 +107,35 @@ pub async fn get_rows(
             "\"description\"",
         ])
         .filter(vec![
-            match Filter::new("\"table\"", "eq", json!(format!("'{}'", unquoted_table,))) {
+            match Filter::new("\"table\"", "eq", json!(format!("'{}'", unquoted_table))) {
                 Ok(f) => f,
                 Err(e) => return Err(GetError::new(e)),
             },
         ]);
 
-    let column_rows = get_table_from_pool(&pool, &select).await?;
+    let column_rows = match get_table_from_pool(&pool, &select).await {
+        Ok(cr) => cr,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
 
     let mut columns: Vec<String> = vec![];
     if shape == "page" {
         columns.push("row_number".to_string());
     }
-    columns.append(
-        &mut column_rows
-            .clone()
-            .into_iter()
-            .map(|r| r.get("column").unwrap().as_str().unwrap().to_string())
-            .collect(),
-    );
+
+    let mut columns_to_append = vec![];
+    for row in &column_rows {
+        match row.get("column") {
+            None => return Err(GetError::new("No column 'column' in row.".to_string())),
+            Some(column) => match column.as_str() {
+                None => {
+                    return Err(GetError::new(format!("Could not convert '{}' to str", column)))
+                }
+                Some(column) => columns_to_append.push(column.to_string()),
+            },
+        };
+    }
+    columns.append(&mut columns_to_append);
 
     let mut select = Select::clone(base_select);
     match select.limit {
@@ -130,11 +146,17 @@ pub async fn get_rows(
 
     match shape {
         "value_rows" => {
-            let value_rows = get_table_from_pool(&pool, &select).await?;
+            let value_rows = match get_table_from_pool(&pool, &select).await {
+                Ok(value_rows) => value_rows,
+                Err(e) => return Err(GetError::new(e.to_string())),
+            };
             match format {
-                "text" => Ok(value_rows_to_text(&value_rows)),
+                "text" => value_rows_to_text(&value_rows),
                 "json" => Ok(json!(value_rows).to_string()),
-                "pretty.json" => Ok(serde_json::to_string_pretty(&json!(value_rows)).unwrap()),
+                "pretty.json" => match serde_json::to_string_pretty(&json!(value_rows)) {
+                    Ok(pretty_json) => Ok(pretty_json),
+                    Err(e) => return Err(GetError::new(e.to_string())),
+                },
                 &_ => Err(GetError::new(format!(
                     "Shape '{}' does not support format '{}'",
                     shape, format
@@ -142,12 +164,18 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page: Value =
-                get_page(&pool, &select, &table_map, &column_rows, show_messages).await?;
+            let page = match get_page(&pool, &select, &table_map, &column_rows, show_messages).await
+            {
+                Ok(page) => page,
+                Err(e) => return Err(GetError::new(e.to_string())),
+            };
             match format {
                 "json" => Ok(page.to_string()),
-                "pretty.json" => Ok(serde_json::to_string_pretty(&page).unwrap()),
-                "html" => Ok(page_to_html(&page)),
+                "pretty.json" => match serde_json::to_string_pretty(&page) {
+                    Ok(pretty_json) => Ok(pretty_json),
+                    Err(e) => return Err(GetError::new(e.to_string())),
+                },
+                "html" => page_to_html(&page),
                 &_ => Err(GetError::new(format!(
                     "Shape '{}' does not support format '{}'",
                     shape, format
@@ -165,7 +193,6 @@ async fn get_page(
     column_rows: &Vec<Map<String, Value>>,
     filter_messages: bool,
 ) -> Result<Value, GetError> {
-    //tracing::info!("SELECT: {:#?}", select);
     // Annotate columns with filters and sorting
     let mut column_map = Map::new();
     for row in column_rows.iter() {
@@ -173,7 +200,10 @@ async fn get_page(
         let mut key = String::from("");
         for (k, v) in row.iter() {
             if k == "column" {
-                key = v.as_str().unwrap().to_string();
+                key = match v.as_str() {
+                    Some(key) => key.to_string(),
+                    None => return Err(GetError::new(format!("Could not convert '{}' to str", v))),
+                };
             } else {
                 r.insert(k.to_string(), v.clone());
             }
@@ -200,21 +230,30 @@ async fn get_page(
     // Query the table view instead of the base table, which includes conflict rows and the
     // message column:
     let mut view_select = Select { table: format!("{}_view", unquoted_table), ..select.clone() };
-    view_select.select_all(pool).unwrap();
+    if let Err(e) = view_select.select_all(pool) {
+        return Err(GetError::new(e.to_string()));
+    }
 
     // If we're filtering for rows with messages:
     if filter_messages {
-        view_select
-            .add_filter(Filter::new("message", "not_is", "null".into()).unwrap())
-            .limit(select.limit.unwrap());
+        view_select.add_filter(match Filter::new("message", "not_is", "null".into()) {
+            Ok(f) => f,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        });
+        if let Some(limit) = select.limit {
+            view_select.limit(limit);
+        }
     }
 
     // Use the view to select the data
-    let value_rows = get_table_from_pool(&pool, &view_select).await?;
-    let message_counts = get_message_counts_from_pool(&pool, &unquoted_table).await?;
-    //tracing::info!("MESSAGE COUNTS: {:#?}", message_counts);
-    //tracing::info!("VALUE ROWS: {:#?}\nTOTAL: {}", value_rows, value_rows.len());
-
+    let value_rows = match get_table_from_pool(&pool, &view_select).await {
+        Ok(value_rows) => value_rows,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let message_counts = match get_message_counts_from_pool(&pool, &unquoted_table).await {
+        Ok(message_counts) => message_counts,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
     // convert value_rows to cell_rows
     let mut cell_rows: Vec<Map<String, Value>> = vec![];
     for row in &value_rows {
@@ -237,25 +276,79 @@ async fn get_page(
             // handle null and nulltype
             if v.is_null() {
                 classes.push("bg-null".to_string());
-                if let Some(nulltype) = column_map.get(k).unwrap().get("nulltype") {
-                    if nulltype.is_string() {
-                        cell.insert("nulltype".to_string(), nulltype.clone());
+                match column_map.get(k) {
+                    Some(column) => {
+                        if let Some(nulltype) = column.get("nulltype") {
+                            if nulltype.is_string() {
+                                cell.insert("nulltype".to_string(), nulltype.clone());
+                            }
+                        }
                     }
-                }
+                    None => {
+                        return Err(GetError::new(format!(
+                            "No key '{}' in column_map {:?}",
+                            k, column_map
+                        )))
+                    }
+                };
             }
 
             // handle datatype
             if !cell.contains_key("nulltype") {
-                let datatype = column_map.get(k).unwrap().get("datatype").unwrap();
+                let datatype = match column_map.get(k) {
+                    Some(column) => match column.get("datatype") {
+                        Some(datatype) => datatype,
+                        None => {
+                            return Err(GetError::new(format!(
+                                "No 'datatype' entry in {:?}",
+                                column
+                            )))
+                        }
+                    },
+                    None => {
+                        return Err(GetError::new(format!(
+                            "No key '{}' in column_map {:?}",
+                            k, column_map
+                        )))
+                    }
+                };
                 cell.insert("datatype".to_string(), datatype.clone());
             }
-            let structure = column_map.get(k).unwrap().get("structure").unwrap();
+            // handle structure
+            let structure = match column_map.get(k) {
+                Some(column) => match column.get("structure") {
+                    Some(structure) => structure,
+                    None => {
+                        return Err(GetError::new(format!("No 'structure' entry in {:?}", column)))
+                    }
+                },
+                None => {
+                    return Err(GetError::new(format!(
+                        "No key '{}' in column_map {:?}",
+                        k, column_map
+                    )))
+                }
+            };
             if structure == "from(table.table)" {
-                let href = format!("/table?table=eq.{}", v.as_str().unwrap().to_string());
+                let href = format!("/table?table=eq.{}", {
+                    match v.as_str() {
+                        Some(s) => s.to_string(),
+                        None => {
+                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
+                        }
+                    }
+                });
                 cell.insert("href".to_string(), Value::String(href));
             } else if k == "table" && unquoted_table == "table" {
                 // In the 'table' table, link to the other tables
-                let href = format!("/{}", v.as_str().unwrap().to_string());
+                let href = format!("/{}", {
+                    match v.as_str() {
+                        Some(s) => s.to_string(),
+                        None => {
+                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
+                        }
+                    }
+                });
                 cell.insert("href".to_string(), Value::String(href));
             }
 
@@ -268,18 +361,66 @@ async fn get_page(
 
         let mut error_values = HashMap::new();
         if let Some(input_messages) = row.get("message") {
+            let input_messages = match input_messages {
+                serde_json::Value::Array(value) => value.clone(),
+                serde_json::Value::String(value) => {
+                    let value = unquote(&value).unwrap_or(value.to_string());
+                    match serde_json::from_str::<Value>(value.as_str()) {
+                        Err(e) => return Err(GetError::new(e.to_string())),
+                        Ok(value) => match value.as_array() {
+                            None => {
+                                return Err(GetError::new(format!(
+                                    "Value '{}' is not an array.",
+                                    value
+                                )))
+                            }
+                            Some(value) => value.to_vec(),
+                        },
+                    }
+                }
+                _ => {
+                    return Err(GetError::new(format!(
+                        "'{}' is not a Value String or Value Array",
+                        input_messages
+                    )))
+                }
+            };
             let mut output_messages: HashMap<&str, Vec<Map<String, Value>>> = HashMap::new();
             let mut max_level: usize = 0;
             let mut message_level = "info".to_string();
-            for message in input_messages.as_array().unwrap() {
+            for message in &input_messages {
                 let mut m = Map::new();
-                for (key, value) in message.as_object().unwrap() {
+                let message_map = match message.as_object() {
+                    Some(o) => o,
+                    None => return Err(GetError::new(format!("{:?} is not an object.", message))),
+                };
+                for (key, value) in message_map.iter() {
                     if key != "column" && key != "value" {
                         m.insert(key.clone(), value.clone());
                     }
                 }
-                let column = message.as_object().unwrap().get("column").unwrap().as_str().unwrap();
-                let value = message.get("value").unwrap().as_str().unwrap();
+                let column = match message_map.get("column") {
+                    Some(c) => match c.as_str() {
+                        Some(s) => s,
+                        None => {
+                            return Err(GetError::new(format!("Could not convert '{}' to str", c)))
+                        }
+                    },
+                    None => {
+                        return Err(GetError::new(format!("No 'column' key in {:?}", message_map)))
+                    }
+                };
+                let value = match message.get("value") {
+                    Some(v) => match v.as_str() {
+                        Some(s) => s,
+                        None => {
+                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
+                        }
+                    },
+                    None => {
+                        return Err(GetError::new(format!("No 'value' key in {:?}", message_map)))
+                    }
+                };
                 error_values.insert(column.clone(), value);
                 if let Some(v) = output_messages.get_mut(&column) {
                     v.push(m);
@@ -287,7 +428,17 @@ async fn get_page(
                     output_messages.insert(column, vec![m]);
                 }
 
-                let level = message.get("level").unwrap().as_str().unwrap().to_string();
+                let level = match message.get("level") {
+                    Some(v) => match v.as_str() {
+                        Some(s) => s.to_string(),
+                        None => {
+                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
+                        }
+                    },
+                    None => {
+                        return Err(GetError::new(format!("No 'level' key in {:?}", message_map)))
+                    }
+                };
                 let lvl = level_to_int(&level);
                 if lvl > max_level {
                     max_level = lvl;
@@ -301,13 +452,41 @@ async fn get_page(
                         cell.remove("nulltype");
                         let mut new_classes = vec![];
                         if let Some(classes) = cell.get_mut("classes") {
-                            for class in classes.as_array().unwrap() {
-                                if class.as_str().unwrap().to_string() != "bg-null" {
-                                    new_classes.push(class.clone());
+                            match classes.as_array() {
+                                None => {
+                                    return Err(GetError::new(format!(
+                                        "{:?} is not an array",
+                                        classes
+                                    )))
                                 }
-                            }
+                                Some(classes_array) => {
+                                    for class in classes_array {
+                                        match class.as_str() {
+                                            None => {
+                                                return Err(GetError::new(format!(
+                                                    "Could not convert '{}' to str",
+                                                    class
+                                                )))
+                                            }
+                                            Some(s) => {
+                                                if s.to_string() != "bg-null" {
+                                                    new_classes.push(class.clone());
+                                                }
+                                            }
+                                        };
+                                    }
+                                }
+                            };
                         }
-                        let value = error_values.get(column).unwrap();
+                        let value = match error_values.get(column) {
+                            Some(v) => v,
+                            None => {
+                                return Err(GetError::new(format!(
+                                    "No '{}' in {:?}",
+                                    column, error_values
+                                )))
+                            }
+                        };
                         cell.insert("value".to_string(), json!(value));
                         cell.insert("classes".to_string(), json!(new_classes));
                         cell.insert("message_level".to_string(), json!(message_level));
@@ -323,14 +502,25 @@ async fn get_page(
     let mut counts = Map::new();
     let count = {
         if filter_messages {
-            message_counts.get("message_row").unwrap().as_u64().unwrap().clone() as usize
+            match message_counts.get("message_row").and_then(|m| m.as_u64()) {
+                Some(m) => m as usize,
+                None => {
+                    return Err(GetError::new(format!("No 'nessage_row' in {:?}", message_counts)))
+                }
+            }
         } else {
-            get_count_from_pool(&pool, &select).await?
+            match get_count_from_pool(&pool, &select).await {
+                Ok(count) => count,
+                Err(e) => return Err(GetError::new(e.to_string())),
+            }
         }
     };
     counts.insert("count".to_string(), json!(count));
 
-    let total = get_total_from_pool(&pool, &unquoted_table).await?;
+    let total = match get_total_from_pool(&pool, &unquoted_table).await {
+        Ok(total) => total,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
     counts.insert("total".to_string(), json!(total));
     for (k, v) in message_counts {
         counts.insert(k, v.into());
@@ -338,7 +528,10 @@ async fn get_page(
 
     let end = select.offset.unwrap_or(0) + cell_rows.len();
 
-    let mut this_table = table_map.get(&unquoted_table).unwrap().as_object().unwrap().clone();
+    let mut this_table = match table_map.get(&unquoted_table).and_then(|t| t.as_object()) {
+        Some(t) => t.clone(),
+        None => return Err(GetError::new(format!("No '{}' in {:?}", unquoted_table, table_map))),
+    };
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
     this_table.insert("href".to_string(), json!(format!("/{}", unquoted_table)));
     this_table.insert("start".to_string(), json!(select.offset.unwrap_or(0) + 1));
@@ -350,13 +543,25 @@ async fn get_page(
     let mut select_format = Select::clone(select);
     select_format.table(format!("\"{}.json\"", unquoted_table));
 
-    let href = select_format.to_url().unwrap();
-    let href = decode(&href).unwrap();
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
     formats.insert("JSON".to_string(), json!(href));
 
     select_format.table(format!("\"{}.pretty.json\"", unquoted_table));
-    let href = select_format.to_url().unwrap();
-    let href = decode(&href).unwrap();
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
 
     formats.insert("JSON (Pretty)".to_string(), json!(href));
     this_table.insert("formats".to_string(), json!(formats));
@@ -365,13 +570,24 @@ async fn get_page(
     let mut select_offset = Select::clone(select);
     match select.offset {
         Some(offset) if offset > 0 => {
-            let href = select_offset.offset(0).to_url().unwrap();
-            let href = decode(&href).unwrap();
+            let href = match select_offset.offset(0).to_url() {
+                Ok(url) => url,
+                Err(e) => return Err(GetError::new(e.to_string())),
+            };
+            let href = match decode(&href) {
+                Ok(href) => href,
+                Err(e) => return Err(GetError::new(e.to_string())),
+            };
             this_table.insert("first".to_string(), json!(href));
             if offset > select.limit.unwrap_or(0) {
-                let href =
-                    select_offset.offset(offset - select.limit.unwrap_or(0)).to_url().unwrap();
-                let href = decode(&href).unwrap();
+                let href = match select_offset.offset(offset - select.limit.unwrap_or(0)).to_url() {
+                    Ok(url) => url,
+                    Err(e) => return Err(GetError::new(e.to_string())),
+                };
+                let href = match decode(&href) {
+                    Ok(href) => href,
+                    Err(e) => return Err(GetError::new(e.to_string())),
+                };
                 this_table.insert("previous".to_string(), json!(href));
             } else {
                 this_table.insert("previous".to_string(), json!(href));
@@ -380,11 +596,17 @@ async fn get_page(
         _ => (),
     };
     if end < count {
-        let href = select_offset
+        let href = match select_offset
             .offset(select.offset.unwrap_or(0) + select.limit.unwrap_or(0))
             .to_url()
-            .unwrap();
-        let href = decode(&href).unwrap();
+        {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
         this_table.insert("next".to_string(), json!(href));
         let remainder = count % select.limit.unwrap_or(0);
         let last = if remainder == 0 {
@@ -392,8 +614,14 @@ async fn get_page(
         } else {
             count - (count % select.limit.unwrap_or(0))
         };
-        let href = select_offset.offset(last).to_url().unwrap();
-        let href = decode(&href).unwrap();
+        let href = match select_offset.offset(last).to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
         this_table.insert("last".to_string(), json!(href));
     }
 
@@ -415,28 +643,34 @@ async fn get_page(
         "column": column_map,
         "row": cell_rows,
     });
-    tracing::info!("ELAPSED: {}", elapsed);
+    tracing::debug!("Elapsed time for get_page(): {}", elapsed);
     Ok(result)
 }
 
-fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
-    if rows.len() == 0 {
-        return "".to_string();
-    }
-
+fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
     // This would be nicer with map, but I got weird borrowing errors.
     let mut lines: Vec<String> = vec![];
     let mut line: Vec<String> = vec![];
-    for key in rows.first().unwrap().keys() {
-        line.push(key.clone());
-    }
+    match rows.first().and_then(|f| Some(f.keys())) {
+        Some(first_keys) => {
+            for key in first_keys {
+                line.push(key.clone());
+            }
+        }
+        None => return Ok("".to_string()),
+    };
     lines.push(line.join("\t"));
     for row in rows {
         let mut line: Vec<String> = vec![];
         for cell in row.values() {
             let mut value = cell.clone().to_string();
             if cell.is_string() {
-                value = cell.as_str().unwrap().to_string();
+                value = match cell.as_str() {
+                    Some(s) => s.to_string(),
+                    None => {
+                        return Err(GetError::new(format!("Could not convert '{}' to str", cell)))
+                    }
+                };
             } else if cell.is_null() {
                 // TODO: better null handling
                 value = "".to_string();
@@ -448,10 +682,20 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> String {
 
     // Format using elastic tabstops
     let mut tw = TabWriter::new(vec![]);
-    write!(&mut tw, "{}", lines.join("\n")).unwrap();
-    tw.flush().unwrap();
+    if let Err(e) = write!(&mut tw, "{}", lines.join("\n")) {
+        return Err(GetError::new(e.to_string()));
+    }
+    if let Err(e) = tw.flush() {
+        return Err(GetError::new(e.to_string()));
+    }
 
-    String::from_utf8(tw.into_inner().unwrap()).unwrap()
+    match tw.into_inner() {
+        Ok(tw) => match String::from_utf8(tw) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(GetError::new(e.to_string())),
+        },
+        Err(e) => Err(GetError::new(e.to_string())),
+    }
 }
 
 fn level_to_int(level: &String) -> usize {
@@ -479,13 +723,23 @@ fn name_to_id(name: String) -> String {
     re.replace_all(&name, "-").to_string()
 }
 
-fn page_to_html(page: &Value) -> String {
+fn page_to_html(page: &Value) -> Result<String, GetError> {
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);
-    env.add_template("page.html", include_str!("resources/page.html")).unwrap();
-    env.add_template("table.html", include_str!("resources/table.html")).unwrap();
+    if let Err(e) = env.add_template("page.html", include_str!("resources/page.html")) {
+        return Err(GetError::new(e.to_string()));
+    }
+    if let Err(e) = env.add_template("table.html", include_str!("resources/table.html")) {
+        return Err(GetError::new(e.to_string()));
+    }
 
-    let template = env.get_template("table.html").unwrap();
-    template.render(page).unwrap()
+    let template = match env.get_template("table.html") {
+        Ok(t) => t,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    match template.render(page) {
+        Ok(p) => Ok(p),
+        Err(e) => return Err(GetError::new(e.to_string())),
+    }
 }
