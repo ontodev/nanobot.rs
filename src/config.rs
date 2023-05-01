@@ -33,8 +33,8 @@ impl Config {
         };
         let default_values = &default_config["tool"];
 
-        //let default_connection = String::from(".nanobot.db");
-        let default_connection = String::from("postgresql:///valve_postgres");
+        let default_connection = String::from(".nanobot.db");
+        //let default_connection = String::from("postgresql:///valve_postgres");
 
         let mut config = Config {
             //set in default_config.toml
