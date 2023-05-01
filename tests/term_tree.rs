@@ -1,14 +1,12 @@
 use nanobot::test::tree_validation::get_json_tree_view;
 //use nanobot::tree_validation::get_json_tree_view;
 use nanobot::tree_view::{get_hiccup_term_tree, get_hiccup_top_hierarchy, get_rich_json_tree_view};
-use serde_json::{from_str, json, Value};
+use serde_json::{from_str, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-use std::env;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::path::Path;
 
 async fn set_up_database(tsv: &str, db: &str) -> SqlitePool {
     let test_database = format!("src/resources/.tmp/{}", db);
@@ -130,7 +128,6 @@ async fn test_get_html_top_hierarchy() {
     let pool = set_up_database("src/resources/test_data/zfa/0000354.tsv", database).await;
 
     let table = "statement";
-    let subject = "obo:ZFA_0000354";
 
     //boolean is for preferred root terms
     let top_class_hierarchy = get_hiccup_top_hierarchy("Class", table, &pool)

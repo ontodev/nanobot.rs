@@ -1,11 +1,9 @@
 use crate::test::part_of_term_tree::{
     get_hierarchy_maps, get_iris_from_subclass_map, get_label_hash_map, identify_roots,
 };
-use serde_json::{from_str, json, Map, Value};
-use sqlx::sqlite::{SqlitePool, SqliteRow};
-use sqlx::Row;
+use serde_json::{json, Map, Value};
+use sqlx::sqlite::SqlitePool;
 use std::collections::{HashMap, HashSet};
-use wiring_rs::util::signature;
 
 /// Given an entity and an LDTab database,
 /// return a term tree (encoded in JSON) for the entity that displays information about

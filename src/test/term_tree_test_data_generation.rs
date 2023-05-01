@@ -1,11 +1,11 @@
 //NB: This is a copy of tree_view.rs.
 //The only difference is that it collects the results of all executed SQL queries and writes them to a file.
 use crate::test::part_of_term_tree::{
-    add_children, build_rich_tree, check_part_of_restriction, get_iris_from_set,
-    get_iris_from_subclass_map, get_part_of_information, identify_invalid_classes, identify_roots,
-    ldtab_2_value, remove_invalid_classes, sort_rich_tree_by_label, update_hierarchy_map,
+    add_children, build_rich_tree, get_iris_from_set, get_iris_from_subclass_map,
+    get_part_of_information, identify_invalid_classes, identify_roots, ldtab_2_value,
+    remove_invalid_classes, sort_rich_tree_by_label, update_hierarchy_map,
 };
-use serde_json::{from_str, json, Map, Value};
+use serde_json::{json, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
@@ -13,7 +13,6 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::Path;
-use wiring_rs::util::signature;
 
 static PART_OF: &'static str = "obo:BFO_0000050";
 static IS_A: &'static str = "rdfs:subClassOf";

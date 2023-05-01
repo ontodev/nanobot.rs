@@ -581,12 +581,12 @@ pub async fn get_hierarchy_maps(
     let mut class_2_subrelations = HashMap::new();
 
     //is-a relations are initialised by default
-    let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
+    let class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
     class_2_subrelations.insert(String::from(IS_A), class_2_subclasses);
 
     //initialise input relations
     for rel in relations {
-        let mut class_2_subrelation: HashMap<String, HashSet<String>> = HashMap::new();
+        let class_2_subrelation: HashMap<String, HashSet<String>> = HashMap::new();
         class_2_subrelations.insert(String::from(rel.clone()), class_2_subrelation);
     }
 
@@ -1304,7 +1304,7 @@ pub async fn get_preferred_roots_hierarchy_maps(
     let mut next = HashSet::new();
     while !current.is_empty() {
         for preferred in &current {
-            for (rel, map) in relation_maps.iter() {
+            for (_rel, map) in relation_maps.iter() {
                 if map.contains_key(preferred) {
                     for (key, value) in map {
                         if value.contains(preferred) {
@@ -1324,7 +1324,7 @@ pub async fn get_preferred_roots_hierarchy_maps(
 
     //remove ancestors for preferred root terms
     for ancestor in preferred_root_ancestor {
-        for (rel, map) in relation_maps.iter_mut() {
+        for (_rel, map) in relation_maps.iter_mut() {
             map.remove(&ancestor);
         }
     }
