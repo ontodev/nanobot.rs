@@ -6,6 +6,41 @@ use wiring_rs::util::signature;
 
 static IS_A: &'static str = "rdfs:subClassOf";
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct TreeFormatError {
+    message: String,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct LDTabError {
+    message: String,
+}
+
+#[derive(Debug)]
+pub enum TreeViewError {
+    TreeFormat(TreeFormatError),
+    LDTab(LDTabError),
+    Database(sqlx::Error),
+}
+
+impl From<sqlx::Error> for TreeViewError {
+    fn from(err: sqlx::Error) -> Self {
+        TreeViewError::Database(err)
+    }
+}
+
+impl From<TreeFormatError> for TreeViewError {
+    fn from(err: TreeFormatError) -> Self {
+        TreeViewError::TreeFormat(err)
+    }
+}
+
+impl From<LDTabError> for TreeViewError {
+    fn from(err: LDTabError) -> Self {
+        TreeViewError::LDTab(err)
+    }
+}
+
 /// Convert LDTab strings to serde Values.
 /// LDTab makes use of both strings and JSON strings.
 /// For example values in the 'subject' column of an LDTab database are
@@ -63,7 +98,7 @@ pub async fn get_label_hash_map(
     curies: &HashSet<String>,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashMap<String, String>, sqlx::Error> {
+) -> Result<HashMap<String, String>, TreeViewError> {
     let mut entity_2_label = HashMap::new();
     let query = build_label_query_for(&curies, table);
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
@@ -499,7 +534,7 @@ pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashMap<String, HashSet<String>>, sqlx::Error> {
+) -> Result<HashMap<String, HashSet<String>>, TreeViewError> {
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
     //recursive SQL query for transitive 'is-a' relationships
@@ -577,7 +612,7 @@ pub async fn get_hierarchy_maps(
     relations: &Vec<&str>,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashMap<String, HashMap<String, HashSet<String>>>, sqlx::Error> {
+) -> Result<HashMap<String, HashMap<String, HashSet<String>>>, TreeViewError> {
     //init map from relations to associated entity hierarchies
     let mut class_2_subrelations = HashMap::new();
 
@@ -944,7 +979,7 @@ pub async fn get_direct_subclasses(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
+) -> Result<HashSet<String>, TreeViewError> {
     let mut subclasses = HashSet::new();
 
     let query = format!(
@@ -979,7 +1014,7 @@ pub async fn get_direct_named_subclasses(
     entity: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
+) -> Result<HashSet<String>, TreeViewError> {
     let subclasses = get_direct_subclasses(entity, table, pool).await?;
 
     let mut is_a: HashSet<String> = HashSet::new();
@@ -1014,7 +1049,7 @@ pub async fn get_direct_sub_relations(
     relation: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
+) -> Result<HashSet<String>, TreeViewError> {
     let mut sub_relations = HashSet::new();
 
     //RDF representation of an OWL existential restriction
@@ -1082,7 +1117,7 @@ pub async fn get_immediate_children_tree(
     relations: &Vec<&str>,
     table: &str,
     pool: &SqlitePool,
-) -> Result<Value, sqlx::Error> {
+) -> Result<Value, TreeViewError> {
     let mut direct_sub_relations = Vec::new();
 
     let mut iris = HashSet::new();
@@ -1257,7 +1292,7 @@ pub fn add_children(tree: &mut Value, children: &Value) {
 pub async fn get_preferred_roots(
     table: &str,
     pool: &SqlitePool,
-) -> Result<HashSet<String>, sqlx::Error> {
+) -> Result<HashSet<String>, TreeViewError> {
     let mut preferred_roots = HashSet::new();
     let query = format!(
         "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
@@ -1379,7 +1414,7 @@ pub async fn get_rich_json_tree_view(
     preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
-) -> Result<Value, sqlx::Error> {
+) -> Result<Value, TreeViewError> {
     //get the entity's ancestor information w.r.t. subsumption and relations
     let mut relation_maps = get_hierarchy_maps(entity, &relations, table, &pool).await?;
 
@@ -1685,7 +1720,7 @@ pub async fn get_hiccup_term_tree(
     preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
-) -> Result<Value, sqlx::Error> {
+) -> Result<Value, TreeViewError> {
     let tree = get_rich_json_tree_view(entity, relations, preferred_roots, table, pool).await?;
 
     let roots = tree_2_hiccup(entity, &tree);
@@ -1738,7 +1773,7 @@ pub async fn get_hiccup_top_hierarchy(
     case: &str,
     table: &str,
     pool: &SqlitePool,
-) -> Result<Value, sqlx::Error> {
+) -> Result<Value, TreeViewError> {
     let mut top = "";
     let mut relation = "";
     let mut rdf_type = "";
