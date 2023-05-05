@@ -1231,7 +1231,7 @@ pub async fn get_immediate_children_tree(
 ///                        }]
 ///      }]
 /// }]
-pub fn add_children(tree: &mut Value, children: &Value) {
+pub fn add_children(tree: &mut Value, children: &Value) -> Result<(), TreeViewError> {
     match tree {
         Value::Object(_x) => {
             let tree_children = tree["children"].as_array_mut().unwrap();
@@ -1240,18 +1240,22 @@ pub fn add_children(tree: &mut Value, children: &Value) {
                 tree["children"] = children.clone();
             } else {
                 //descend into first child
-                add_children(&mut tree_children[0], children);
+                add_children(&mut tree_children[0], children)?;
             }
+            Ok(())
         }
         Value::Array(x) => {
             if x.is_empty() {
                 //do nothing
             } else {
                 //descend
-                add_children(&mut x[0], children);
+                add_children(&mut x[0], children)?;
             }
+            Ok(())
         }
-        _ => {} //TODO: ERROR
+        _ => Err(TreeViewError::TreeFormat(String::from(
+            "Expected array of child nodes or a node",
+        ))),
     }
 }
 
@@ -1425,7 +1429,7 @@ pub async fn get_rich_json_tree_view(
         child["children"] = grand_children;
     }
     //... and add these to the tree in the first occurrence of the input entity
-    add_children(&mut sorted, &children);
+    add_children(&mut sorted, &children)?;
 
     Ok(sorted)
 }
@@ -1458,8 +1462,10 @@ pub async fn get_rich_json_tree_view(
 ///  ["li" ["a", {"resource" : "obo:ZFA_0005015, "about": obo:ZFA_0000211, "rev":"obo:BFO_0000050" }, "afferent lamellar arteriole"] ]
 ///  ["li" ["a", {"resource" : "obo:ZFA_0005019, "about": obo:ZFA_0000211, "rev":"obo:BFO_0000050" }, "efferent lamellar arteriole"] ]
 /// ]
-//TODO: Return Result
-pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> Value {
+pub fn tree_2_hiccup_direct_children(
+    parent: &str,
+    direct_children: &Value,
+) -> Result<Value, TreeViewError> {
     let mut res = Vec::new();
     res.push(json!("ul"));
     res.push(json!({"id" : "children"}));
@@ -1476,14 +1482,16 @@ pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> V
                 let grand_children_html = tree_2_hiccup_direct_children(
                     child["curie"].as_str().unwrap(),
                     &child["children"],
-                );
+                )?;
                 res_element.push(grand_children_html);
 
                 res.push(Value::Array(res_element));
             }
-            Value::Array(res)
+            Ok(Value::Array(res))
         }
-        _ => json!("ERROR"), //TODO: encode error
+        _ => Err(TreeViewError::TreeFormat(String::from(
+            "Expected array of child nodes",
+        ))),
     }
 }
 
@@ -1509,8 +1517,11 @@ pub fn tree_2_hiccup_direct_children(parent: &str, direct_children: &Value) -> V
 ///         [ 'recursive encoding for children' -> node_2_hiccup ... ]
 ///   ]
 /// ]
-/// TODO: Return Result
-pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value) -> Value {
+pub fn tree_2_hiccup_descendants(
+    entity: &str,
+    parent: &str,
+    descendants: &Value,
+) -> Result<Value, TreeViewError> {
     let mut res = Vec::new();
     res.push(json!("ul"));
 
@@ -1526,9 +1537,11 @@ pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value
 
                 res.push(Value::Array(res_elements));
             }
-            Value::Array(res)
+            Ok(Value::Array(res))
         }
-        _ => json!("ERROR"), //TODO: encode error
+        _ => Err(TreeViewError::TreeFormat(String::from(
+            "Expected array of child nodes",
+        ))),
     }
 }
 
@@ -1547,21 +1560,23 @@ pub fn tree_2_hiccup_descendants(entity: &str, parent: &str, descendants: &Value
 /// Then node_2_hiccup only wraps
 ///
 /// returns ["ul" hiccup] because there are no more children nodes to be added.
-/// TODO: return result + error handling
-pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
+pub fn node_2_hiccup(
+    entity: &str,
+    node: &Value,
+    hiccup: &mut Vec<Value>,
+) -> Result<(), TreeViewError> {
     if node["curie"].as_str().unwrap().eq(entity) {
         //base case for direct children
-        hiccup.push(tree_2_hiccup_direct_children(
-            node["curie"].as_str().unwrap(),
-            &node["children"],
-        ));
+        let direct_children =
+            tree_2_hiccup_direct_children(node["curie"].as_str().unwrap(), &node["children"])?;
+        hiccup.push(direct_children);
+        Ok(())
     } else {
         //recursive call for nested children
-        hiccup.push(tree_2_hiccup_descendants(
-            entity,
-            node["curie"].as_str().unwrap(),
-            &node["children"],
-        ));
+        let descendants =
+            tree_2_hiccup_descendants(entity, node["curie"].as_str().unwrap(), &node["children"])?;
+        hiccup.push(descendants);
+        Ok(())
     }
 }
 
@@ -1633,7 +1648,6 @@ pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
 ///                ],
 ///             ...  
 pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Result<Value, TreeViewError> {
-    //TODO: return Result and add error handling
     let mut tree_hiccup = Vec::new();
     tree_hiccup.push(json!("ul"));
 
@@ -1647,7 +1661,7 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Result<Value, TreeViewError>
 
                 node_hiccup.push(json!(["a", {"resource" : root["curie"] }, root["label"] ]));
 
-                node_2_hiccup(entity, &root, &mut node_hiccup);
+                node_2_hiccup(entity, &root, &mut node_hiccup)?;
 
                 tree_hiccup.push(Value::Array(node_hiccup));
             }
