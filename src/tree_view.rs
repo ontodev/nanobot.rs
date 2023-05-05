@@ -2,43 +2,21 @@ use serde_json::{from_str, json, Map, Value};
 use sqlx::sqlite::{SqlitePool, SqliteRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
+use thiserror::Error;
 use wiring_rs::util::signature;
 
 static IS_A: &'static str = "rdfs:subClassOf";
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct TreeFormatError {
-    message: String,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct LDTabError {
-    message: String,
-}
-
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum TreeViewError {
-    TreeFormat(TreeFormatError),
-    LDTab(LDTabError),
-    Database(sqlx::Error),
-}
-
-impl From<sqlx::Error> for TreeViewError {
-    fn from(err: sqlx::Error) -> Self {
-        TreeViewError::Database(err)
-    }
-}
-
-impl From<TreeFormatError> for TreeViewError {
-    fn from(err: TreeFormatError) -> Self {
-        TreeViewError::TreeFormat(err)
-    }
-}
-
-impl From<LDTabError> for TreeViewError {
-    fn from(err: LDTabError) -> Self {
-        TreeViewError::LDTab(err)
-    }
+    #[error("data base error")]
+    Database(#[from] sqlx::Error),
+    #[error("the data format `{0}` is not correct")]
+    LDTab(String),
+    #[error("the data format `{0}` is not correct")]
+    TreeFormat(String),
+    #[error("unknown error")]
+    Unknown,
 }
 
 /// Convert LDTab strings to serde Values.
@@ -1654,7 +1632,7 @@ pub fn node_2_hiccup(entity: &str, node: &Value, hiccup: &mut Vec<Value>) {
 ///                  "anatomical group"
 ///                ],
 ///             ...  
-pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
+pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Result<Value, TreeViewError> {
     //TODO: return Result and add error handling
     let mut tree_hiccup = Vec::new();
     tree_hiccup.push(json!("ul"));
@@ -1673,9 +1651,11 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Value {
 
                 tree_hiccup.push(Value::Array(node_hiccup));
             }
-            Value::Array(tree_hiccup)
+            Ok(Value::Array(tree_hiccup))
         }
-        _ => json!("ERROR"), //TODO: encode error
+        _ => Err(TreeViewError::TreeFormat(String::from(
+            "Expected array of root nodes",
+        ))),
     }
 }
 
@@ -1723,7 +1703,7 @@ pub async fn get_hiccup_term_tree(
 ) -> Result<Value, TreeViewError> {
     let tree = get_rich_json_tree_view(entity, relations, preferred_roots, table, pool).await?;
 
-    let roots = tree_2_hiccup(entity, &tree);
+    let roots = tree_2_hiccup(entity, &tree)?;
 
     let mut res = Vec::new();
     res.push(json!("ul"));
