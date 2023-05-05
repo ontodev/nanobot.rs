@@ -682,28 +682,24 @@ pub fn build_rich_tree_branch(
     relation: &str,
     relation_maps: &HashMap<String, HashMap<String, HashSet<String>>>,
     curie_2_label: &HashMap<String, String>,
-) -> Value {
+) -> Result<Value, TreeViewError> {
     let mut children_vec: Vec<Value> = Vec::new();
 
     for (rel, map) in relation_maps {
-        //match relation_maps[i].get(to_insert) {
         match map.get(to_insert) {
             Some(children) => {
                 for c in children {
-                    match build_rich_tree_branch(c, rel, relation_maps, curie_2_label) {
-                        Value::Object(x) => {
-                            //json_map.extend(x);
-                            children_vec.push(Value::Object(x));
-                        }
-                        _ => {}
-                    }
+                    let v = build_rich_tree_branch(c, rel, relation_maps, curie_2_label)?;
+                    children_vec.push(v);
                 }
             }
             None => {}
         }
     }
 
-    json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : relation, "children" : children_vec})
+    Ok(
+        json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : relation, "children" : children_vec}),
+    )
 }
 
 /// Given a set (root) entities,
@@ -745,7 +741,7 @@ pub fn build_rich_tree(
     to_insert: &HashSet<String>,
     relation_maps: &HashMap<String, HashMap<String, HashSet<String>>>,
     curie_2_label: &HashMap<String, String>,
-) -> Value {
+) -> Result<Value, TreeViewError> {
     let mut json_vec: Vec<Value> = Vec::new();
 
     for i in to_insert {
@@ -753,12 +749,8 @@ pub fn build_rich_tree(
         for (rel, map) in relation_maps {
             if map.contains_key(i) {
                 inserted = true;
-                match build_rich_tree_branch(i, rel, relation_maps, curie_2_label) {
-                    Value::Object(x) => {
-                        json_vec.push(Value::Object(x));
-                    }
-                    _ => {} //TODO: should be an error
-                }
+                let branch = build_rich_tree_branch(i, rel, relation_maps, curie_2_label)?;
+                json_vec.push(branch);
             }
         }
 
@@ -766,7 +758,7 @@ pub fn build_rich_tree(
             json_vec.push(json!(String::from(i)));
         }
     }
-    Value::Array(json_vec)
+    Ok(Value::Array(json_vec))
 }
 
 /// Given a node in a term tree, return its associated label.
@@ -1414,7 +1406,7 @@ pub async fn get_rich_json_tree_view(
     }
     let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
 
-    let tree = build_rich_tree(&roots, &relation_maps, &curie_2_label);
+    let tree = build_rich_tree(&roots, &relation_maps, &curie_2_label)?;
 
     //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree);
