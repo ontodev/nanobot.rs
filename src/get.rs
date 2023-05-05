@@ -138,9 +138,10 @@ pub async fn get_rows(
     columns.append(&mut columns_to_append);
 
     let mut select = Select::clone(base_select);
+    select.select(columns);
     match select.limit {
-        Some(l) if l > LIMIT_MAX => select.select(columns).limit(LIMIT_MAX),
-        Some(l) if l > 0 => select.select(columns).limit(l),
+        Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
+        Some(l) if l > 0 => select.limit(l),
         _ => select.limit(LIMIT_DEFAULT),
     };
 
