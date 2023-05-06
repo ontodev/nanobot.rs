@@ -7,7 +7,7 @@ use enquote::unquote;
 use minijinja::Environment;
 use ontodev_sqlrest::{Filter, Select};
 use regex::Regex;
-use serde_json::{json, Map, Value};
+use serde_json::{json, to_string_pretty, Map, Value};
 use sqlx::any::AnyPool;
 use std::collections::HashMap;
 use std::error::Error;
@@ -58,7 +58,8 @@ pub async fn get_table(
     format: &str,
     show_messages: bool,
 ) -> Result<String, GetError> {
-    let mut select = Select::new(table);
+    let table = unquote(table).unwrap_or(table.to_string());
+    let mut select = Select::new(format!("\"{}\"", table));
     select.limit(LIMIT_DEFAULT);
     get_rows(config, &select, shape, format, show_messages).await
 }
@@ -157,7 +158,7 @@ pub async fn get_rows(
             match format {
                 "text" => value_rows_to_text(&value_rows),
                 "json" => Ok(json!(value_rows).to_string()),
-                "pretty.json" => match serde_json::to_string_pretty(&json!(value_rows)) {
+                "pretty.json" => match to_string_pretty(&json!(value_rows)) {
                     Ok(pretty_json) => Ok(pretty_json),
                     Err(e) => return Err(GetError::new(e.to_string())),
                 },
@@ -175,7 +176,7 @@ pub async fn get_rows(
             };
             match format {
                 "json" => Ok(page.to_string()),
-                "pretty.json" => match serde_json::to_string_pretty(&page) {
+                "pretty.json" => match to_string_pretty(&page) {
                     Ok(pretty_json) => Ok(pretty_json),
                     Err(e) => return Err(GetError::new(e.to_string())),
                 },
@@ -366,8 +367,8 @@ async fn get_page(
         let mut error_values = HashMap::new();
         if let Some(input_messages) = row.get("message") {
             let input_messages = match input_messages {
-                serde_json::Value::Array(value) => value.clone(),
-                serde_json::Value::String(value) => {
+                Value::Array(value) => value.clone(),
+                Value::String(value) => {
                     let value = unquote(&value).unwrap_or(value.to_string());
                     match serde_json::from_str::<Value>(value.as_str()) {
                         Err(e) => return Err(GetError::new(e.to_string())),
@@ -382,7 +383,7 @@ async fn get_page(
                         },
                     }
                 }
-                serde_json::Value::Null => vec![],
+                Value::Null => vec![],
                 _ => {
                     return Err(GetError::new(format!(
                         "'{}' is not a Value String or Value Array",

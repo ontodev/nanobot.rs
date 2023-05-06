@@ -4,8 +4,10 @@ You can read rows from tables using `nanobot get`:
 
 ```console tesh-session="get"
 $ nanobot init
+...
 Initialized a Nanobot project
 $ nanobot get table
+...
 table     path                     type      description
 table     src/schema/table.tsv     table     All of the tables in this project.
 column    src/schema/column.tsv    column    Columns for all of the tables.
