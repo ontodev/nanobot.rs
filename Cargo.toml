@@ -25,7 +25,8 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 urlencoding = "2.1.2"
 
 [dependencies.ontodev_sqlrest]
-path = "../sqlrest.rs"
+git = "https://github.com/ontodev/sqlrest.rs"
+rev = "750c459c47b702761e05f88c58315dc0660daad1"
 
 [build-dependencies]
 cc = "1.0"

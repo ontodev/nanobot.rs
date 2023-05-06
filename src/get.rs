@@ -131,7 +131,10 @@ pub async fn get_rows(
                 None => {
                     return Err(GetError::new(format!("Could not convert '{}' to str", column)))
                 }
-                Some(column) => columns_to_append.push(column.to_string()),
+                Some(column) => {
+                    let unquoted_column = unquote(&column).unwrap_or(column.to_string());
+                    columns_to_append.push(format!("\"{}\"", unquoted_column));
+                }
             },
         };
     }
@@ -287,7 +290,7 @@ async fn get_page(
                     }
                     None => {
                         return Err(GetError::new(format!(
-                            "No key '{}' in column_map {:?}",
+                            "While handling nulltype: No key '{}' in column_map {:?}",
                             k, column_map
                         )))
                     }
@@ -301,7 +304,7 @@ async fn get_page(
                         Some(datatype) => datatype,
                         None => {
                             return Err(GetError::new(format!(
-                                "No 'datatype' entry in {:?}",
+                                "While handling datatype: No 'datatype' entry in {:?}",
                                 column
                             )))
                         }
@@ -379,6 +382,7 @@ async fn get_page(
                         },
                     }
                 }
+                serde_json::Value::Null => vec![],
                 _ => {
                     return Err(GetError::new(format!(
                         "'{}' is not a Value String or Value Array",
