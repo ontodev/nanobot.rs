@@ -992,8 +992,8 @@ pub fn sort_object(v: &Map<String, Value>) -> Result<Value, TreeViewError> {
 /// }]
 pub fn sort_rich_tree_by_label(tree: &Value) -> Result<Value, TreeViewError> {
     match tree {
-        Value::Array(a) => Ok(sort_array(a)?)),
-        Value::Object(o) => Ok(sort_object(o)?)),
+        Value::Array(a) => Ok(sort_array(a)?),
+        Value::Object(o) => Ok(sort_object(o)?),
         Value::String(_s) => Ok(tree.clone()),
         _ => Err(TreeViewError::TreeFormat(format!(
             "Got {} but expected a tree, list of nodes, or string",
@@ -1176,13 +1176,22 @@ pub async fn get_immediate_children_tree(
 
     let mut children = Vec::new();
     for sub in direct_subclasses {
-        let element = json!({"curie" : sub, "label" : curie_2_label.get(&sub).unwrap(), "property" : IS_A, "children" : []});
+        let label = match curie_2_label.get(&sub) {
+            Some(l) => l,
+            None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
+        };
+        let element = json!({"curie" : sub, "label" : label, "property" : IS_A, "children" : []});
         children.push(element);
     }
 
     for n in 0..relations.len() {
         for sub in &direct_sub_relations[n] {
-            let element = json!({"curie" : sub, "label" : curie_2_label.get(sub).unwrap(), "property" : relations[n], "children" : []});
+            let label = match curie_2_label.get(sub) {
+                Some(l) => l,
+                None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
+            };
+            let element =
+                json!({"curie" : sub, "label" : label, "property" : relations[n], "children" : []});
             children.push(element);
         }
     }
@@ -1296,7 +1305,15 @@ pub async fn get_immediate_children_tree(
 pub fn add_children(tree: &mut Value, children: &Value) -> Result<(), TreeViewError> {
     match tree {
         Value::Object(_x) => {
-            let tree_children = tree["children"].as_array_mut().unwrap();
+            let tree_children = match tree["children"].as_array_mut() {
+                Some(array) => array,
+                None => {
+                    return Err(TreeViewError::TreeFormat(format!(
+                        "Couldn't access children nodes in {}",
+                        tree.to_string()
+                    )))
+                }
+            };
 
             if tree_children.is_empty() {
                 tree["children"] = children.clone();
@@ -1373,9 +1390,9 @@ pub async fn get_preferred_roots_hierarchy_maps(
     relation_maps: &mut HashMap<String, HashMap<String, HashSet<String>>>,
     table: &str,
     pool: &SqlitePool,
-) {
+) -> Result<(), TreeViewError> {
     //query for preferred roots
-    let preferred_roots = get_preferred_roots(table, pool).await.unwrap();
+    let preferred_roots = get_preferred_roots(table, pool).await?;
 
     //collect all transitive ancestors
     let mut preferred_root_ancestor = HashSet::new();
@@ -1408,6 +1425,7 @@ pub async fn get_preferred_roots_hierarchy_maps(
             map.remove(&ancestor);
         }
     }
+    Ok(())
 }
 
 /// Given an IRI/CURIE for an entity, a list of relations (other than rdfs:subClassOf),
@@ -1464,7 +1482,7 @@ pub async fn get_rich_json_tree_view(
 
     //modify ancestor information w.r.t. preferred root terms
     if preferred_roots {
-        get_preferred_roots_hierarchy_maps(&mut relation_maps, table, pool).await;
+        get_preferred_roots_hierarchy_maps(&mut relation_maps, table, pool).await?;
     }
 
     let roots = identify_roots(&relation_maps);
@@ -1484,8 +1502,26 @@ pub async fn get_rich_json_tree_view(
     //get direct children ...
     let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
     //... and grandchildren ...
-    for child in children.as_array_mut().unwrap() {
-        let child_iri = child["curie"].as_str().unwrap();
+    let mut grand_children = match children.as_array_mut() {
+        Some(array) => array,
+        None => {
+            return Err(TreeViewError::TreeFormat(format!(
+                "No children nodes in {}",
+                tree.to_string()
+            )))
+        }
+    };
+
+    for child in grand_children {
+        let child_iri = match child["curie"].as_str() {
+            Some(s) => s,
+            None => {
+                return Err(TreeViewError::TreeFormat(format!(
+                    "No value for 'curie' field in {}",
+                    child.to_string()
+                )))
+            }
+        };
         let grand_children =
             get_immediate_children_tree(child_iri, &relations, table, pool).await?;
         child["children"] = grand_children;
@@ -1541,10 +1577,16 @@ pub fn tree_2_hiccup_direct_children(
                 res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
 
                 //encode grand children
-                let grand_children_html = tree_2_hiccup_direct_children(
-                    child["curie"].as_str().unwrap(),
-                    &child["children"],
-                )?;
+                let curie = match child["curie"].as_str() {
+                    Some(s) => s,
+                    None => {
+                        return Err(TreeViewError::TreeFormat(format!(
+                            "No value for 'curie' field in {}",
+                            child.to_string()
+                        )))
+                    }
+                };
+                let grand_children_html = tree_2_hiccup_direct_children(curie, &child["children"])?;
                 res_element.push(grand_children_html);
 
                 res.push(Value::Array(res_element));
@@ -1627,16 +1669,23 @@ pub fn node_2_hiccup(
     node: &Value,
     hiccup: &mut Vec<Value>,
 ) -> Result<(), TreeViewError> {
-    if node["curie"].as_str().unwrap().eq(entity) {
+    let curie = match node["curie"].as_str() {
+        Some(s) => s,
+        None => {
+            return Err(TreeViewError::TreeFormat(format!(
+                "No value for 'curie' field in {}",
+                node.to_string()
+            )))
+        }
+    };
+    if curie.eq(entity) {
         //base case for direct children
-        let direct_children =
-            tree_2_hiccup_direct_children(node["curie"].as_str().unwrap(), &node["children"])?;
+        let direct_children = tree_2_hiccup_direct_children(curie, &node["children"])?;
         hiccup.push(direct_children);
         Ok(())
     } else {
         //recursive call for nested children
-        let descendants =
-            tree_2_hiccup_descendants(entity, node["curie"].as_str().unwrap(), &node["children"])?;
+        let descendants = tree_2_hiccup_descendants(entity, curie, &node["children"])?;
         hiccup.push(descendants);
         Ok(())
     }
@@ -1898,7 +1947,7 @@ pub async fn get_hiccup_top_hierarchy(
     }
 
     //get labels for entities
-    let entity_2_label = get_label_hash_map(&entities, table, pool).await.unwrap();
+    let entity_2_label = get_label_hash_map(&entities, table, pool).await?;
 
     for subject in ent_vec {
         match entity_2_label.get(&subject) {
