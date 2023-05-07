@@ -33,7 +33,7 @@ pub enum TreeViewError {
 pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewError> {
     match value {
         Value::Object(map) => match map.get(field) {
-            Some(y) => Ok(y.clone()),
+            Some(field_value) => Ok(field_value.clone()),
             None => {
                 return Err(TreeViewError::LDTab(format!(
                     "No field {} in LDTab value {}",
@@ -124,7 +124,7 @@ pub fn ldtab_2_value(string: &str) -> Value {
     //NB: an LDTab thick triple makes use of strings (which are not JSON strings
     //example: "this is a string" and "\"this is a JSON string\"".).
     let serde_value = match from_str::<Value>(string) {
-        Ok(x) => x,
+        Ok(json) => json,
         _ => json!(string),
     };
 
@@ -191,13 +191,13 @@ pub async fn get_label_hash_map(
 /// then get_iris_from_ldtab_string(s) returns the set
 ///
 /// {"owl:onProperty", "obo:BFO_0000050", "owl:someValuesFrom","obo:ZFA_0000040", "rdf:type", "owl:Restriction"}
-pub fn get_iris_from_ldtab_string(s: &str) -> HashSet<String> {
+pub fn get_iris_from_ldtab_string(ldtab_string: &str) -> HashSet<String> {
     let mut iris: HashSet<String> = HashSet::new();
 
-    let value = ldtab_2_value(&s);
+    let value = ldtab_2_value(&ldtab_string);
     match value {
-        Value::String(x) => {
-            iris.insert(x);
+        Value::String(iri_string) => {
+            iris.insert(iri_string);
         }
         _ => {
             //use wiring_rs to extract IRIs recursively
@@ -567,11 +567,11 @@ pub fn update_hierarchy_map(
 ) {
     for (class, subclasses) in updates {
         match to_update.get_mut(class) {
-            Some(x) => {
+            Some(set_of_subclasses) => {
                 //key exists
                 for sub in subclasses {
-                    if !x.contains(sub) {
-                        x.insert(sub.clone()); //so add all elements to value
+                    if !set_of_subclasses.contains(sub) {
+                        set_of_subclasses.insert(sub.clone()); //so add all elements to value
                     }
                 }
             }
@@ -632,9 +632,9 @@ pub async fn get_class_2_subclass_map(
         let object_string = String::from(object);
 
         match class_2_subclasses.get_mut(&object_string) {
-            Some(x) => {
+            Some(set_of_subclasses) => {
                 //there already exists an entry in the map
-                x.insert(subject_string);
+                set_of_subclasses.insert(subject_string);
             }
             None => {
                 //create a new entry in the map
@@ -875,24 +875,24 @@ pub fn build_rich_tree(
 ///  }
 ///
 /// return "respiratory system"
-pub fn extract_label(v: &Value) -> Result<String, TreeViewError> {
-    match v {
+pub fn extract_label(value: &Value) -> Result<String, TreeViewError> {
+    match value {
         Value::Object(map) => match map.get("label") {
             Some(label) => match label.as_str() {
                 Some(string) => Ok(String::from(string)),
                 None => Err(TreeViewError::TreeFormat(format!(
                     "Key for 'label' is not a string {}",
-                    v.to_string()
+                    value.to_string()
                 ))),
             },
             None => Err(TreeViewError::TreeFormat(format!(
                 "No field 'label' in node {}",
-                v.to_string()
+                value.to_string()
             ))),
         },
         _ => Err(TreeViewError::TreeFormat(format!(
             "Expected JSON object for tree node but got {}",
-            v.to_string()
+            value.to_string()
         ))),
     }
 }
@@ -967,7 +967,7 @@ pub fn sort_array(array: &Vec<Value>) -> Result<Value, TreeViewError> {
     Ok(Value::Array(res))
 }
 
-pub fn sort_object(v: &Map<String, Value>) -> Result<Value, TreeViewError> {
+pub fn sort_object(object: &Map<String, Value>) -> Result<Value, TreeViewError> {
     //serde objects are sorted by keys:
     //"By default the map is backed by a BTreeMap."
     //However, this order does not (necessarily) match
@@ -975,7 +975,7 @@ pub fn sort_object(v: &Map<String, Value>) -> Result<Value, TreeViewError> {
     let mut map = Map::new();
 
     //sort nested values
-    for (key, value) in v.iter() {
+    for (key, value) in object.iter() {
         let sorted_value = sort_rich_tree_by_label(value)?;
         map.insert(key.clone(), sorted_value);
     }
@@ -1563,7 +1563,7 @@ pub async fn get_rich_json_tree_view(
 
     for child in grand_children {
         let child_iri = match child["curie"].as_str() {
-            Some(s) => s,
+            Some(string) => string,
             None => {
                 return Err(TreeViewError::TreeFormat(format!(
                     "No value for 'curie' field in {}",
@@ -1627,7 +1627,7 @@ pub fn tree_2_hiccup_direct_children(
 
                 //encode grand children
                 let curie = match child["curie"].as_str() {
-                    Some(s) => s,
+                    Some(string) => string,
                     None => {
                         return Err(TreeViewError::TreeFormat(format!(
                             "No value for 'curie' field in {}",
@@ -1686,7 +1686,7 @@ pub fn tree_2_hiccup_descendants(
 
                 res_elements.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
 
-                node_2_hiccup(entity, &child, &mut res_elements);
+                node_2_hiccup(entity, &child, &mut res_elements)?;
 
                 res.push(Value::Array(res_elements));
             }
@@ -1719,7 +1719,7 @@ pub fn node_2_hiccup(
     hiccup: &mut Vec<Value>,
 ) -> Result<(), TreeViewError> {
     let curie = match node["curie"].as_str() {
-        Some(s) => s,
+        Some(string) => string,
         None => {
             return Err(TreeViewError::TreeFormat(format!(
                 "No value for 'curie' field in {}",
@@ -2000,9 +2000,9 @@ pub async fn get_hiccup_top_hierarchy(
 
     for subject in ent_vec {
         match entity_2_label.get(&subject) {
-            Some(x) => {
+            Some(label) => {
                 children_list.push(
-                    json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"}, x  ]]),
+                    json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"}, label  ]]),
                 );
             }
             None => {
@@ -2011,10 +2011,9 @@ pub async fn get_hiccup_top_hierarchy(
                 );
             }
         }
-        //TODO: handle children
-        //let children = get_immediate_children_tree(subject, table, pool).await.unwrap();
-        //TODO: children for object properties
-        //TODO: children for data properties
+        //TODO: handle children?
+        //TODO: children for object properties?
+        //TODO: children for data properties?
     }
 
     res.push(json!(["li", case, children_list]));
