@@ -19,6 +19,17 @@ pub enum TreeViewError {
     Unknown,
 }
 
+/// Given an LDTab _JSON value, return the LDTab value associated with the provided key 'field'.
+///
+/// # Examples
+///
+/// Consider the following LDTab _JSON value
+///
+/// v = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],
+///      "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000027"}],
+///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]
+///
+/// get_ldtab_field(&v, "owl:onProperty") returns [{"datatype":"_IRI","object":"obo:RO_0002496"}].
 pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewError> {
     match value {
         Value::Object(map) => match map.get(field) {
@@ -40,6 +51,15 @@ pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewErro
     }
 }
 
+/// Given an LDTab array, return the first element in the array.
+///
+/// # Examples
+///
+/// Consider the following LDTab array
+///
+/// a = [{"object":"obo:RO_0002496","object":"obo:RO_0002497","object":"obo:RO_0002498"}]
+///
+/// get_ldtab_array_at(&a, 0)  returns "object":"obo:RO_0002496"
 pub fn get_ldtab_array_at(value: &Value, index: usize) -> Result<Value, TreeViewError> {
     match value {
         Value::Array(array) => Ok(array[index].clone()),
@@ -52,12 +72,30 @@ pub fn get_ldtab_array_at(value: &Value, index: usize) -> Result<Value, TreeView
     }
 }
 
+/// Given an LDTab _JSON value, return the first LDTab value in the array associated with the key 'field'.
+///
+/// # Examples
+///
+/// Consider the following LDTab _JSON value
+///
+/// v = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],
+///      "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000027"}],
+///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]
+///
+/// get_ldtab_first_field(&v, "owl:onProperty") returns {"datatype":"_IRI","object":"obo:RO_0002496"}.
 pub fn get_ldtab_first_field(value: &Value, field: &str) -> Result<Value, TreeViewError> {
     let target_array = get_ldtab_field(value, field)?;
     let target = get_ldtab_array_at(&target_array, 0)?;
     Ok(target)
 }
 
+/// Given an LDTab string value, return the corresponding String
+///
+/// # Examples
+///
+/// Consider the following LDTab string s = \"obo:0000356\".
+///
+/// get_ldtab_value_as_string(&s) returns "obo:0000356".
 pub fn get_ldtab_value_as_string(value: &Value) -> Result<String, TreeViewError> {
     match value.as_str() {
         Some(string) => Ok(String::from(string)),
@@ -413,6 +451,17 @@ pub fn check_restriction(value: &Value, relation: &str) -> Result<bool, TreeView
     Ok(part_of_restriction)
 }
 
+/// Given an LDTab _JSON value for an existential restriction.
+///
+/// # Examples
+///
+/// Consider the following LDTab _JSON value
+///
+/// v = {"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],
+///      "owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000027"}],
+///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]
+///
+/// get_existential_filler_as_string(&v) returns "obo:ZFS_0000027".
 pub fn get_existential_filler_as_string(
     existential_restriction: &Value,
 ) -> Result<String, TreeViewError> {
