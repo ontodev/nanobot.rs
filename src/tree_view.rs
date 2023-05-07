@@ -19,38 +19,54 @@ pub enum TreeViewError {
     Unknown,
 }
 
-pub fn get_ldtab_field(value : &Value, field : &str) -> Result<Value,TreeViewError> {
-
+pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewError> {
     match value {
-        Value::Object(map) => { 
-		match map.get(field) {
-			Some(y) => Ok(y.clone()),
-			None => return Err(TreeViewError::LDTab(format!("No field {} in LDTab value {}", field, value.to_string()))), 
-		}
+        Value::Object(map) => match map.get(field) {
+            Some(y) => Ok(y.clone()),
+            None => {
+                return Err(TreeViewError::LDTab(format!(
+                    "No field {} in LDTab value {}",
+                    field,
+                    value.to_string()
+                )))
+            }
         },
-        _ => return Err(TreeViewError::LDTab(format!("Not an LDTab object {}", value.to_string())))
-}
+        _ => {
+            return Err(TreeViewError::LDTab(format!(
+                "Not an LDTab object {}",
+                value.to_string()
+            )))
+        }
+    }
 }
 
-pub fn get_ldtab_array_at(value : &Value, index : usize) -> Result<Value,TreeViewError> {
+pub fn get_ldtab_array_at(value: &Value, index: usize) -> Result<Value, TreeViewError> {
     match value {
         Value::Array(array) => Ok(array[index].clone()),
-        _ => return Err(TreeViewError::LDTab(format!("Not an LDTab array {}", value.to_string()))), 
-    } 
+        _ => {
+            return Err(TreeViewError::LDTab(format!(
+                "Not an LDTab array {}",
+                value.to_string()
+            )))
+        }
+    }
 }
 
-pub fn get_ldtab_first_field(value : &Value, field : &str) -> Result<Value, TreeViewError> {
-
+pub fn get_ldtab_first_field(value: &Value, field: &str) -> Result<Value, TreeViewError> {
     let target_array = get_ldtab_field(value, field)?;
     let target = get_ldtab_array_at(&target_array, 0)?;
-    Ok(target) 
+    Ok(target)
 }
 
-pub fn get_ldtab_value_as_string(value : &Value) -> Result<String,TreeViewError> { 
-     match value.as_str() {
+pub fn get_ldtab_value_as_string(value: &Value) -> Result<String, TreeViewError> {
+    match value.as_str() {
         Some(string) => Ok(String::from(string)),
-        None => return Err(TreeViewError::LDTab(format!("Not an LDTab string {}", value.to_string()))), 
-        
+        None => {
+            return Err(TreeViewError::LDTab(format!(
+                "Not an LDTab string {}",
+                value.to_string()
+            )))
+        }
     }
 }
 
@@ -332,10 +348,10 @@ pub fn remove_invalid_classes(class_2_subclasses: &mut HashMap<String, HashSet<S
 /// v = {"datatype":"_IRI","object":"obo:BFO_0000050"}
 ///
 /// then check_part_of_property(v) returns true
-pub fn check_property(value: &Value, relation: &str) -> Result<bool,TreeViewError> {
+pub fn check_property(value: &Value, relation: &str) -> Result<bool, TreeViewError> {
     let property = get_ldtab_field(value, "object")?;
     let relation_json = json!(relation);
-    Ok(property.eq(&relation_json)) 
+    Ok(property.eq(&relation_json))
 }
 
 /// Given an LDTab predicate map encoded as a Serde Value, return true
@@ -355,7 +371,7 @@ pub fn check_property(value: &Value, relation: &str) -> Result<bool,TreeViewErro
 ///        "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
 ///
 /// then check_filler(v_1) returns true  and check_filler(v_2) returns false
-pub fn check_filler(value: &Value) -> Result<bool,TreeViewError> {
+pub fn check_filler(value: &Value) -> Result<bool, TreeViewError> {
     let filler = get_ldtab_field(value, "object")?;
     //check whether 'filler' is a named class (represented as a JSON string)
     //as opposed to complex expression (represnted as a JSON object)
@@ -374,37 +390,36 @@ pub fn check_filler(value: &Value) -> Result<bool,TreeViewError> {
 ///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
 ///
 /// then check_part_of_restriction(v,"obo:BFO_0000050") returns true
-pub fn check_restriction(value: &Value, relation: &str) -> Result<bool,TreeViewError> {
+pub fn check_restriction(value: &Value, relation: &str) -> Result<bool, TreeViewError> {
+    let part_of_restriction = match value {
+        Value::Object(map) => {
+            if map.contains_key("owl:onProperty")
+                & map.contains_key("owl:someValuesFrom")
+                & map.contains_key("rdf:type")
+            {
+                let property = get_ldtab_first_field(value, "owl:onProperty")?;
+                let filler = get_ldtab_first_field(value, "owl:someValuesFrom")?;
 
-        let part_of_restriction = match value {
-            Value::Object(map) =>  {
-                if map.contains_key("owl:onProperty")
-                    & map.contains_key("owl:someValuesFrom")
-                    & map.contains_key("rdf:type")
-                {
-                    let property = get_ldtab_first_field(value, "owl:onProperty")?;
-                    let filler = get_ldtab_first_field(value, "owl:someValuesFrom")?; 
+                let property_check = check_property(&property, relation)?;
+                let filler_check = check_filler(&filler)?;
 
-                    let property_check = check_property(&property, relation)?;
-                    let filler_check = check_filler(&filler)?;
-
-                     property_check & filler_check
-                } else {
-                    false
-                }
-
-
-}
-            _ => false,
-        };
-Ok(part_of_restriction)
+                property_check & filler_check
+            } else {
+                false
+            }
+        }
+        _ => false,
+    };
+    Ok(part_of_restriction)
 }
 
-pub fn get_existential_filler_as_string(existential_restriction : &Value) -> Result<String, TreeViewError> {
+pub fn get_existential_filler_as_string(
+    existential_restriction: &Value,
+) -> Result<String, TreeViewError> {
     let filler = get_ldtab_first_field(&existential_restriction, "owl:someValuesFrom")?;
     let filler = get_ldtab_field(&filler, "object")?;
     let filler = get_ldtab_value_as_string(&filler)?;
-    Ok(filler) 
+    Ok(filler)
 }
 
 /// Given a mapping from classes to sets of their subclasses,
@@ -442,7 +457,7 @@ pub fn get_existential_filler_as_string(existential_restriction : &Value) -> Res
 pub fn get_relation_information(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
     relation: &str,
-) -> Result<HashMap<String, HashSet<String>>,TreeViewError> {
+) -> Result<HashMap<String, HashSet<String>>, TreeViewError> {
     let mut class_2_relation: HashMap<String, HashSet<String>> = HashMap::new();
 
     //original axiom: S is-a part-of some filler
@@ -453,7 +468,7 @@ pub fn get_relation_information(
         //check whether there is an existential restriction
         let is_restriction = check_restriction(&class_value, relation)?;
 
-        if is_restriction { 
+        if is_restriction {
             let filler = get_existential_filler_as_string(&class_value)?;
 
             //encode information in class_2_relation
@@ -811,11 +826,25 @@ pub fn build_rich_tree(
 ///  }
 ///
 /// return "respiratory system"
-pub fn extract_label(v: &Value) -> String {
+pub fn extract_label(v: &Value) -> Result<String, TreeViewError> {
     match v {
-        Value::Object(_x) => String::from(v["label"].as_str().unwrap()),
-        Value::String(x) => String::from(x), //use IRI instead of label (TODO: this case shouldn't occur)
-        _ => String::from("error"),
+        Value::Object(map) => match map.get("label") {
+            Some(label) => match label.as_str() {
+                Some(string) => Ok(String::from(string)),
+                None => Err(TreeViewError::TreeFormat(format!(
+                    "Key for 'label' is not a string {}",
+                    v.to_string()
+                ))),
+            },
+            None => Err(TreeViewError::TreeFormat(format!(
+                "No field 'label' in node {}",
+                v.to_string()
+            ))),
+        },
+        _ => Err(TreeViewError::TreeFormat(format!(
+            "Expected JSON object for tree node but got {}",
+            v.to_string()
+        ))),
     }
 }
 
@@ -866,29 +895,30 @@ pub fn extract_label(v: &Value) -> String {
 ///       "property": "rdfs:subClassOf",
 ///       "children": [  ]
 ///      }]
-pub fn sort_array(array: &Vec<Value>) -> Value {
+pub fn sort_array(array: &Vec<Value>) -> Result<Value, TreeViewError> {
     let mut labels = Vec::new();
-    let mut label_2_element = HashMap::new();
-    for element in array {
-        //let label  = element["label"].as_str().unwrap();
-        let label = extract_label(element);
+    let mut label_2_node = HashMap::new();
+    for node in array {
+        let label = extract_label(node)?;
         labels.push(label.clone());
-        let sorted_element = sort_rich_tree_by_label(element);
-        label_2_element.insert(label.clone(), sorted_element);
+        let sorted_element = sort_rich_tree_by_label(node)?;
+        label_2_node.insert(label.clone(), sorted_element);
     }
 
     labels.sort();
 
     let mut res = Vec::new();
     for label in labels {
-        let element = label_2_element.get(&label).unwrap();
-        res.push(element.clone());
+        //NB: label_2_node was created in this function
+        //and is guaranteed to include 'label'
+        let node = label_2_node.get(&label).unwrap();
+        res.push(node.clone());
     }
 
-    Value::Array(res)
+    Ok(Value::Array(res))
 }
 
-pub fn sort_object(v: &Map<String, Value>) -> Value {
+pub fn sort_object(v: &Map<String, Value>) -> Result<Value, TreeViewError> {
     //serde objects are sorted by keys:
     //"By default the map is backed by a BTreeMap."
     //However, this order does not (necessarily) match
@@ -897,10 +927,10 @@ pub fn sort_object(v: &Map<String, Value>) -> Value {
 
     //sort nested values
     for (key, value) in v.iter() {
-        let sorted_value = sort_rich_tree_by_label(value);
+        let sorted_value = sort_rich_tree_by_label(value)?;
         map.insert(key.clone(), sorted_value);
     }
-    Value::Object(map)
+    Ok(Value::Object(map))
 }
 
 /// Given a rich term tree (encoded with JSON),
@@ -960,11 +990,15 @@ pub fn sort_object(v: &Map<String, Value>) -> Value {
 ///       "children": [  ]
 ///      }]
 /// }]
-pub fn sort_rich_tree_by_label(tree: &Value) -> Value {
+pub fn sort_rich_tree_by_label(tree: &Value) -> Result<Value, TreeViewError> {
     match tree {
-        Value::Array(a) => sort_array(a),
-        Value::Object(o) => sort_object(o),
-        _ => tree.clone(),
+        Value::Array(a) => Ok(sort_array(a)?)),
+        Value::Object(o) => Ok(sort_object(o)?)),
+        Value::String(_s) => Ok(tree.clone()),
+        _ => Err(TreeViewError::TreeFormat(format!(
+            "Got {} but expected a tree, list of nodes, or string",
+            tree.to_string()
+        ))),
     }
 }
 
@@ -1155,7 +1189,7 @@ pub async fn get_immediate_children_tree(
 
     let children_tree = Value::Array(children);
 
-    let sorted: Value = sort_rich_tree_by_label(&children_tree);
+    let sorted: Value = sort_rich_tree_by_label(&children_tree)?;
     Ok(sorted)
 }
 
@@ -1445,7 +1479,7 @@ pub async fn get_rich_json_tree_view(
     let tree = build_rich_tree(&roots, &relation_maps, &curie_2_label)?;
 
     //sort tree by label
-    let mut sorted = sort_rich_tree_by_label(&tree);
+    let mut sorted = sort_rich_tree_by_label(&tree)?;
 
     //get direct children ...
     let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
