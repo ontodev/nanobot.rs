@@ -19,6 +19,41 @@ pub enum TreeViewError {
     Unknown,
 }
 
+pub fn get_ldtab_field(value : &Value, field : &str) -> Result<Value,TreeViewError> {
+
+    match value {
+        Value::Object(map) => { 
+		match map.get(field) {
+			Some(y) => Ok(y.clone()),
+			None => return Err(TreeViewError::LDTab(format!("No field {} in LDTab value {}", field, value.to_string()))), 
+		}
+        },
+        _ => return Err(TreeViewError::LDTab(format!("Not an LDTab object {}", value.to_string())))
+}
+}
+
+pub fn get_ldtab_array_at(value : &Value, index : usize) -> Result<Value,TreeViewError> {
+    match value {
+        Value::Array(array) => Ok(array[index].clone()),
+        _ => return Err(TreeViewError::LDTab(format!("Not an LDTab array {}", value.to_string()))), 
+    } 
+}
+
+pub fn get_ldtab_first_field(value : &Value, field : &str) -> Result<Value, TreeViewError> {
+
+    let target_array = get_ldtab_field(value, field)?;
+    let target = get_ldtab_array_at(&target_array, 0)?;
+    Ok(target) 
+}
+
+pub fn get_ldtab_value_as_string(value : &Value) -> Result<String,TreeViewError> { 
+     match value.as_str() {
+        Some(string) => Ok(String::from(string)),
+        None => return Err(TreeViewError::LDTab(format!("Not an LDTab string {}", value.to_string()))), 
+        
+    }
+}
+
 /// Convert LDTab strings to serde Values.
 /// LDTab makes use of both strings and JSON strings.
 /// For example values in the 'subject' column of an LDTab database are
@@ -297,15 +332,10 @@ pub fn remove_invalid_classes(class_2_subclasses: &mut HashMap<String, HashSet<S
 /// v = {"datatype":"_IRI","object":"obo:BFO_0000050"}
 ///
 /// then check_part_of_property(v) returns true
-pub fn check_property(value: &Value, relation: &str) -> bool {
-    match value {
-        Value::Object(x) => {
-            let property = x.get("object").unwrap();
-            let relation_json = json!(relation);
-            property.eq(&relation_json)
-        }
-        _ => false,
-    }
+pub fn check_property(value: &Value, relation: &str) -> Result<bool,TreeViewError> {
+    let property = get_ldtab_field(value, "object")?;
+    let relation_json = json!(relation);
+    Ok(property.eq(&relation_json)) 
 }
 
 /// Given an LDTab predicate map encoded as a Serde Value, return true
@@ -325,16 +355,13 @@ pub fn check_property(value: &Value, relation: &str) -> bool {
 ///        "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
 ///
 /// then check_filler(v_1) returns true  and check_filler(v_2) returns false
-pub fn check_filler(value: &Value) -> bool {
-    match value {
-        Value::Object(x) => {
-            let filler = x.get("object").unwrap();
-            match filler {
-                Value::String(_x) => true,
-                _ => false,
-            }
-        }
-        _ => false,
+pub fn check_filler(value: &Value) -> Result<bool,TreeViewError> {
+    let filler = get_ldtab_field(value, "object")?;
+    //check whether 'filler' is a named class (represented as a JSON string)
+    //as opposed to complex expression (represnted as a JSON object)
+    match filler {
+        Value::String(_string) => Ok(true),
+        _ => Ok(false),
     }
 }
 
@@ -347,19 +374,37 @@ pub fn check_filler(value: &Value) -> bool {
 ///      "rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}
 ///
 /// then check_part_of_restriction(v,"obo:BFO_0000050") returns true
-pub fn check_restriction(value: &Map<String, Value>, relation: &str) -> bool {
-    if value.contains_key("owl:onProperty")
-        & value.contains_key("owl:someValuesFrom")
-        & value.contains_key("rdf:type")
-    {
-        let property = value.get("owl:onProperty").unwrap().as_array().unwrap()[0].clone();
-        let filler = value.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
-        //let rdf_type = value.get("rdf:type").unwrap().as_array().unwrap()[0]; //not necessary
+pub fn check_restriction(value: &Value, relation: &str) -> Result<bool,TreeViewError> {
 
-        check_property(&property, relation) & check_filler(&filler)
-    } else {
-        false
-    }
+        let part_of_restriction = match value {
+            Value::Object(map) =>  {
+                if map.contains_key("owl:onProperty")
+                    & map.contains_key("owl:someValuesFrom")
+                    & map.contains_key("rdf:type")
+                {
+                    let property = get_ldtab_first_field(value, "owl:onProperty")?;
+                    let filler = get_ldtab_first_field(value, "owl:someValuesFrom")?; 
+
+                    let property_check = check_property(&property, relation)?;
+                    let filler_check = check_filler(&filler)?;
+
+                     property_check & filler_check
+                } else {
+                    false
+                }
+
+
+}
+            _ => false,
+        };
+Ok(part_of_restriction)
+}
+
+pub fn get_existential_filler_as_string(existential_restriction : &Value) -> Result<String, TreeViewError> {
+    let filler = get_ldtab_first_field(&existential_restriction, "owl:someValuesFrom")?;
+    let filler = get_ldtab_field(&filler, "object")?;
+    let filler = get_ldtab_value_as_string(&filler)?;
+    Ok(filler) 
 }
 
 /// Given a mapping from classes to sets of their subclasses,
@@ -397,7 +442,7 @@ pub fn check_restriction(value: &Map<String, Value>, relation: &str) -> bool {
 pub fn get_relation_information(
     class_2_subclasses: &HashMap<String, HashSet<String>>,
     relation: &str,
-) -> HashMap<String, HashSet<String>> {
+) -> Result<HashMap<String, HashSet<String>>,TreeViewError> {
     let mut class_2_relation: HashMap<String, HashSet<String>> = HashMap::new();
 
     //original axiom: S is-a part-of some filler
@@ -406,38 +451,27 @@ pub fn get_relation_information(
         let class_value = ldtab_2_value(class);
 
         //check whether there is an existential restriction
-        let part_of_restriction = match class_value.clone() {
-            Value::Object(x) => check_restriction(&x, relation),
-            _ => false,
-        };
+        let is_restriction = check_restriction(&class_value, relation)?;
 
-        if part_of_restriction {
+        if is_restriction { 
+            let filler = get_existential_filler_as_string(&class_value)?;
+
             //encode information in class_2_relation
-            let part_of_filler = class_value
-                .get("owl:someValuesFrom")
-                .unwrap()
-                .as_array()
-                .unwrap()[0]
-                .clone();
-
-            let part_of_filler = part_of_filler.get("object").unwrap();
-            let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
-
             for subclass in subclasses {
-                match class_2_relation.get_mut(part_of_filler.as_str().unwrap()) {
-                    Some(x) => {
-                        x.insert(subclass.clone());
+                match class_2_relation.get_mut(&filler) {
+                    Some(set_of_subclasses) => {
+                        set_of_subclasses.insert(subclass.clone());
                     }
                     None => {
                         let mut subclasses = HashSet::new();
                         subclasses.insert(subclass.clone());
-                        class_2_relation.insert(part_of_filler_string.clone(), subclasses);
+                        class_2_relation.insert(filler.clone(), subclasses);
                     }
                 }
             }
         }
     }
-    class_2_relation
+    Ok(class_2_relation)
 }
 
 /// Given two maps from classes to subclasses,
@@ -617,12 +651,14 @@ pub async fn get_hierarchy_maps(
         let mut new_relations: HashSet<String> = HashSet::new();
         for update in &updates {
             let subclasses_updates = get_class_2_subclass_map(&update, table, pool).await?;
+            //NB: class_2_subrelations is guaranteed to contain IS_A
             let mut subclassof_map = class_2_subrelations.get_mut(IS_A).unwrap();
             update_hierarchy_map(&mut subclassof_map, &subclasses_updates);
 
             for rel in relations {
-                let relation_updates = get_relation_information(&subclasses_updates, rel);
-                let mut rel_map = class_2_subrelations.get_mut(rel.clone()).unwrap();
+                let relation_updates = get_relation_information(&subclasses_updates, rel)?;
+                //NB: class_2_subrelations is guaranteed to contain rel
+                let mut rel_map = class_2_subrelations.get_mut(rel as &str).unwrap();
                 update_hierarchy_map(&mut rel_map, &relation_updates);
 
                 for relation_update in relation_updates.keys() {
