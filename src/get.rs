@@ -56,12 +56,11 @@ pub async fn get_table(
     table: &str,
     shape: &str,
     format: &str,
-    show_messages: bool,
 ) -> Result<String, GetError> {
     let table = unquote(table).unwrap_or(table.to_string());
     let mut select = Select::new(format!("\"{}\"", table));
     select.limit(LIMIT_DEFAULT);
-    get_rows(config, &select, shape, format, show_messages).await
+    get_rows(config, &select, shape, format).await
 }
 
 pub async fn get_rows(
@@ -69,7 +68,6 @@ pub async fn get_rows(
     base_select: &Select,
     shape: &str,
     format: &str,
-    show_messages: bool,
 ) -> Result<String, GetError> {
     // Get all the tables
     let mut select = Select::new("\"table\"");
@@ -98,6 +96,22 @@ pub async fn get_rows(
     }
 
     // Get the columns for the selected table
+    let mut base_select = base_select.clone();
+    if base_select.select.is_empty() {
+        if let Err(e) = base_select.select_all(pool) {
+            return Err(GetError::new(e.to_string()));
+        }
+    }
+    let base_columns = base_select
+        .select
+        .iter()
+        .map(|s| {
+            let column = unquote(&s.expression).unwrap_or(s.expression.to_string());
+            let column = format!("'{}'", column);
+            column
+        })
+        .collect::<Vec<_>>();
+
     let mut select = Select::new("\"column\"");
     select
         .select(vec![
@@ -112,6 +126,10 @@ pub async fn get_rows(
                 Ok(f) => f,
                 Err(e) => return Err(GetError::new(e)),
             },
+            match Filter::new("\"column\"", "in", json!(base_columns)) {
+                Ok(f) => f,
+                Err(e) => return Err(GetError::new(e)),
+            },
         ]);
 
     let column_rows = match get_table_from_pool(&pool, &select).await {
@@ -120,10 +138,6 @@ pub async fn get_rows(
     };
 
     let mut columns: Vec<String> = vec![];
-    if shape == "page" {
-        columns.push("row_number".to_string());
-    }
-
     let mut columns_to_append = vec![];
     for row in &column_rows {
         match row.get("column") {
@@ -141,7 +155,7 @@ pub async fn get_rows(
     }
     columns.append(&mut columns_to_append);
 
-    let mut select = Select::clone(base_select);
+    let mut select = Select::clone(&base_select);
     select.select(columns);
     match select.limit {
         Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
@@ -169,8 +183,7 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page = match get_page(&pool, &select, &table_map, &column_rows, show_messages).await
-            {
+            let page = match get_page(&pool, &select, &table_map, &column_rows).await {
                 Ok(page) => page,
                 Err(e) => return Err(GetError::new(e.to_string())),
             };
@@ -196,8 +209,19 @@ async fn get_page(
     select: &Select,
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
-    filter_messages: bool,
 ) -> Result<Value, GetError> {
+    let filter_messages = {
+        let m = select
+            .select
+            .iter()
+            .filter(|s| {
+                let s_column = unquote(&s.expression).unwrap_or(s.expression.to_string());
+                s_column == "message"
+            })
+            .collect::<Vec<_>>();
+        !m.is_empty()
+    };
+
     // Annotate columns with filters and sorting
     let mut column_map = Map::new();
     for row in column_rows.iter() {
@@ -235,16 +259,15 @@ async fn get_page(
     // Query the table view instead of the base table, which includes conflict rows and the
     // message column:
     let mut view_select = Select { table: format!("{}_view", unquoted_table), ..select.clone() };
-    if let Err(e) = view_select.select_all(pool) {
-        return Err(GetError::new(e.to_string()));
+    let curr_cols = view_select.select.to_vec();
+    view_select.select(vec!["row_number"]);
+    for col in &curr_cols {
+        view_select.add_explicit_select(col);
     }
+    view_select.add_select("message");
 
     // If we're filtering for rows with messages:
     if filter_messages {
-        view_select.add_filter(match Filter::new("message", "not_is", "null".into()) {
-            Ok(f) => f,
-            Err(e) => return Err(GetError::new(e.to_string())),
-        });
         if let Some(limit) = select.limit {
             view_select.limit(limit);
         }
