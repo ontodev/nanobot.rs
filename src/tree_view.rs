@@ -44,7 +44,7 @@ pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewErro
         },
         _ => {
             return Err(TreeViewError::LDTab(format!(
-                "Not an LDTab object {}",
+                "Not an LDTab object: {}",
                 value.to_string()
             )))
         }
@@ -65,7 +65,7 @@ pub fn get_ldtab_array_at(value: &Value, index: usize) -> Result<Value, TreeView
         Value::Array(array) => Ok(array[index].clone()),
         _ => {
             return Err(TreeViewError::LDTab(format!(
-                "Not an LDTab array {}",
+                "Not an LDTab array: {}",
                 value.to_string()
             )))
         }
@@ -101,7 +101,7 @@ pub fn get_ldtab_value_as_string(value: &Value) -> Result<String, TreeViewError>
         Some(string) => Ok(String::from(string)),
         None => {
             return Err(TreeViewError::LDTab(format!(
-                "Not an LDTab string {}",
+                "Not an LDTab string: {}",
                 value.to_string()
             )))
         }
@@ -881,17 +881,17 @@ pub fn extract_label(value: &Value) -> Result<String, TreeViewError> {
             Some(label) => match label.as_str() {
                 Some(string) => Ok(String::from(string)),
                 None => Err(TreeViewError::TreeFormat(format!(
-                    "Key for 'label' is not a string {}",
+                    "Value for field 'label' is not a string: {}",
                     value.to_string()
                 ))),
             },
             None => Err(TreeViewError::TreeFormat(format!(
-                "No field 'label' in node {}",
+                "No field 'label' in node: {}",
                 value.to_string()
             ))),
         },
         _ => Err(TreeViewError::TreeFormat(format!(
-            "Expected JSON object for tree node but got {}",
+            "Expected JSON object for tree node but got: {}",
             value.to_string()
         ))),
     }
@@ -1045,7 +1045,7 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Result<Value, TreeViewError> {
         Value::Object(o) => Ok(sort_object(o)?),
         Value::String(_s) => Ok(tree.clone()),
         _ => Err(TreeViewError::TreeFormat(format!(
-            "Got {} but expected a tree, list of nodes, or string",
+            "Expected a tree, list of nodes, or string but got: {}",
             tree.to_string()
         ))),
     }
@@ -1358,7 +1358,7 @@ pub fn add_children(tree: &mut Value, children: &Value) -> Result<(), TreeViewEr
                 Some(array) => array,
                 None => {
                     return Err(TreeViewError::TreeFormat(format!(
-                        "Couldn't access children nodes in {}",
+                        "Couldn't access field 'children' in {}",
                         tree.to_string()
                     )))
                 }
@@ -1381,8 +1381,9 @@ pub fn add_children(tree: &mut Value, children: &Value) -> Result<(), TreeViewEr
             }
             Ok(())
         }
-        _ => Err(TreeViewError::TreeFormat(String::from(
-            "Expected array of child nodes or a node",
+        _ => Err(TreeViewError::TreeFormat(format!(
+            "Expected array of child nodes or a node but got {}",
+            tree.to_string()
         ))),
     }
 }
@@ -1630,7 +1631,7 @@ pub fn tree_2_hiccup_direct_children(
                     Some(string) => string,
                     None => {
                         return Err(TreeViewError::TreeFormat(format!(
-                            "No value for 'curie' field in {}",
+                            "No value for field 'curie' in {}",
                             child.to_string()
                         )))
                     }
@@ -1642,8 +1643,9 @@ pub fn tree_2_hiccup_direct_children(
             }
             Ok(Value::Array(res))
         }
-        _ => Err(TreeViewError::TreeFormat(String::from(
-            "Expected array of child nodes",
+        _ => Err(TreeViewError::TreeFormat(format!(
+            "Expected array of child nodes but got {}",
+            direct_children.to_string()
         ))),
     }
 }
@@ -1692,8 +1694,9 @@ pub fn tree_2_hiccup_descendants(
             }
             Ok(Value::Array(res))
         }
-        _ => Err(TreeViewError::TreeFormat(String::from(
-            "Expected array of child nodes",
+        _ => Err(TreeViewError::TreeFormat(format!(
+            "Expected array of child nodes but got {}",
+            descendants.to_string()
         ))),
     }
 }
@@ -1827,8 +1830,9 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Result<Value, TreeViewError>
             }
             Ok(Value::Array(tree_hiccup))
         }
-        _ => Err(TreeViewError::TreeFormat(String::from(
-            "Expected array of root nodes",
+        _ => Err(TreeViewError::TreeFormat(format!(
+            "Expected array of root nodes but got {}",
+            tree.to_string()
         ))),
     }
 }
