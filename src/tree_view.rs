@@ -1252,6 +1252,81 @@ pub async fn get_immediate_children_tree(
 }
 
 /// Given a rich term tree,
+/// add grandchildren to children nodes.
+///
+/// # Examples
+///
+/// Consider the rich term tree for "zebrafish anatomical entity"
+/// that currently only includes children but no grandchildren
+///
+/// tree = {
+///          "curie": "obo:ZFA_0100000",
+///          "label": "zebrafish anatomical entity",
+///          "property": "rdfs:subClassOf",        
+///          "children": [
+///            {
+///              "curie": "obo:ZFA_0000272",
+///              "label": "respiratory system",   
+///              "property": "rdfs:subClassOf",  
+///              "children": [ ]
+///             }]
+///        }
+///
+/// add_grandchildren(tree["children"], relations, table, pool)
+/// adds children nodes to all direct children in the tree, e.g.,
+///
+/// [{
+///   "curie": "obo:ZFA_0100000",
+///   "label": "zebrafish anatomical entity",
+///   "property": "rdfs:subClassOf",        
+///   "children": [
+///     {
+///       "curie": "obo:ZFA_0000272",
+///       "label": "respiratory system",   
+///       "property": "rdfs:subClassOf",  
+///       "children": [
+///         {
+///           "curie": "obo:ZFA_0000354",
+///           "label": "gill",
+///           "property": "obo:BFO_0000050",
+///           "children": [ ]              
+///          }]
+///      }]
+/// }]
+pub async fn add_grandchildren(
+    children: &mut Value,
+    relations: &Vec<&str>,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<(), TreeViewError> {
+    let mut grand_children = match children.as_array_mut() {
+        Some(array) => array,
+        None => {
+            return Err(TreeViewError::TreeFormat(format!(
+                "No children nodes in {}",
+                children.to_string()
+            )))
+        }
+    };
+
+    for child in grand_children {
+        let child_iri = match child["curie"].as_str() {
+            Some(string) => string,
+            None => {
+                return Err(TreeViewError::TreeFormat(format!(
+                    "No value for 'curie' field in {}",
+                    child.to_string()
+                )))
+            }
+        };
+        let grand_children =
+            get_immediate_children_tree(child_iri, &relations, table, pool).await?;
+        child["children"] = grand_children;
+    }
+    Ok(())
+}
+
+/// Given a rich term tree,
 /// add children to the first occurrence of their respective parents in the tree.
 ///
 /// # Examples
@@ -1551,32 +1626,11 @@ pub async fn get_rich_json_tree_view(
 
     //get direct children ...
     let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
-    //... and grandchildren ...
-    let mut grand_children = match children.as_array_mut() {
-        Some(array) => array,
-        None => {
-            return Err(TreeViewError::TreeFormat(format!(
-                "No children nodes in {}",
-                tree.to_string()
-            )))
-        }
-    };
 
-    for child in grand_children {
-        let child_iri = match child["curie"].as_str() {
-            Some(string) => string,
-            None => {
-                return Err(TreeViewError::TreeFormat(format!(
-                    "No value for 'curie' field in {}",
-                    child.to_string()
-                )))
-            }
-        };
-        let grand_children =
-            get_immediate_children_tree(child_iri, &relations, table, pool).await?;
-        child["children"] = grand_children;
-    }
-    //... and add these to the tree in the first occurrence of the input entity
+    //... then and grandchildren ...
+    add_grandchildren(&mut children, relations, table, pool).await?;
+
+    //... and then add these to the tree in the first occurrence of the input entity
     add_children(&mut sorted, &children)?;
 
     Ok(sorted)
