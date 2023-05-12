@@ -6,7 +6,10 @@ use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use enquote::unquote;
+use futures::executor::block_on;
 use ontodev_sqlrest::{parse, Select};
+use ontodev_valve::{validate::validate_row, valve_grammar::StartParser};
+use serde_json::{json, Value as SerdeValue};
 use sqlx::any::AnyPool;
 
 use std::collections::HashMap;
@@ -25,6 +28,11 @@ struct AppState {
 }
 
 pub type RequestParams = HashMap<String, String>;
+/// An alias for [serde_json::Map](..//serde_json/struct.Map.html)<String, [serde_json::Value](../serde_json/enum.Value.html)>.
+// Note: serde_json::Map is
+// [backed by a BTreeMap by default](https://docs.serde.rs/serde_json/map/index.html) which can be
+// overriden by specifying the preserve-order feature in Cargo.toml, which we have indeed specified.
+pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 #[tokio::main]
 pub async fn app(config: &Config) -> Result<String, String> {
@@ -158,7 +166,7 @@ fn row(
     render_row_from_database(
         &table,
         None,
-        &row_number,
+        row_number,
         state,
         query_params,
         form_params,
@@ -169,7 +177,7 @@ fn row(
 fn render_row_from_database(
     table: &str,
     term_id: Option<String>,
-    row_number: &u32,
+    row_number: u32,
     state: &Arc<AppState>,
     query_params: &RequestParams,
     form_params: &RequestParams,
@@ -188,6 +196,57 @@ fn render_row_from_database(
         None => return Err(format!("No 'view' in {:?}", query_params).into()),
         Some(v) => v.to_string(),
     };
+    //let mut messages = None;
+    let mut form_html = None;
+    if request_type == RequestType::POST {
+        let mut new_row = SerdeMap::new();
+        let columns = match get_sql_columns(table, pool) {
+            Err(e) => return Err(e.into()),
+            Ok(v) => v,
+        };
+        // Use the list of columns for the table from the db to look up their values in the form:
+        for column in &columns {
+            if column != "row_number" {
+                let value = match form_params.get(column) {
+                    Some(v) => v,
+                    None => {
+                        let other_column = format!("{}_other", column);
+                        match form_params.get(&other_column) {
+                            Some(v) => v,
+                            None => {
+                                return Err(format!(
+                                    "No '{}' or '{}' in {:?}",
+                                    column, other_column, form_params
+                                )
+                                .into())
+                            }
+                        }
+                    }
+                };
+                new_row.insert(column.to_string(), value.to_string().into());
+            }
+        }
+
+        // Manually override view, which is not included in request.args in CGI app
+        view = String::from("form");
+        let action = match form_params.get("action") {
+            None => return Err(format!("No 'action' in {:?}", form_params).into()),
+            Some(v) => v,
+        };
+        if action == "validate" {
+            let validated_row = match validate_table_row(table, &new_row, Some(row_number), state) {
+                Ok(v) => {
+                    let mut tmp = SerdeMap::new();
+                    tmp.insert("row_number".to_string(), json!(row_number));
+                    tmp.extend(v);
+                    tmp
+                }
+                Err(e) => return Err(e.into()),
+            };
+            form_html = Some(get_row_as_form(table, &validated_row));
+            todo!();
+        }
+    }
 
     Ok(Html(format!(
         "What can I do for you, your table '{}' and your row number {} today, sir?",
@@ -218,4 +277,64 @@ fn is_ontology(table: &str, pool: &AnyPool) -> Result<bool, String> {
         && columns.contains(&"object".to_string())
         && columns.contains(&"datatype".to_string())
         && columns.contains(&"annotation".to_string()))
+}
+
+fn validate_table_row(
+    table_name: &str,
+    row_data: &SerdeMap,
+    row_number: Option<u32>,
+    state: &Arc<AppState>,
+) -> Result<SerdeMap, String> {
+    let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+        None => return Err(format!("Valve configuration is undefined in {:?}", state.config)),
+    };
+    let pool = match &state.config.pool {
+        Some(p) => p.clone(),
+        None => return Err(format!("Pool is undefined in {:?}", state.config)),
+    };
+
+    let validated_row = match row_number {
+        Some(row_number) => {
+            let mut result_row = SerdeMap::new();
+            for (column, value) in row_data.iter() {
+                result_row.insert(
+                    column.to_string(),
+                    json!({
+                        "value": value.clone(),
+                        "valid": true,
+                        "messages": Vec::<SerdeMap>::new(),
+                    }),
+                );
+            }
+            block_on(validate_row(
+                &vconfig,
+                &dt_conds,
+                &rule_conds,
+                &pool,
+                table_name,
+                &result_row,
+                true,
+                Some(row_number),
+            ))
+            .unwrap()
+        }
+        None => block_on(validate_row(
+            &vconfig,
+            &dt_conds,
+            &rule_conds,
+            &pool,
+            table_name,
+            row_data,
+            false,
+            None,
+        ))
+        .unwrap(),
+    };
+    Ok(validated_row)
+}
+
+fn get_row_as_form(table_name: &str, row_data: &SerdeMap) -> String {
+    todo!();
+    String::from("")
 }
