@@ -1,3 +1,7 @@
+// TODO: Have a general look through all of this code (and in the other modules) and see if
+// we can use the valve config (which is now available) instead of running db requests. But do
+// this later.
+
 use crate::config::Config;
 use crate::sql::{
     get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,

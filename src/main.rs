@@ -14,8 +14,8 @@ async fn main() {
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        //.with_max_level(tracing::Level::INFO)
-        .with_max_level(tracing::Level::WARN)
+        .with_max_level(tracing::Level::INFO)
+        //.with_max_level(tracing::Level::WARN)
         //.with_max_level(tracing::Level::DEBUG)
         // completes the builder.
         .finish();
@@ -91,7 +91,9 @@ async fn main() {
                     };
                 Ok(result)
             }
-            Some(("serve", _sub_matches)) => serve::app(config.start_pool().await.unwrap()),
+            Some(("serve", _sub_matches)) => {
+                serve::app(config.start_pool().await.unwrap().load_valve_config().await.unwrap())
+            }
             _ => unreachable!(
                 "Exhausted list of subcommands and subcommand_required prevents `None`"
             ),
