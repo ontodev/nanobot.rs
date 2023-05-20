@@ -7,6 +7,7 @@ use axum::routing::get;
 use axum::Router;
 use enquote::unquote;
 use futures::executor::block_on;
+use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Select};
 use ontodev_valve::{ast::Expression, validate::validate_row, CompiledCondition};
@@ -552,12 +553,6 @@ fn get_row_as_form(
             _ => readonly = false,
         };
 
-        // TODO: Use Chris's hiccupriir library for this instead.
-        //let mut html = String::new();
-        //hiccup!(&mut html, html[form{method=>"post"}]);
-        //tracing::info!("HTML: {}", html);
-        // TODO: This should not be initialised as empty. See the commented out code above.
-
         let mut html = vec![json!("html"), json!(["form", {"method": "post"}])];
         tracing::info!("HTML: {:?}", html);
 
@@ -669,8 +664,14 @@ fn get_hiccup_form_row(
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut textarea_element = vec![json!("textarea"), json!(input_attrs)];
         if let Some(value) = value {
-            // TODO: HTML escape value.
-            textarea_element.push(json!(value));
+            match value.as_str() {
+                Some(v) => {
+                    let mut empty = String::new();
+                    let value = encode_text_to_string(v, &mut empty);
+                    textarea_element.push(json!(value));
+                }
+                None => (),
+            };
         }
         value_col.push(json!(textarea_element));
     } else if html_type == "select" {
@@ -680,14 +681,13 @@ fn get_hiccup_form_row(
         let mut has_selected = false;
         if let Some(allowed_values) = allowed_values {
             for av in allowed_values {
-                // TODO: HTML-escape av
-                let av_safe = av;
+                let mut empty = String::new();
+                let av_safe = encode_text_to_string(av, &mut empty);
                 match value {
                     Some(value) if value == av => {
                         has_selected = true;
                         select_element.append(&mut vec![
                             json!("option"),
-                            // TODO: HTML-escape av_safe yet again here.
                             json!({"value": av_safe, "selected": true}),
                             json!(av_safe),
                         ]);
@@ -695,7 +695,6 @@ fn get_hiccup_form_row(
                     _ => {
                         select_element.append(&mut vec![
                             json!("option"),
-                            // TODO: HTML-escape av_safe yet again here.
                             json!({ "value": av_safe }),
                             json!(av_safe),
                         ]);
@@ -712,6 +711,7 @@ fn get_hiccup_form_row(
             select_element.insert(2, json!(["option", {"value": "", "selected": true}]));
         }
         value_col.push(json!(select_element));
+        tracing::info!("VALUE COL: {:?}", value_col);
     } else if vec!["text", "number", "search"].contains(&html_type) {
         todo!();
     } else if html_type == "radio" {
