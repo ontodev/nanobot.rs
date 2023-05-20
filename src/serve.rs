@@ -665,16 +665,62 @@ fn get_hiccup_form_row(
 
     let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
     if html_type == "textarea" {
-
+        classes.insert(0, "form-control");
+        input_attrs.insert("class".to_string(), json!(classes.join(" ")));
+        let mut textarea_element = vec![json!("textarea"), json!(input_attrs)];
+        if let Some(value) = value {
+            // TODO: HTML escape value.
+            textarea_element.push(json!(value));
+        }
+        value_col.push(json!(textarea_element));
     } else if html_type == "select" {
+        classes.insert(0, "form-select");
+        input_attrs.insert("class".to_string(), json!(classes.join(" ")));
+        let mut select_element = vec![json!("select"), json!(input_attrs)];
+        let mut has_selected = false;
+        if let Some(allowed_values) = allowed_values {
+            for av in allowed_values {
+                // TODO: HTML-escape av
+                let av_safe = av;
+                match value {
+                    Some(value) if value == av => {
+                        has_selected = true;
+                        select_element.append(&mut vec![
+                            json!("option"),
+                            // TODO: HTML-escape av_safe yet again here.
+                            json!({"value": av_safe, "selected": true}),
+                            json!(av_safe),
+                        ]);
+                    }
+                    _ => {
+                        select_element.append(&mut vec![
+                            json!("option"),
+                            // TODO: HTML-escape av_safe yet again here.
+                            json!({ "value": av_safe }),
+                            json!(av_safe),
+                        ]);
+                    }
+                };
+            }
+        }
 
+        // Add an empty string for no value at the start of the options
+        if has_selected {
+            select_element.insert(2, json!(["option", {"value": ""}]));
+        } else {
+            // If there is currently no value, make sure this one is selected
+            select_element.insert(2, json!(["option", {"value": "", "selected": true}]));
+        }
+        value_col.push(json!(select_element));
     } else if vec!["text", "number", "search"].contains(&html_type) {
-
+        todo!();
     } else if html_type == "radio" {
-
+        todo!();
     } else {
-
+        todo!();
     }
+
+    todo!();
 
     Ok(vec![])
 }
