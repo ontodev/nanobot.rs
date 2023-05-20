@@ -11,7 +11,6 @@ axum = "0.6.1"
 clap = { version = "4.0.27", features = ["cargo", "derive"] }
 enquote = "1.1.0"
 futures = "0.3"
-hiccup = "0.2.5"
 lazy_static = "1.4.0"
 minijinja = { version = "0.26.0", features = ["json", "urlencode", "preserve_order"]}
 # ontodev_valve = "0.2.1"
@@ -25,6 +24,10 @@ toml = { version = "0.5.9" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 urlencoding = "2.1.2"
+
+[dependencies.ontodev_hiccup]
+git = "https://github.com/ontodev/hiccup.rs"
+rev = "962f54994fd6d4c58f8c8855159d3cb6126b974b"
 
 [dependencies.ontodev_valve]
 path = "../ontodev_demo/valve.rs"

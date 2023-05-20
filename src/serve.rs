@@ -7,7 +7,7 @@ use axum::routing::get;
 use axum::Router;
 use enquote::unquote;
 use futures::executor::block_on;
-use hiccup::hiccup; // TODO: Use Chris's library instead.
+use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Select};
 use ontodev_valve::{ast::Expression, validate::validate_row, CompiledCondition};
 use serde_json::{json, Value as SerdeValue};
@@ -175,7 +175,7 @@ fn row(
 
     render_row_from_database(
         &table,
-        None,
+        &None,
         row_number,
         state,
         query_params,
@@ -186,7 +186,7 @@ fn row(
 
 fn render_row_from_database(
     table: &str,
-    term_id: Option<String>,
+    term_id: &Option<String>,
     row_number: u32,
     state: &Arc<AppState>,
     query_params: &RequestParams,
@@ -240,7 +240,8 @@ fn render_row_from_database(
             Some(v) => v,
         };
         if action == "validate" {
-            let validated_row = match validate_table_row(table, &new_row, Some(row_number), state) {
+            let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
+            {
                 Ok(v) => {
                     let mut tmp = SerdeMap::new();
                     tmp.insert("row_number".to_string(), json!(row_number));
@@ -250,7 +251,7 @@ fn render_row_from_database(
                 Err(e) => return Err(e.into()),
             };
             //tracing::info!("VALIDATED ROW: {:#?}", validated_row);
-            form_html = Some(get_row_as_form(config, table, &validated_row));
+            form_html = Some(get_row_as_form(state, config, table, &validated_row));
         } else if action == "submit" {
             todo!();
         }
@@ -315,7 +316,7 @@ fn get_column_config(table: &str, column: &str, config: &ValveConfig) -> Result<
 fn get_html_type_and_values(
     config: &ValveConfig,
     datatype: &str,
-    values: Option<Vec<String>>,
+    values: &Option<Vec<String>>,
 ) -> Result<(Option<String>, Option<Vec<String>>), String> {
     let dt_config = match config
         .config
@@ -353,7 +354,7 @@ fn get_html_type_and_values(
                 _ => (),
             },
         },
-        Some(values) => new_values = values,
+        Some(values) => new_values = values.to_vec(),
     };
     let new_values = {
         if new_values.is_empty() {
@@ -375,7 +376,7 @@ fn get_html_type_and_values(
     if let Some(parent) = dt_config.get("parent").and_then(|t| t.as_str()) {
         if !parent.is_empty() {
             //tracing::info!("Could not find html type. Trying with {} and {:?}", parent, new_values);
-            return get_html_type_and_values(config, parent, new_values);
+            return get_html_type_and_values(config, parent, &new_values);
         }
     }
 
@@ -394,7 +395,7 @@ fn is_ontology(table: &str, config: &ValveConfig) -> Result<bool, String> {
 fn validate_table_row(
     table_name: &str,
     row_data: &SerdeMap,
-    row_number: Option<u32>,
+    row_number: &Option<u32>,
     state: &Arc<AppState>,
 ) -> Result<SerdeMap, String> {
     let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
@@ -427,7 +428,7 @@ fn validate_table_row(
                 table_name,
                 &result_row,
                 true,
-                Some(row_number),
+                Some(*row_number),
             ))
             .unwrap()
         }
@@ -447,16 +448,13 @@ fn validate_table_row(
 }
 
 fn get_row_as_form(
+    state: &Arc<AppState>,
     config: &ValveConfig,
     table_name: &str,
     row_data: &SerdeMap,
 ) -> Result<String, String> {
-    // TODO: Use Chris's hiccupriir library for this instead.
-    let mut html = String::new();
-    hiccup!(&mut html, html[form{method=>"post"}]);
-    tracing::info!("HTML: {}", html);
-
     let mut row_valid = true;
+    let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
         if cell_header == "row_number" {
             continue;
@@ -524,7 +522,7 @@ fn get_row_as_form(
             },
             None => return Err(format!("No 'datatype' in {:?}", column_config)),
         };
-        let structure_func = match column_config.get("structure") {
+        let structure = match column_config.get("structure") {
             Some(d) => match d.as_str() {
                 None => return Err(format!("{} is not a str", d)),
                 Some(d) => d.split('(').collect::<Vec<_>>()[0],
@@ -532,21 +530,151 @@ fn get_row_as_form(
             None => return Err(format!("No 'structure' in {:?}", column_config)),
         };
 
-        //tracing::info!("D,D,S: {}, {}, {}", description, datatype, structure_func);
+        //tracing::info!("D,D,S: {}, {}, {}", description, datatype, structure);
 
         let mut allowed_values = None;
-        if vec!["from", "in", "tree", "under"].contains(&structure_func) {
+        if vec!["from", "in", "tree", "under"].contains(&structure) {
             html_type = Some("search".into());
         } else {
-            (html_type, allowed_values) = get_html_type_and_values(config, &datatype, None)?;
+            (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
 
         if allowed_values != None && html_type == None {
             html_type = Some("search".into());
         }
 
-        todo!();
+        let readonly;
+        match html_type {
+            Some(s) if s == "readonly" => {
+                readonly = true;
+                html_type = Some("text".into());
+            }
+            _ => readonly = false,
+        };
+
+        // TODO: Use Chris's hiccupriir library for this instead.
+        //let mut html = String::new();
+        //hiccup!(&mut html, html[form{method=>"post"}]);
+        //tracing::info!("HTML: {}", html);
+        // TODO: This should not be initialised as empty. See the commented out code above.
+
+        let mut html = vec![json!("html"), json!(["form", {"method": "post"}])];
+        tracing::info!("HTML: {:?}", html);
+
+        let mut hiccup_form_row = get_hiccup_form_row(
+            state,
+            cell_header,
+            &None,
+            &allowed_values,
+            &None,
+            &Some(description),
+            &None,
+            &html_type,
+            &Some(message),
+            &Some(readonly),
+            &Some(valid),
+            &Some(value),
+            form_row_id,
+        )?;
+        html.append(&mut hiccup_form_row);
+        tracing::info!("HICCUP: {}", hiccup::render(&json!(html), 0));
     }
 
+    todo!();
+    // if row_valid {
+
     Ok(String::from(""))
+}
+
+fn get_hiccup_form_row(
+    mut state: &Arc<AppState>,
+    header: &str,
+    allow_delete: &Option<bool>,
+    allowed_values: &Option<Vec<String>>,
+    annotations: &Option<HashMap<String, String>>,
+    description: &Option<String>,
+    display_header: &Option<String>,
+    html_type: &Option<String>,
+    message: &Option<String>,
+    readonly: &Option<bool>,
+    valid: &Option<bool>,
+    value: &Option<SerdeValue>,
+    mut form_row_id: usize,
+) -> Result<Vec<SerdeValue>, String> {
+    let allow_delete = match allow_delete {
+        None => false,
+        Some(b) => *b,
+    };
+    let readonly = match readonly {
+        None => false,
+        Some(b) => *b,
+    };
+    let html_type = match html_type {
+        None => "text",
+        Some(t) => t,
+    };
+    if vec!["select", "radio", "checkbox"].contains(&html_type) && *allowed_values == None {
+        return Err(format!("A list of allowed values is required for HTML type '{}'", html_type));
+    }
+
+    // Create the header lavel for this form row:
+    let mut header_col = vec![json!("div"), json!({"class": "col-md-3", "id": form_row_id})];
+    if allow_delete {
+        header_col.append(&mut vec![
+            json!("a"),
+            json!({ "href": format!("javascript:del({})", form_row_id) }),
+            json!(["i", {"class": "bi-x-circle", "style": "font-size: 16px; color: #dc3545;"}]),
+            json!("&nbsp"),
+        ]);
+    }
+    form_row_id += 1;
+
+    match display_header {
+        Some(d) => header_col.append(&mut vec![json!("b"), json!(d)]),
+        None => header_col.append(&mut vec![json!("b"), json!(header)]),
+    };
+
+    if let Some(description) = description {
+        header_col.append(&mut vec![
+            json!("button"),
+            json!({
+                "class": "btn",
+                "data-bs-toggle": "tooltip",
+                "data-bs-placement": "right",
+                "title": description,
+            }),
+            json!(["i", {"class": "bi-question-circle"}]),
+        ]);
+    }
+
+    tracing::info!("HEADER COL: {:#?}", header_col);
+
+    // Create the value input for this form row:
+    let mut classes = vec![];
+    match valid {
+        Some(flag) if *flag => classes.push("is-valid"),
+        _ => classes.push("is-invalid"),
+    };
+
+    let mut input_attrs = SerdeMap::new();
+    if readonly {
+        input_attrs.insert("readonly".to_string(), json!(true));
+    } else {
+        input_attrs.insert("name".to_string(), json!(header));
+    }
+
+    let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
+    if html_type == "textarea" {
+
+    } else if html_type == "select" {
+
+    } else if vec!["text", "number", "search"].contains(&html_type) {
+
+    } else if html_type == "radio" {
+
+    } else {
+
+    }
+
+    Ok(vec![])
 }
