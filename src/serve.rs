@@ -539,6 +539,7 @@ fn get_row_as_form(
         } else {
             (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
+        tracing::info!("************ HTML TYPE IS {:?}", html_type);
 
         if allowed_values != None && html_type == None {
             html_type = Some("search".into());
@@ -586,7 +587,7 @@ fn get_hiccup_form_row(
     header: &str,
     allow_delete: &Option<bool>,
     allowed_values: &Option<Vec<String>>,
-    annotations: &Option<HashMap<String, String>>,
+    annotations: &Option<SerdeMap>,
     description: &Option<String>,
     display_header: &Option<String>,
     html_type: &Option<String>,
@@ -615,22 +616,22 @@ fn get_hiccup_form_row(
     // Create the header lavel for this form row:
     let mut header_col = vec![json!("div"), json!({"class": "col-md-3", "id": form_row_id})];
     if allow_delete {
-        header_col.append(&mut vec![
+        header_col.push(json!([
             json!("a"),
             json!({ "href": format!("javascript:del({})", form_row_id) }),
             json!(["i", {"class": "bi-x-circle", "style": "font-size: 16px; color: #dc3545;"}]),
             json!("&nbsp"),
-        ]);
+        ]));
     }
     form_row_id += 1;
 
     match display_header {
-        Some(d) => header_col.append(&mut vec![json!("b"), json!(d)]),
-        None => header_col.append(&mut vec![json!("b"), json!(header)]),
+        Some(d) => header_col.push(json!([json!("b"), json!(d)])),
+        None => header_col.push(json!([json!("b"), json!(header)])),
     };
 
     if let Some(description) = description {
-        header_col.append(&mut vec![
+        header_col.push(json!([
             json!("button"),
             json!({
                 "class": "btn",
@@ -639,7 +640,7 @@ fn get_hiccup_form_row(
                 "title": description,
             }),
             json!(["i", {"class": "bi-question-circle"}]),
-        ]);
+        ]));
     }
 
     tracing::info!("HEADER COL: {:#?}", header_col);
@@ -658,23 +659,23 @@ fn get_hiccup_form_row(
         input_attrs.insert("name".to_string(), json!(header));
     }
 
+    tracing::info!("GET HICCUP FORM ROW HTML TYPE: {}", html_type);
     let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
-    if html_type == "textarea" {
+    if vec!["textarea", "input"].contains(&html_type) {
+        tracing::info!("TEXTAREA OR INPUT");
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
-        let mut textarea_element = vec![json!("textarea"), json!(input_attrs)];
+        let mut element = vec![json!(html_type), json!(input_attrs)];
         if let Some(value) = value {
-            match value.as_str() {
-                Some(v) => {
-                    let mut empty = String::new();
-                    let value = encode_text_to_string(v, &mut empty);
-                    textarea_element.push(json!(value));
-                }
-                None => (),
-            };
+            if let Some(v) = value.as_str() {
+                let mut empty = String::new();
+                let value = encode_text_to_string(v, &mut empty);
+                element.push(json!(value));
+            }
         }
-        value_col.push(json!(textarea_element));
+        value_col.push(json!(element));
     } else if html_type == "select" {
+        tracing::info!("SELECT");
         classes.insert(0, "form-select");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut select_element = vec![json!("select"), json!(input_attrs)];
@@ -686,18 +687,18 @@ fn get_hiccup_form_row(
                 match value {
                     Some(value) if value == av => {
                         has_selected = true;
-                        select_element.append(&mut vec![
+                        select_element.push(json!([
                             json!("option"),
                             json!({"value": av_safe, "selected": true}),
                             json!(av_safe),
-                        ]);
+                        ]));
                     }
                     _ => {
-                        select_element.append(&mut vec![
+                        select_element.push(json!([
                             json!("option"),
                             json!({ "value": av_safe }),
                             json!(av_safe),
-                        ]);
+                        ]));
                     }
                 };
             }
@@ -711,16 +712,191 @@ fn get_hiccup_form_row(
             select_element.insert(2, json!(["option", {"value": "", "selected": true}]));
         }
         value_col.push(json!(select_element));
-        tracing::info!("VALUE COL: {:?}", value_col);
+        tracing::info!("VALUE COL FOR SELECT: {:?}", value_col);
     } else if vec!["text", "number", "search"].contains(&html_type) {
-        todo!();
+        tracing::info!("TEXT NUMBER SEARCH");
+        // TODO: Support a range restriction for 'number'
+        classes.insert(0, "form-control");
+        input_attrs.insert("type".to_string(), json!(html_type));
+        if html_type == "search" {
+            classes.append(&mut vec!["search", "typeahead"]);
+            input_attrs.insert("id".to_string(), json!(format!("{}-typeahead-form", header)));
+        }
+        input_attrs.insert("class".to_string(), json!(classes.join(" ")));
+        if let Some(value) = value {
+            if let Some(v) = value.as_str() {
+                let mut empty = String::new();
+                let value = encode_text_to_string(v, &mut empty);
+                input_attrs.insert("value".to_string(), json!(value));
+            }
+        }
+        value_col.push(json!([json!("input"), json!(input_attrs)]));
+        tracing::info!("VALUE COL: {:#?}", value_col);
     } else if html_type == "radio" {
-        todo!();
+        tracing::info!("RADIO");
+        // TODO: what if value is not in allowed_values? Or what if there is no value?
+        classes.insert(0, "form-check-input");
+        input_attrs.insert("type".to_string(), json!(html_type));
+        input_attrs.insert("class".to_string(), json!(classes.join(" ")));
+        if let Some(allowed_values) = allowed_values {
+            for av in allowed_values {
+                let mut empty = String::new();
+                let av_safe = encode_text_to_string(av, &mut empty);
+                let mut attrs_copy = input_attrs.clone();
+                attrs_copy.insert("value".to_string(), json!(av_safe));
+                if let Some(value) = value {
+                    if value == av {
+                        attrs_copy.insert("checked".to_string(), json!(true));
+                    }
+                }
+                value_col.push(json!([
+                    json!("div"),
+                    json!([json!("input"), json!(attrs_copy)]),
+                    json!([
+                        json!("label"),
+                        json!({"class": "form-check-label", "for": av_safe}),
+                        json!(av_safe),
+                    ]),
+                ]));
+            }
+        }
+        tracing::info!("VALUE COL FOR RADIO: {:#?}", value_col);
+
+        let mut attrs_copy = input_attrs.clone();
+        attrs_copy.insert("value".to_string(), json!(""));
+        let mut input_attrs: SerdeMap = match serde_json::from_str(&format!(
+            r#"{{
+                 "type": "text",
+                 "class": "form-control",
+                 "name": {} + "_other",
+                 "placeholder": "other",
+               }}"#,
+            header,
+        )) {
+            Ok(a) => a,
+            Err(e) => return Err(e.to_string()),
+        };
+
+        if let Some(value) = value {
+            if let Some(value) = value.as_str() {
+                if let Some(allowed_values) = allowed_values {
+                    if !allowed_values.contains(&value.to_string()) {
+                        attrs_copy.insert("checked".to_string(), json!(true));
+                        input_attrs.insert("value".to_string(), json!(value));
+                    }
+                }
+            }
+        }
+        let mut e = vec![
+            json!("div"),
+            json!(["input", attrs_copy]),
+            json!(["label", {"class": "form-check-label", "for": "other"}, ["input", input_attrs]]),
+        ];
+        if let Some(message) = message {
+            let validation_cls = {
+                match valid {
+                    Some(flag) if *flag => "valid-feedback",
+                    _ => "invalid-feedback",
+                }
+            };
+            e.push(json!([json!("div"), json!({ "class": validation_cls }), json!(message),]));
+        }
+        value_col.push(json!(e));
     } else {
-        todo!();
+        tracing::info!("ERROR");
+        return Err(format!("'{}' form field is not supported for column '{}'", html_type, header));
     }
 
-    todo!();
+    match message {
+        Some(message) if html_type != "radio" => {
+            let validation_cls = {
+                match valid {
+                    Some(flag) if *flag => "valid-feedback",
+                    _ => "invalid-feedback",
+                }
+            };
+            value_col.push(json!([
+                json!("div"),
+                json!({ "class": validation_cls }),
+                json!(message),
+            ]));
+        }
+        _ => (),
+    };
 
-    Ok(vec![])
+    tracing::info!("SVAVOODIA!!!!");
+
+    ////////////////////////////////////////////
+    // Remove these statements later:
+    let mut annotations = SerdeMap::new();
+    let my_leg = json!([
+        {"object": "Pep \"Mr. Blue\" Guardiola"},
+        {"object": "Kevin De Bruyne"},
+    ]);
+    let my_arm = json!([
+        {"object": "Jürgen \"Mr. Red\" Klopp"},
+        {"object": "Trent Alexander-Arnold"},
+    ]);
+    annotations.insert("MyFoot".to_string(), my_leg);
+    annotations.insert("MyHand".to_string(), my_arm);
+    let annotations = Some(annotations);
+    ////////////////////////////////////////////
+
+    if let Some(annotations) = annotations {
+        let mut ann_html = json!([]);
+        for (ann_pred, ann_values) in annotations {
+            for av in ann_values.as_array().unwrap() {
+                let av = match av.as_object() {
+                    Some(av) => match av.get("object") {
+                        Some(o) => match o.as_str() {
+                            Some(s) => s,
+                            None => return Err(format!("{:?} is not a str", o)),
+                        },
+                        None => return Err(format!("No 'object' in {:?}", av)),
+                    },
+                    None => return Err(format!("{:?} is not an object.", av)),
+                };
+                tracing::info!("AV FOR {}: {}", ann_pred, av);
+                ann_html = json!([
+                    "div",
+                    {
+                        "class": "row justify-content-end",
+                        "style": "padding-right: 0px; padding-top: 5px;",
+                    },
+                    [
+                        "div",
+                        {"class": "col-sm-9"},
+                        [
+                            "div",
+                            {"class": "row"},
+                            [
+                                "label",
+                                {
+                                    "class": "col-sm-2 col-form-label",
+                                    "style": "padding-left: 20px !important;",
+                                },
+                                format!("{}", ann_pred),
+                            ],
+                            [
+                                "div",
+                                {"class": "col-sm-10", "style": "padding-right: 0px !important;"},
+                                [
+                                    "input",
+                                    {
+                                        "type": "text",
+                                        "class": "form-control",
+                                        "value": format!("{}", av.replace('"', "&quot;")),
+                                    },
+                                ],
+                            ],
+                        ],
+                    ],
+                ]);
+                tracing::info!("ANN HTML: {}", ann_html);
+            }
+        }
+        value_col.push(ann_html);
+    }
+
+    Ok(vec![json!("div"), json!({"class": "row py-1"}), json!(header_col), json!(value_col)])
 }
