@@ -454,7 +454,9 @@ fn get_row_as_form(
     table_name: &str,
     row_data: &SerdeMap,
 ) -> Result<String, String> {
-    let mut row_valid = true;
+    let mut html = vec![json!("html"), json!(["form", {"method": "post"}])];
+    tracing::info!("HTML: {:?}", html);
+    let mut row_valid = None;
     let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
         if cell_header == "row_number" {
@@ -481,8 +483,17 @@ fn get_row_as_form(
             }
         };
 
-        if !valid && row_valid {
-            row_valid = false;
+        match row_valid {
+            None if !valid => row_valid = Some(false),
+            None if valid => row_valid = Some(true),
+            Some(true) if !valid => row_valid = Some(false),
+            _ => (),
+        };
+
+        if valid && row_valid == None {
+            row_valid = Some(true)
+        } else if !valid {
+            row_valid = Some(false)
         }
 
         //tracing::info!("MESSAGES FOR {}.{}: {:?}", table_name, cell_header, messages);
@@ -539,7 +550,7 @@ fn get_row_as_form(
         } else {
             (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
-        tracing::info!("************ HTML TYPE IS {:?}", html_type);
+        tracing::info!("HTML TYPE IS {:?}", html_type);
 
         if allowed_values != None && html_type == None {
             html_type = Some("search".into());
@@ -553,9 +564,6 @@ fn get_row_as_form(
             }
             _ => readonly = false,
         };
-
-        let mut html = vec![json!("html"), json!(["form", {"method": "post"}])];
-        tracing::info!("HTML: {:?}", html);
 
         let mut hiccup_form_row = get_hiccup_form_row(
             state,
@@ -572,14 +580,59 @@ fn get_row_as_form(
             &Some(value),
             form_row_id,
         )?;
-        html.append(&mut hiccup_form_row);
+        html.push(json!(hiccup_form_row));
+        tracing::info!("HTML PRIOR TO HICCUP: {}", json!(html));
         tracing::info!("HICCUP: {}", hiccup::render(&json!(html), 0));
     }
 
-    todo!();
-    // if row_valid {
+    let submit_cls = match row_valid {
+        Some(flag) => {
+            if flag {
+                "success"
+            } else {
+                "danger"
+            }
+        }
+        None => "secondary", // Row has not yet been validated - display gray button.
+    };
 
-    Ok(String::from(""))
+    html.push(json!([
+        "div",
+        {"class": "row", "style": "padding-top: 10px;"},
+        [
+            "div",
+            {"class": "col-auto"},
+            [
+                "button",
+                {
+                    "type": "submit",
+                    "name": "action",
+                    "value": "validate",
+                    "class": "btn btn-large btn-outline-primary",
+                },
+                "Validate",
+            ],
+        ],
+        [
+            "div",
+            {"class": "col-auto"},
+            [
+                "button",
+                {
+                    "type": "submit",
+                    "name": "action",
+                    "value": "submit",
+                    "class": format!("btn btn-large btn-outline-{}", submit_cls),
+                },
+                "Submit",
+            ],
+        ],
+    ]));
+
+    tracing::info!("PAGE HTML PRIOR TO HICCUP: {}", json!(html));
+    let page_hiccup = hiccup::render(&json!(html), 0);
+    tracing::info!("PAGE HICCUP: {}", page_hiccup);
+    Ok(page_hiccup)
 }
 
 fn get_hiccup_form_row(
