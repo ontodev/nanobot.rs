@@ -4,8 +4,10 @@ use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use wiring_rs::util::signature;
+use ontodev_hiccup::hiccup;
 
 static IS_A: &'static str = "rdfs:subClassOf";
+static SUBPROPERTY: &'static str = "rdfs:subPropertyOf";
 
 #[derive(Error, Debug)]
 pub enum TreeViewError {
@@ -16,7 +18,231 @@ pub enum TreeViewError {
     #[error("the data format `{0}` is not correct")]
     TreeFormat(String),
     #[error("unknown error")]
-    Unknown,
+    Unknown(String),
+}
+
+#[derive(Debug,Clone)]
+pub enum OWLEntityType {
+    Ontology,
+    Class,
+    AnnotationProperty,
+    DataProperty,
+    ObjectProperty,
+    Individual,
+    Datatype
+}
+
+
+/// Given a CURIE/IRI for a property (note that we don't check the rdf:type)
+/// and a connection to an LDTab database,
+/// return a map capturing (transitive) information about the 'subPropertyOf' relationship.
+/// The mapping is structured in a hierarchical descending manner in which
+/// a key-value pair consists of an entity (the key) and a set (the value) of all
+/// its immediate subclasses ('subPropertyOf' relationship).
+///
+/// Example:
+///
+/// The information captured by the axioms
+///
+/// axiom 1: 'a' subPropertyOf 'b'
+/// axiom 2: 'c' subPropertyOf 'd'
+/// axiom 3: 'd' subPropertyOf 'f'
+/// axiom 4: 'e' subPropertyOf 'f'
+///
+/// would be represented by the map
+///
+/// {
+///  'b' : {'a'},
+///  'd' : {'c'},
+///  'f' : {'d', 'e'}
+/// }
+pub async fn get_property_2_subproperty_map(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<HashMap<String, HashSet<String>>, TreeViewError> {
+    let mut property_2_subproperties: HashMap<String, HashSet<String>> = HashMap::new();
+
+    //recursive SQL query for transitive 'subProperty' relationships
+    let query = format!("WITH RECURSIVE
+    superproperties( subject, object ) AS
+    ( SELECT subject, object FROM {table} WHERE subject='{entity}' AND predicate='rdfs:subPropertyOf'
+        UNION ALL
+        SELECT {table}.subject, {table}.object FROM {table}, superproperties WHERE {table}.subject = superproperties.object AND {table}.predicate='rdfs:subPropertyOf'
+     ) SELECT * FROM superproperties;", table=table, entity=entity);
+
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+    for row in rows {
+        //axiom structure: subject rdfs:subPropertyOf object
+        let subject: &str = row.get("subject"); //subclass
+        let object: &str = row.get("object"); //superclass
+
+        let subject_string = String::from(subject);
+        let object_string = String::from(object);
+
+        match property_2_subproperties.get_mut(&object_string) {
+            Some(set_of_subclasses) => {
+                //there already exists an entry in the map
+                set_of_subclasses.insert(subject_string);
+            }
+            None => {
+                //create a new entry in the map
+                let mut subclasses = HashSet::new();
+                subclasses.insert(subject_string);
+                property_2_subproperties.insert(object_string, subclasses);
+            }
+        }
+    }
+    Ok(property_2_subproperties)
+}
+
+/// Given a CURIE/IRI of a property , and a connection to an LDTab database,
+/// return the immediate children of the property w.r.t. rdfs:subPropertyOf
+/// as rich JSON term tree nodes.
+///
+/// # Examples
+///
+/// Consider the (simplified) LDTab database with the following rows:
+///
+/// subject|predicate|object
+/// b|subPropertyOf|a
+/// c|subPropertyOf|a
+/// d|subPropertyOf|b
+/// (... rdfs:label information for a,b,c, ...)
+///
+///   then get_immediate_children_tree for a returns
+///
+///  [{
+///    "curie": "b",
+///    "label": "b_label",
+///    "property": "rdfs:subClassOf",
+///    "children": []
+///    },
+///    {
+///     "curie": "c",
+///     "label": "c_label",
+///     "property": "rdfs:subClassOf",
+///     "children": []
+///    }]
+pub async fn get_immediate_property_children_tree(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, TreeViewError> {
+
+    let mut direct_sub_properties = HashSet::new();
+
+    let query = format!(
+        "SELECT subject FROM {table} WHERE object='{entity}' AND predicate='rdfs:subPropertyOf'",
+        table = table,
+        entity = entity,
+    );
+
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    for row in rows {
+        let subject: &str = row.get("subject");
+        direct_sub_properties.insert(String::from(subject));
+    }
+
+    let mut iris = HashSet::new();
+    iris.extend(get_iris_from_set(&direct_sub_properties));
+
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
+
+    let mut children = Vec::new();
+    for sub in direct_sub_properties {
+        let label = match curie_2_label.get(&sub) {
+            Some(l) => l,
+            None => &sub,
+            //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
+        };
+        let element = json!({"curie" : sub, "label" : label, "property" : SUBPROPERTY, "children" : []});
+        children.push(element);
+    }
+
+    let children_tree = Value::Array(children);
+
+    Ok(children_tree) 
+}
+
+pub async fn add_property_grandchildren(
+    children: &mut Value,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<(), TreeViewError> {
+    let mut children_array = match children.as_array_mut() {
+        Some(array) => array,
+        None => {
+            return Err(TreeViewError::TreeFormat(format!(
+                "No children nodes in {}",
+                children.to_string()
+            )))
+        }
+    };
+
+    for child in children_array {
+        let child_iri = match child["curie"].as_str() {
+            Some(string) => string,
+            None => {
+                return Err(TreeViewError::TreeFormat(format!(
+                    "No value for 'curie' field in {}",
+                    child.to_string()
+                )))
+            }
+        };
+        let grand_children =
+            get_immediate_property_children_tree(child_iri, table, pool).await?;
+        child["children"] = grand_children;
+    }
+    Ok(())
+}
+
+pub async fn get_rich_json_property_tree_view(
+    entity: &str,
+    preferred_roots: bool,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, TreeViewError> {
+
+    let mut property_hierarchy_map = get_property_2_subproperty_map(entity, table, pool).await?;
+    let mut property_2_hierarchy_map = HashMap::new();
+    property_2_hierarchy_map.insert(String::from(SUBPROPERTY),property_hierarchy_map);
+
+    //modify ancestor information w.r.t. preferred root terms
+    if preferred_roots {
+        get_preferred_roots_hierarchy_maps(&mut property_2_hierarchy_map, table, pool).await?;
+    }
+
+    let roots = identify_roots(&property_2_hierarchy_map);
+
+    //extract all IRI/CURIEs from the hierarchy maps (to query for their respective labels)
+    let mut iris = HashSet::new();
+    iris.insert(String::from(entity));//add entity for root case (when ancestor tree is empty) 
+    for map in property_2_hierarchy_map.values() {
+        iris.extend(get_iris_from_subclass_map(&map));
+    }
+
+    let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
+
+    let mut tree = build_rich_tree(&roots, &property_2_hierarchy_map, &curie_2_label)?;
+
+    if is_empty(&tree)? {
+        let label = match curie_2_label.get(entity) {
+             Some(l) => l,
+             None => entity,
+        };
+        tree = json!([{"curie": entity, "label":label, "property": SUBPROPERTY, "children" : [] }]);
+    }
+
+    //sort tree by label
+    let mut sorted = sort_rich_tree_by_label(&tree)?;
+
+    let mut immediate_children = get_immediate_property_children_tree(entity, table, pool).await?;
+    add_property_grandchildren(&mut immediate_children, table, pool).await?;
+    add_children(&mut sorted, &immediate_children)?; 
+
+    Ok(sorted) 
 }
 
 /// Given an LDTab _JSON value, return the LDTab value associated with the provided key 'field'.
@@ -584,7 +810,8 @@ pub fn update_hierarchy_map(
     }
 }
 
-/// Given a CURIE for an entity and a connection to an LDTab database,
+/// Given a CURIE/IRI for a class (note that we don't check the rdf:type)
+/// and a connection to an LDTab database,
 /// return a map capturing (transitive) information about the 'is-a' relationship.
 /// The mapping is structured in a hierarchical descending manner in which
 /// a key-value pair consists of an entity (the key) and a set (the value) of all
@@ -1227,7 +1454,8 @@ pub async fn get_immediate_children_tree(
     for sub in direct_subclasses {
         let label = match curie_2_label.get(&sub) {
             Some(l) => l,
-            None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
+            None => &sub,
+            //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
         };
         let element = json!({"curie" : sub, "label" : label, "property" : IS_A, "children" : []});
         children.push(element);
@@ -1237,7 +1465,8 @@ pub async fn get_immediate_children_tree(
         for sub in &direct_sub_relations[n] {
             let label = match curie_2_label.get(sub) {
                 Some(l) => l,
-                None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
+                None => &sub,
+                //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
             };
             let element =
                 json!({"curie" : sub, "label" : label, "property" : relations[n], "children" : []});
@@ -1553,6 +1782,19 @@ pub async fn get_preferred_roots_hierarchy_maps(
     Ok(())
 }
 
+pub fn is_empty(tree : &Value) -> Result<bool, TreeViewError> {
+	match tree {
+		Value::Array(array) => { return Ok(array.is_empty()) }
+		_ => { return Err(TreeViewError::TreeFormat(format!(
+						"Expected array of root nodes {}",
+						tree.to_string()
+						)))
+		} 
+	} 
+}
+
+//pub fn build_root_node(
+
 /// Given an IRI/CURIE for an entity, a list of relations (other than rdfs:subClassOf),
 /// and a connection to an LDTab database, return a tree (encoded in JSON)
 /// for the entity's ancestors and immediate children (and grandchildren) w.r.t.
@@ -1595,6 +1837,7 @@ pub async fn get_preferred_roots_hierarchy_maps(
 ///          }]
 ///      }]
 /// }]
+//TODO: this is only relevant for classes
 pub async fn get_rich_json_tree_view(
     entity: &str,
     relations: &Vec<&str>,
@@ -1614,12 +1857,23 @@ pub async fn get_rich_json_tree_view(
 
     //extract all IRI/CURIEs from the hierarchy maps (to query for their respective labels)
     let mut iris = HashSet::new();
+    iris.insert(String::from(entity));//add entity for root case (when ancestor tree is empty)
     for map in relation_maps.values() {
         iris.extend(get_iris_from_subclass_map(&map));
     }
     let curie_2_label = get_label_hash_map(&iris, table, pool).await?;
 
-    let tree = build_rich_tree(&roots, &relation_maps, &curie_2_label)?;
+    let mut tree = build_rich_tree(&roots, &relation_maps, &curie_2_label)?;
+
+    //if there are no ancestors for entity, then 'tree' will be an empty list
+    //so, we create a root note for the entity that we can attach children to
+    if is_empty(&tree)? {
+        let label = match curie_2_label.get(entity) {
+             Some(l) => l,
+             None => entity,
+        };
+        tree = json!([{"curie": entity, "label":label, "property": IS_A, "children" : [] }]);
+    }
 
     //sort tree by label
     let mut sorted = sort_rich_tree_by_label(&tree)?;
@@ -1926,7 +2180,7 @@ pub fn tree_2_hiccup(entity: &str, tree: &Value) -> Result<Value, TreeViewError>
 ///                  "anatomical group"
 ///                ],
 ///             ...  
-pub async fn get_hiccup_term_tree(
+pub async fn get_hiccup_class_tree(
     entity: &str,
     relations: &Vec<&str>,
     preferred_roots: bool,
@@ -1938,74 +2192,67 @@ pub async fn get_hiccup_term_tree(
     let roots = tree_2_hiccup(entity, &tree)?;
 
     let mut res = Vec::new();
+    //a term tree is displayed below owl:Class by definition 
     res.push(json!("ul"));
-    res.push(json!(["li", "Ontology"]));
-    let class = json!(["a", {"resource" : "owl:Class"}, "owl:Class"]);
+    let class = json!(["a", {"resource" : "owl:Class"}, "Class"]);
     res.push(json!(["li", class, roots]));
 
     Ok(Value::Array(res))
 }
 
-/// Given a target OWL type, e.g., "Class", "Object Property", and "Datatype Property",
-/// return a hiccup-style list of all the top-level nodes of that type.
-///
-/// # Examples
-///
-/// The call get_hiccup_top_hierarchy("Object Property", "statement", &zfa_connection)
-/// returns (only an excerpt is shown)
-///
-/// ["ul",
-///   ["li", "Ontology"],
-///   ["li","Object Property",
-///     ["ul", { "id": "children" },
-///       ["li",
-///         ["a",
-///           {
-///             "resource": "obo:RO_0002131",
-///             "rev": "rdfs:subClassOf"
-///           },
-///           "overlaps"
-///         ]
-///       ],
-///       ["li",
-///         ["a",
-///           {
-///             "resource": "obo:RO_0002150",
-///             "rev": "rdfs:subClassOf"
-///           },
-///           "continuous with"
-///         ]
-///       ],
-///       ,
-///      ...
-///     ]
-///   ]
-/// ]
-pub async fn get_hiccup_top_hierarchy(
-    case: &str,
+pub async fn get_hiccup_property_tree(
+    entity: &str,
+    case: OWLEntityType,
+    preferred_roots: bool,
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, TreeViewError> {
+    let tree = get_rich_json_property_tree_view(entity, preferred_roots, table, pool).await?;
+
+    let roots = tree_2_hiccup(entity, &tree)?;
+
+    let mut res = Vec::new();
+    //a term tree is displayed below owl:Class by definition 
+    res.push(json!("ul"));
+
+    let property = match case {
+        OWLEntityType::AnnotationProperty => json!(["a", {"resource" : "owl:AnnotationProperty"}, "Annotation Property"]),
+        OWLEntityType::DataProperty => json!(["a", {"resource" : "owl:DataProperty"}, "Data Property"]),
+        OWLEntityType::ObjectProperty => json!(["a", {"resource" : "owl:ObjectProperty"}, "Object Property"]),
+        _ => return Err(TreeViewError::Unknown(format!("Expected property type but got {:?}", case)))
+    };
+    res.push(json!(["li", property, roots]));
+
+    Ok(Value::Array(res))
+}
+
+pub async fn build_top_level_query(case: OWLEntityType, table: &str, pool: &SqlitePool) -> String {
+
     let mut top = "";
     let mut relation = "";
     let mut rdf_type = "";
 
     match case {
-        "Class" => {
+        OWLEntityType::Class => {
             top = "owl:Thing";
-            relation = "rdfs:subClassOf";
+            relation = IS_A;
             rdf_type = "owl:Class"
-        }
-        "Object Property" => {
+        },
+        OWLEntityType::ObjectProperty => {
             top = "owl:topObjectProperty";
-            relation = "rdfs:subPropertyOf";
+            relation = SUBPROPERTY;
             rdf_type = "owl:ObjectProperty";
-        }
-        "Data Property" => {
+        },
+        OWLEntityType::DataProperty => {
             top = "owl:topDataProperty";
-            relation = "rdfs:subPropertyOf";
+            relation = SUBPROPERTY;
             rdf_type = "owl:DatatypeProperty";
-        }
+        }, 
+        OWLEntityType::AnnotationProperty => {
+            top = "owl:topAnnotationProperty";
+            relation = SUBPROPERTY;
+            rdf_type = "owl:AnnotationProperty";
+        },
         _ => {}
     }
 
@@ -2031,51 +2278,269 @@ pub async fn get_hiccup_top_hierarchy(
         relation = relation,
         rdf_type = rdf_type,
     );
+    query 
+}
 
+/// Return a hiccup-style list of all the top-level nodes.
+///
+/// # Examples
+///
+/// The call get_hiccup_top_hierarchy("statement", &zfa_connection)
+/// returns (only an excerpt is shown)
+///
+/// ["ul",
+///   ["li","Class",
+///     ["ul", { "id": "children" },
+///       ["li",
+///         ["a",
+///           {
+///             "resource": "obo:ZFA_0000460",
+///             "rev": "rdfs:subClassOf"
+///           },
+///           "Mauthner axon"
+///         ]
+///       ],
+///       ["li",
+///         ["a",
+///           {
+///             "resource": "obo:ZFS_0100000",
+///             "rev": "rdfs:subClassOf"
+///           },
+///           "Stages"
+///         ]
+///       ],
+///       ,
+///      ...
+///     ]
+///   ]
+/// ]
+pub async fn get_hiccup_top_class_hierarchy(
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, TreeViewError> {
+
+    let query = build_top_level_query(OWLEntityType::Class, table, pool).await; 
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
-    //build HTML view
-    let mut res = Vec::new();
-    res.push(json!("ul"));
-    res.push(json!(["li", "Ontology"]));
-
-    let mut children_list = Vec::new();
-    children_list.push(json!("ul"));
-    children_list.push(json!({"id" : "children"}));
-
-    let mut entities = HashSet::new();
-    let mut ent_vec = Vec::new(); //workaround to ensure deterministic output (for testing purposes)
-
     //collect entities
+    let mut entities = HashSet::new(); 
     for row in rows {
         let subject: &str = row.get("subject");
         entities.insert(String::from(subject));
-        ent_vec.push(String::from(subject));
     }
 
-    //get labels for entities
     let entity_2_label = get_label_hash_map(&entities, table, pool).await?;
 
-    for subject in ent_vec {
-        match entity_2_label.get(&subject) {
+    //build term trees for top level nodes
+    let mut top_hierarchy_nodes = Vec::new(); 
+    for entity in &entities {
+
+        let mut root_tree = match entity_2_label.get(entity) {
             Some(label) => {
-                children_list.push(
-                    json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"}, label  ]]),
-                );
+                    json!({"curie":entity, "label":label, "property" : IS_A, "children" : []})
             }
             None => {
-                children_list.push(
-                    json!(["li", ["a", {"resource":subject, "rev" : "rdfs:subClassOf"},subject ]]),
-                );
+                    json!({"curie":entity, "label":entity, "property" : IS_A, "children" : []})
             }
-        }
-        //TODO: handle children?
-        //TODO: children for object properties?
-        //TODO: children for data properties?
+        };
+
+        //add children & grandchildren
+        let mut children = get_immediate_children_tree(entity, &vec![IS_A], table, pool).await?;
+        add_grandchildren(&mut children, &vec![IS_A], table, pool).await?;
+        add_children(&mut root_tree, &children)?; 
+
+        top_hierarchy_nodes.push(root_tree); 
     }
 
-    res.push(json!(["li", case, children_list]));
-    Ok(Value::Array(res))
+    //add top level nodes as children of "owl:Class"
+    let owl_class_children = Value::Array(top_hierarchy_nodes);
+    let top_hierarchy_tree = json!([{"curie":"owl:Class", "label":"Class", "property":IS_A, "children": owl_class_children }]);
+    let sorted = sort_rich_tree_by_label(&top_hierarchy_tree)?;
+    let hiccup = tree_2_hiccup("owl:Class", &sorted)?;
+    Ok(hiccup) 
+}
+
+pub async fn get_hiccup_top_property_hierarchy(
+    case : OWLEntityType,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, TreeViewError> {
+    match case.clone() {
+       OWLEntityType::AnnotationProperty => {},
+       OWLEntityType::DataProperty => {},
+       OWLEntityType::ObjectProperty => {},
+        _ => return Err(TreeViewError::Unknown(format!("Expected property type but got {:?}", case)))
+    }
+
+    let query = build_top_level_query(case.clone(), table, pool).await; 
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+    //collect entities
+    let mut entities = HashSet::new(); 
+    for row in rows {
+        let subject: &str = row.get("subject");
+        entities.insert(String::from(subject));
+    }
+
+    let entity_2_label = get_label_hash_map(&entities, table, pool).await?;
+
+    //build term trees for top level nodes
+    let mut top_hierarchy_nodes = Vec::new(); 
+    for entity in &entities {
+
+        let mut root_tree = match entity_2_label.get(entity) {
+            Some(label) => {
+                    json!({"curie":entity, "label":label, "property" : SUBPROPERTY, "children" : []})
+            }
+            None => {
+                    json!({"curie":entity, "label":entity, "property" : SUBPROPERTY, "children" : []})
+            }
+        };
+
+        //add children & grandchildren
+        let mut children = get_immediate_property_children_tree(entity, table, pool).await?;
+        add_property_grandchildren(&mut children, table, pool).await?;
+        add_children(&mut root_tree, &children)?; 
+
+        top_hierarchy_nodes.push(root_tree); 
+    }
+
+    let owl_property_children = Value::Array(top_hierarchy_nodes);
+    let mut top_hierarchy_tree = json!("to be modified");
+    match case {
+       OWLEntityType::AnnotationProperty => {
+    top_hierarchy_tree = json!([{"curie":"owl:AnnotationProperty", "label":"Annotation Property", "property":SUBPROPERTY, "children": owl_property_children }]);
+
+},
+       OWLEntityType::DataProperty => { 
+    top_hierarchy_tree = json!([{"curie":"owl:DataProperty", "label":"Data Property", "property":SUBPROPERTY, "children": owl_property_children }]);
+},
+       OWLEntityType::ObjectProperty => {
+    top_hierarchy_tree = json!([{"curie":"owl:ObjectProperty", "label":"Object Property", "property":SUBPROPERTY, "children": owl_property_children }]);
+
+},
+        _ => return Err(TreeViewError::Unknown(format!("Expected property type but got {:?}", case)))
+    }
+
+    let sorted = sort_rich_tree_by_label(&top_hierarchy_tree)?;
+    let hiccup = tree_2_hiccup("owl:Class", &sorted)?;
+    Ok(hiccup) 
+}
+
+//TODO: ontology (can do)
+//TODO: annotation property (? is this covered by the current code)
+//TODO: Data property (can do)
+//TODO: Objecct property (can do)
+//TODO: individual (lists all classes)
+//TODO: Datatpe (?)
+
+pub fn get_list_encoding(case: OWLEntityType) -> Value {
+    match case {
+        OWLEntityType::Ontology => json!(["ul", ["li", ["a", {"resource":"owl:Ontology"}, "Ontology" ]]]),
+        OWLEntityType::Class => json!(["ul", ["li", ["a", {"resource":"owl:Class"}, "Class" ]]]),
+        OWLEntityType::AnnotationProperty => json!(["ul", ["li", ["a", {"resource":"owl:AnnotationProperty"}, "Annotation Property" ]]]),
+        OWLEntityType::DataProperty => json!(["ul", ["li", ["a", {"resource":"owl:DataProperty"}, "Data Property" ]]]),
+        OWLEntityType::ObjectProperty => json!(["ul", ["li", ["a", {"resource":"owl:ObjectProperty"}, "Object Property"]]]),
+        OWLEntityType::Individual => json!(["ul", ["li", ["a", {"resource":"owl:Individual"}, "Individual" ]]]),
+        OWLEntityType::Datatype => json!(["ul", ["li", ["a", {"resource":"owl:Datatype"}, "Datatype" ]]]),
+    } 
+}
+
+pub async fn get_type(entity: &str, table: &str, pool: &SqlitePool) -> Result<OWLEntityType, TreeViewError> {
+
+    let query = format!(
+        "SELECT subject, predicate, object FROM {table} WHERE subject='{entity}' AND predicate='rdf:type'",table=table, entity=entity);
+    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+
+    for row in rows {
+        let entity: &str = row.get("subject");
+        let rdf_type: &str = row.get("object");
+        match rdf_type {
+              "owl:Ontology" => return Ok(OWLEntityType::Ontology),
+              "owl:Class" => return Ok(OWLEntityType::Class),
+              "owl:AnnotationProperty" => return Ok(OWLEntityType::AnnotationProperty),
+              "owl:ObjectProperty" => return Ok(OWLEntityType::ObjectProperty),
+              "owl:DataProperty" => return Ok(OWLEntityType::DataProperty),
+              "owl:Individual" => return Ok(OWLEntityType::Individual), 
+              "owl:NamedIndividual" => return Ok(OWLEntityType::Individual), 
+              "rdfs:Datatype" => return Ok(OWLEntityType::Datatype), 
+              _ => {}
+        }
+    }
+return Err(TreeViewError::LDTab(format!(
+    "No suitable rdf:type for {} in LDTab table {}",
+    entity,
+    table
+)))
+    
+}
+
+pub async fn get_hiccup_term_tree(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<Value, TreeViewError> {
+
+    let mut list_view = Vec::new();
+
+    list_view.push(json!("ul")); 
+    list_view.push(get_list_encoding(OWLEntityType::Ontology)); 
+    list_view.push(get_list_encoding(OWLEntityType::Class)); 
+    list_view.push(get_list_encoding(OWLEntityType::AnnotationProperty)); 
+    list_view.push(get_list_encoding(OWLEntityType::DataProperty)); 
+    list_view.push(get_list_encoding(OWLEntityType::ObjectProperty)); 
+    list_view.push(get_list_encoding(OWLEntityType::Individual)); 
+    list_view.push(get_list_encoding(OWLEntityType::Datatype)); 
+
+    //top hierarchy
+    match entity {
+        "owl:Class" => { let term_tree = get_hiccup_top_class_hierarchy(table, pool).await?; 
+                        list_view[2] = term_tree;
+                        return Ok(Value::Array(list_view));
+         },
+         "owl:AnnotationProperty" => { let term_tree = get_hiccup_top_property_hierarchy(OWLEntityType::AnnotationProperty, table, pool).await?;
+                        list_view[3] = term_tree;
+                        return Ok(Value::Array(list_view)); 
+  },
+         "owl:DataProperty" => { let term_tree = get_hiccup_top_property_hierarchy(OWLEntityType::DataProperty, table, pool).await?;
+                        list_view[3] = term_tree;
+                        return Ok(Value::Array(list_view)); 
+  },
+         "owl:ObjectProperty" => { let term_tree = get_hiccup_top_property_hierarchy(OWLEntityType::ObjectProperty, table, pool).await?;
+                        list_view[5] = term_tree;
+                        return Ok(Value::Array(list_view)); 
+  },
+         _ => {}
+   }
+     
+
+    let rdf_type = get_type(entity, table, pool).await?; 
+    match rdf_type {
+        OWLEntityType::Class => { 
+                                 //TODO: use a config struct?
+                                 //use part-of by default
+                                 let relations = vec!["obo:BFO_0000050"];
+                                 //don't use preferred root nodes by default
+                                 let term_tree = get_hiccup_class_tree(entity, &relations, false, table, pool).await?; 
+                                 list_view[2] = term_tree;
+   }, 
+      OWLEntityType::AnnotationProperty => { let term_tree = get_hiccup_property_tree(entity, OWLEntityType::AnnotationProperty, false, table, pool).await?;
+                                 list_view[3] = term_tree;
+
+  }, 
+      OWLEntityType::DataProperty => { let term_tree = get_hiccup_property_tree(entity, OWLEntityType::DataProperty, false, table, pool).await?;
+                                 list_view[4] = term_tree;
+
+  }, 
+      OWLEntityType::ObjectProperty => { let term_tree = get_hiccup_property_tree(entity, OWLEntityType::ObjectProperty, false, table, pool).await?;
+                                 list_view[5] = term_tree;
+
+  },
+
+ _ => {}
+    } 
+
+    Ok(Value::Array(list_view)) 
 }
 
 #[cfg(test)]
