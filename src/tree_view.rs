@@ -2475,6 +2475,16 @@ return Err(TreeViewError::LDTab(format!(
     
 }
 
+pub async fn get_html_term_tree(
+    entity: &str,
+    table: &str,
+    pool: &SqlitePool,
+) -> Result<String, TreeViewError> {
+    let hiccup = get_hiccup_term_tree(entity, table, pool).await?;
+    let html = hiccup::render(&hiccup, 0); 
+    Ok(html)
+}
+
 pub async fn get_hiccup_term_tree(
     entity: &str,
     table: &str,
