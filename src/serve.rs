@@ -10,7 +10,7 @@ use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Select};
-use ontodev_valve::{ast::Expression, validate::validate_row, CompiledCondition};
+use ontodev_valve::{ast::Expression, update_row, validate::validate_row, CompiledCondition};
 use serde_json::{json, Value as SerdeValue};
 use sqlx::any::AnyPool;
 
@@ -196,13 +196,6 @@ fn render_row_from_database(
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("QUERY PARAMS: {:#?}", query_params);
     tracing::info!("FORM PARAMS: {:#?}", form_params);
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        _ => {
-            let error = format!("Could not connect to database using pool {:?}", state.config.pool);
-            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
-        }
-    };
     let config = match state.config.valve.as_ref() {
         Some(c) => c,
         None => {
@@ -254,15 +247,77 @@ fn render_row_from_database(
             //tracing::info!("VALIDATED ROW: {:#?}", validated_row);
             form_html = Some(get_row_as_form(state, config, table, &validated_row));
         } else if action == "submit" {
+            let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
+            {
+                Ok(v) => v,
+                Err(e) => return Err(e.into()),
+            };
+            let pool = match state.config.pool.as_ref() {
+                Some(p) => p,
+                _ => {
+                    let error =
+                        format!("Could not connect to database using pool {:?}", state.config.pool);
+                    return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+                }
+            };
+            // TODO: Remove unwrap()
+            block_on(update_row(&config.config, pool, table, &validated_row, row_number)).unwrap();
+            let messages = get_messages(&validated_row);
+            tracing::info!("GOT MESSAGES {:#?}", messages);
             todo!();
         }
     }
+
+    // TODO: Finish this function.
+    // if view == "form"
 
     Ok(Html(format!(
         "What can I do for you, your table '{}' and your row number {} today, sir?\n",
         table, row_number,
     ))
     .into_response())
+}
+
+fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<&str>> {
+    let mut messages = HashMap::new();
+    for (header, details) in row {
+        if header == "row_number" {
+            continue;
+        }
+        if let Some(SerdeValue::Array(row_messages)) = details.get("messages") {
+            for msg in row_messages {
+                match msg.get("level") {
+                    Some(level) if level == "error" => {
+                        if !messages.contains_key("error") {
+                            messages.insert("error", vec![]);
+                        }
+                        let mut error_list = messages.get_mut("error").unwrap();
+                        let error_msg = msg.get("message").unwrap().as_str().unwrap();
+                        error_list.push(error_msg);
+                    }
+                    Some(level) if level == "warn" => {
+                        if !messages.contains_key("warn") {
+                            messages.insert("warn", vec![]);
+                        }
+                        let mut warn_list = messages.get_mut("warn").unwrap();
+                        let warn_msg = msg.get("message").unwrap().as_str().unwrap();
+                        warn_list.push(warn_msg);
+                    }
+                    Some(level) if level == "info" => {
+                        if !messages.contains_key("info") {
+                            messages.insert("info", vec![]);
+                        }
+                        let mut info_list = messages.get_mut("info").unwrap();
+                        let info_msg = msg.get("message").unwrap().as_str().unwrap();
+                        info_list.push(info_msg);
+                    }
+                    Some(level) => tracing::warn!("Unrecognized level '{}' in {}", level, msg),
+                    None => tracing::warn!("Message: {} has no 'level'. Ignoring it.", msg),
+                };
+            }
+        }
+    }
+    messages
 }
 
 fn get_sql_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
@@ -431,7 +486,7 @@ fn validate_table_row(
                 true,
                 Some(*row_number),
             ))
-            .unwrap()
+            .unwrap() // TODO: Remove unwrap
         }
         None => block_on(validate_row(
             &vconfig,
@@ -443,7 +498,7 @@ fn validate_table_row(
             false,
             None,
         ))
-        .unwrap(),
+        .unwrap(), // TODO: Remove unwrap
     };
     Ok(validated_row)
 }
@@ -581,8 +636,6 @@ fn get_row_as_form(
             form_row_id,
         )?;
         html.push(json!(hiccup_form_row));
-        tracing::info!("HTML PRIOR TO HICCUP: {}", json!(html));
-        tracing::info!("HICCUP: {}", hiccup::render(&json!(html), 0));
     }
 
     let submit_cls = match row_valid {
@@ -630,9 +683,12 @@ fn get_row_as_form(
     ]));
 
     tracing::info!("PAGE HTML PRIOR TO HICCUP: {}", json!(html));
-    let page_hiccup = hiccup::render(&json!(html), 0);
-    tracing::info!("PAGE HICCUP: {}", page_hiccup);
-    Ok(page_hiccup)
+    // TODO: The call to hiccup::render() is panicking. Fix this.
+    // ----
+    //let page_hiccup = hiccup::render(&json!(html), 0);
+    //tracing::info!("PAGE HICCUP: {}", page_hiccup);
+    //Ok(page_hiccup)
+    Ok("".to_string())
 }
 
 fn get_hiccup_form_row(
