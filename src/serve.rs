@@ -824,8 +824,6 @@ fn get_hiccup_form_row(
         _ => (),
     };
 
-    tracing::info!("SVAVOODIA!!!!");
-
     ////////////////////////////////////////////
     // Remove these statements later:
     let mut annotations = SerdeMap::new();
@@ -843,6 +841,13 @@ fn get_hiccup_form_row(
     ////////////////////////////////////////////
 
     if let Some(annotations) = annotations {
+        // TODO: This code is weird. It seems like ann_html is assigned on every iteration,
+        // but then the value is thrown away at the end of each iteration. It could be that there
+        // is a bug and that the statement:
+        //   `value_col.push(ann_html);`
+        // should happen inside one of the for loops. Otherwise this code is extremely inefficient,
+        // and the best thing to do is just to take the *last* tuple in `annotations` and
+        // also the *last* element of `ann_values`.
         let mut ann_html = json!([]);
         for (ann_pred, ann_values) in annotations {
             for av in ann_values.as_array().unwrap() {
