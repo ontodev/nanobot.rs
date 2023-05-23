@@ -260,11 +260,26 @@ fn render_row_from_database(
                     return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
                 }
             };
-            // TODO: Remove unwrap()
-            block_on(update_row(&config.config, pool, table, &validated_row, row_number)).unwrap();
-            let messages = get_messages(&validated_row);
+            if let Err(e) =
+                block_on(update_row(&config.config, pool, table, &validated_row, row_number))
+            {
+                return Err(e.to_string().into());
+            }
+
+            let mut messages = get_messages(&validated_row);
             tracing::info!("GOT MESSAGES {:#?}", messages);
-            todo!();
+            if let Some(error_messages) = messages.get_mut("error") {
+                let extra_message = format!("Row updated with {} errors", error_messages.len());
+                match messages.get_mut("warn") {
+                    Some(warn_messages) => warn_messages.push(extra_message),
+                    None => {
+                        messages.insert("warn", vec![extra_message]);
+                    }
+                };
+            } else {
+                messages.insert("success", vec!["Row successfully updated!".to_string()]);
+            }
+            tracing::info!("MESSAGES ARE NOW {:#?}", messages);
         }
     }
 
@@ -278,12 +293,13 @@ fn render_row_from_database(
     .into_response())
 }
 
-fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<&str>> {
+fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<String>> {
     let mut messages = HashMap::new();
     for (header, details) in row {
         if header == "row_number" {
             continue;
         }
+        // TODO: Remove unwraps.
         if let Some(SerdeValue::Array(row_messages)) = details.get("messages") {
             for msg in row_messages {
                 match msg.get("level") {
@@ -293,7 +309,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<&str>> {
                         }
                         let mut error_list = messages.get_mut("error").unwrap();
                         let error_msg = msg.get("message").unwrap().as_str().unwrap();
-                        error_list.push(error_msg);
+                        error_list.push(error_msg.to_string());
                     }
                     Some(level) if level == "warn" => {
                         if !messages.contains_key("warn") {
@@ -301,7 +317,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<&str>> {
                         }
                         let mut warn_list = messages.get_mut("warn").unwrap();
                         let warn_msg = msg.get("message").unwrap().as_str().unwrap();
-                        warn_list.push(warn_msg);
+                        warn_list.push(warn_msg.to_string());
                     }
                     Some(level) if level == "info" => {
                         if !messages.contains_key("info") {
@@ -309,7 +325,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<&str>> {
                         }
                         let mut info_list = messages.get_mut("info").unwrap();
                         let info_msg = msg.get("message").unwrap().as_str().unwrap();
-                        info_list.push(info_msg);
+                        info_list.push(info_msg.to_string());
                     }
                     Some(level) => tracing::warn!("Unrecognized level '{}' in {}", level, msg),
                     None => tracing::warn!("Message: {} has no 'level'. Ignoring it.", msg),
