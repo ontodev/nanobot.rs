@@ -9,7 +9,7 @@ use enquote::unquote;
 use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
-use ontodev_sqlrest::{parse, Select};
+use ontodev_sqlrest::{parse, Filter, Select};
 use ontodev_valve::{ast::Expression, update_row, validate::validate_row, CompiledCondition};
 use serde_json::{json, Value as SerdeValue};
 use sqlx::any::AnyPool;
@@ -204,6 +204,13 @@ fn render_row_from_database(
                 .into());
         }
     };
+    let pool = match state.config.pool.as_ref() {
+        Some(p) => p,
+        _ => {
+            let error = format!("Could not connect to database using pool {:?}", state.config.pool);
+            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+        }
+    };
     let mut view = match query_params.get("view") {
         None => return Err(format!("No 'view' in {:?}", query_params).into()),
         Some(v) => v.to_string(),
@@ -244,21 +251,13 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            //tracing::info!("VALIDATED ROW: {:#?}", validated_row);
-            form_html = Some(get_row_as_form(state, config, table, &validated_row));
+            tracing::info!("VALIDATED ROW: {:#?}", validated_row);
+            form_html = Some(get_row_as_form(state, config, table, &validated_row).unwrap());
         } else if action == "submit" {
             let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
             {
                 Ok(v) => v,
                 Err(e) => return Err(e.into()),
-            };
-            let pool = match state.config.pool.as_ref() {
-                Some(p) => p,
-                _ => {
-                    let error =
-                        format!("Could not connect to database using pool {:?}", state.config.pool);
-                    return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
-                }
             };
             if let Err(e) =
                 block_on(update_row(&config.config, pool, table, &validated_row, row_number))
@@ -267,7 +266,7 @@ fn render_row_from_database(
             }
 
             let mut messages = get_messages(&validated_row);
-            tracing::info!("GOT MESSAGES {:#?}", messages);
+            //tracing::info!("GOT MESSAGES {:#?}", messages);
             if let Some(error_messages) = messages.get_mut("error") {
                 let extra_message = format!("Row updated with {} errors", error_messages.len());
                 match messages.get_mut("warn") {
@@ -279,12 +278,72 @@ fn render_row_from_database(
             } else {
                 messages.insert("success", vec!["Row successfully updated!".to_string()]);
             }
-            tracing::info!("MESSAGES ARE NOW {:#?}", messages);
+            //tracing::info!("MESSAGES ARE NOW {:#?}", messages);
         }
     }
 
+    if view == "form" {
+        if let None = form_html {
+            let mut select = Select::new(format!("{}_view", table));
+            select.filter(vec![
+                Filter::new("row_number", "eq", json!(format!("{}", row_number))).unwrap()
+            ]);
+            //tracing::info!("RUNNING SELECT: {}", select.to_sqlite().unwrap());
+            let mut rows = select.fetch_rows_as_json(pool, &HashMap::new()).unwrap();
+            let row = &mut rows[0];
+            //tracing::info!("GOT ROW: {:#?}", row);
+            let metafied_row = {
+                // TODO: Make this block its own function.
+                let mut tmp = SerdeMap::new();
+                let mut messages = match row.get_mut("message") {
+                    Some(SerdeValue::Array(m)) => m.clone(),
+                    _ => return Err(format!("No array called 'messages' in row: {:?}", row).into()),
+                };
+                //tracing::info!("ROW MESSAGES: {:#?}", messages);
+                for (column, value) in row {
+                    if column == "message" || column == "row_number" {
+                        continue;
+                    }
+                    let mut tmp_cell = SerdeMap::new();
+                    tmp_cell.insert("value".to_string(), value.clone());
+                    let tmp_messages = {
+                        let mut tmp_messages = vec![];
+                        for m in &mut messages {
+                            //tracing::info!("MMMM: {:?}", m);
+                            if let Some(SerdeValue::String(mcol)) = m.get("column") {
+                                //tracing::info!("MCOL: {}", mcol);
+                                if mcol == column {
+                                    let mut m = m.as_object_mut().unwrap();
+                                    m.remove("column");
+                                    tmp_messages.push(m.clone());
+                                    // Overwrite the value in the tmp_cell:
+                                    tmp_cell.insert(
+                                        "value".to_string(),
+                                        m.get("value").unwrap().clone(),
+                                    );
+                                    m.remove("value");
+                                }
+                            }
+                        }
+                        tmp_messages
+                    };
+                    //tracing::info!("TMP MESSAGES: {:#?}", tmp_messages);
+                    tmp_cell.insert("messages".to_string(), json!(tmp_messages));
+                    tmp_cell.insert("valid".to_string(), json!(tmp_messages.is_empty()));
+                    //tracing::info!("COLUMN: {}, TMP_CELL: {:#?}", column, tmp_cell);
+                    tmp.insert(column.to_string(), json!(tmp_cell));
+                }
+                tmp
+            };
+            tracing::info!("METAFIED ROW: {:#?}", metafied_row);
+            form_html = Some(get_row_as_form(state, config, table, &metafied_row).unwrap());
+            tracing::info!("FORM HTML: {}", form_html.unwrap());
+        }
+        todo!();
+        // if not form_html ... return abort ...
+    }
+
     // TODO: Finish this function.
-    // if view == "form"
 
     Ok(Html(format!(
         "What can I do for you, your table '{}' and your row number {} today, sir?\n",
@@ -381,7 +440,7 @@ fn get_column_config(table: &str, column: &str, config: &ValveConfig) -> Result<
         .and_then(|c| c.as_object())
     {
         Some(c) => Ok(c.clone()),
-        None => Err(format!("Unable to retrieve column config from {:#?}", config.config)),
+        None => Err("Unable to retrieve column config from Valve configuration".to_string()),
     }
 }
 
@@ -533,6 +592,8 @@ fn get_row_as_form(
         if cell_header == "row_number" {
             continue;
         }
+
+        tracing::info!("GOT CELL VALUE: {:#?}", cell_value);
         let mut valid = false;
         let mut value = json!("");
         let messages;
@@ -567,7 +628,7 @@ fn get_row_as_form(
             row_valid = Some(false)
         }
 
-        //tracing::info!("MESSAGES FOR {}.{}: {:?}", table_name, cell_header, messages);
+        tracing::info!("MESSAGES FOR {}.{}: {:?}", table_name, cell_header, messages);
         let message = {
             let mut tmp = vec![];
             for m in messages {
@@ -621,7 +682,7 @@ fn get_row_as_form(
         } else {
             (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
-        tracing::info!("HTML TYPE IS {:?}", html_type);
+        //tracing::info!("HTML TYPE IS {:?}", html_type);
 
         if allowed_values != None && html_type == None {
             html_type = Some("search".into());
@@ -698,13 +759,9 @@ fn get_row_as_form(
         ],
     ]));
 
-    tracing::info!("PAGE HTML PRIOR TO HICCUP: {}", json!(html));
-    // TODO: The call to hiccup::render() is panicking. Fix this.
-    // ----
-    //let page_hiccup = hiccup::render(&json!(html), 0);
-    //tracing::info!("PAGE HICCUP: {}", page_hiccup);
-    //Ok(page_hiccup)
-    Ok("".to_string())
+    let page_hiccup = hiccup::render(&json!(html)).unwrap();
+    tracing::info!("PAGE HICCUP: {}", page_hiccup);
+    Ok(page_hiccup)
 }
 
 fn get_hiccup_form_row(
@@ -768,7 +825,7 @@ fn get_hiccup_form_row(
         ]));
     }
 
-    tracing::info!("HEADER COL: {:#?}", header_col);
+    //tracing::info!("HEADER COL: {:#?}", header_col);
 
     // Create the value input for this form row:
     let mut classes = vec![];
@@ -784,10 +841,10 @@ fn get_hiccup_form_row(
         input_attrs.insert("name".to_string(), json!(header));
     }
 
-    tracing::info!("GET HICCUP FORM ROW HTML TYPE: {}", html_type);
+    //tracing::info!("GET HICCUP FORM ROW HTML TYPE: {}", html_type);
     let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
     if vec!["textarea", "input"].contains(&html_type) {
-        tracing::info!("TEXTAREA OR INPUT");
+        //tracing::info!("TEXTAREA OR INPUT");
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut element = vec![json!(html_type), json!(input_attrs)];
@@ -800,7 +857,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(element));
     } else if html_type == "select" {
-        tracing::info!("SELECT");
+        //tracing::info!("SELECT");
         classes.insert(0, "form-select");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut select_element = vec![json!("select"), json!(input_attrs)];
@@ -837,9 +894,9 @@ fn get_hiccup_form_row(
             select_element.insert(2, json!(["option", {"value": "", "selected": true}]));
         }
         value_col.push(json!(select_element));
-        tracing::info!("VALUE COL FOR SELECT: {:?}", value_col);
+        //tracing::info!("VALUE COL FOR SELECT: {:?}", value_col);
     } else if vec!["text", "number", "search"].contains(&html_type) {
-        tracing::info!("TEXT NUMBER SEARCH");
+        //tracing::info!("TEXT NUMBER SEARCH");
         // TODO: Support a range restriction for 'number'
         classes.insert(0, "form-control");
         input_attrs.insert("type".to_string(), json!(html_type));
@@ -856,9 +913,9 @@ fn get_hiccup_form_row(
             }
         }
         value_col.push(json!([json!("input"), json!(input_attrs)]));
-        tracing::info!("VALUE COL: {:#?}", value_col);
+        //tracing::info!("VALUE COL: {:#?}", value_col);
     } else if html_type == "radio" {
-        tracing::info!("RADIO");
+        //tracing::info!("RADIO");
         // TODO: what if value is not in allowed_values? Or what if there is no value?
         classes.insert(0, "form-check-input");
         input_attrs.insert("type".to_string(), json!(html_type));
@@ -885,7 +942,7 @@ fn get_hiccup_form_row(
                 ]));
             }
         }
-        tracing::info!("VALUE COL FOR RADIO: {:#?}", value_col);
+        //tracing::info!("VALUE COL FOR RADIO: {:#?}", value_col);
 
         let mut attrs_copy = input_attrs.clone();
         attrs_copy.insert("value".to_string(), json!(""));
@@ -928,7 +985,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(e));
     } else {
-        tracing::info!("ERROR");
+        //tracing::info!("ERROR");
         return Err(format!("'{}' form field is not supported for column '{}'", html_type, header));
     }
 
@@ -986,7 +1043,7 @@ fn get_hiccup_form_row(
                     },
                     None => return Err(format!("{:?} is not an object.", av)),
                 };
-                tracing::info!("AV FOR {}: {}", ann_pred, av);
+                //tracing::info!("AV FOR {}: {}", ann_pred, av);
                 ann_html = json!([
                     "div",
                     {
@@ -1022,7 +1079,7 @@ fn get_hiccup_form_row(
                         ],
                     ],
                 ]);
-                tracing::info!("ANN HTML: {}", ann_html);
+                //tracing::info!("ANN HTML: {}", ann_html);
             }
         }
         value_col.push(ann_html);

@@ -27,8 +27,9 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 urlencoding = "2.1.2"
 
 [dependencies.ontodev_hiccup]
-git = "https://github.com/ontodev/hiccup.rs"
-rev = "962f54994fd6d4c58f8c8855159d3cb6126b974b"
+# git = "https://github.com/ontodev/hiccup.rs"
+# rev = "962f54994fd6d4c58f8c8855159d3cb6126b974b"
+path = "../hiccup.rs"
 
 [dependencies.ontodev_valve]
 path = "../ontodev_demo/valve.rs"
