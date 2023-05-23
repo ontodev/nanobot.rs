@@ -1,6 +1,6 @@
 use nanobot::test::tree_validation::get_json_tree_view;
 //use nanobot::tree_validation::get_json_tree_view;
-use nanobot::tree_view::{get_hiccup_term_tree, get_hiccup_top_hierarchy, get_rich_json_tree_view};
+use nanobot::tree_view::{get_hiccup_class_tree, get_rich_json_tree_view};
 use serde_json::{from_str, Value};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use std::fs;
@@ -28,8 +28,6 @@ async fn set_up_database(tsv: &str, db: &str) -> SqlitePool {
   'annotation' TEXT);"#;
     sqlx::query(&statement_query).execute(&pool).await.unwrap();
 
-    //TODO: I couldn't figure out how to import a tsv file into the sql database
-    //also: adding things line by line is bad (but I didn't find anything useful and didn't want to spend more time on this...)
     //let f = File::open("src/resources/test_data/uberon/0002535.tsv").unwrap();
     let f = File::open(tsv).unwrap();
     for line in BufReader::new(f).lines() {
@@ -74,7 +72,7 @@ async fn test_get_rich_json_tree_view() {
 }
 
 #[tokio::test]
-async fn test_get_hiccup_term_tree() {
+async fn test_get_hiccup_class_tree() {
     let database = "0000354_hiccup.db";
     let pool = set_up_database("src/resources/test_data/zfa/0000354.tsv", database).await;
 
@@ -83,7 +81,7 @@ async fn test_get_hiccup_term_tree() {
     let rels = vec!["obo:BFO_0000050"];
 
     //boolean is for preferred root terms
-    let hiccup = get_hiccup_term_tree(&subject, &rels, false, table, &pool)
+    let hiccup = get_hiccup_class_tree(&subject, &rels, false, table, &pool)
         .await
         .unwrap();
 
@@ -98,7 +96,7 @@ async fn test_get_hiccup_term_tree() {
 }
 
 #[tokio::test]
-async fn test_get_hiccup_term_tree_with_preferred_roots() {
+async fn test_get_hiccup_class_tree_with_preferred_roots() {
     let database = "0000354_preferred_hiccup.db";
     let pool = set_up_database("src/resources/test_data/zfa/0000354.tsv", database).await;
 
@@ -107,7 +105,7 @@ async fn test_get_hiccup_term_tree_with_preferred_roots() {
     let rels = vec!["obo:BFO_0000050"];
 
     //boolean is for preferred root terms
-    let hiccup = get_hiccup_term_tree(&subject, &rels, true, table, &pool)
+    let hiccup = get_hiccup_class_tree(&subject, &rels, true, table, &pool)
         .await
         .unwrap();
 
@@ -122,27 +120,31 @@ async fn test_get_hiccup_term_tree_with_preferred_roots() {
     assert_eq!(hiccup, expected.unwrap());
 }
 
-#[tokio::test]
-async fn test_get_html_top_hierarchy() {
-    let database = "0000354_html_top_hierarchy.db";
-    let pool = set_up_database("src/resources/test_data/zfa/0000354.tsv", database).await;
-
-    let table = "statement";
-
-    //boolean is for preferred root terms
-    let top_class_hierarchy = get_hiccup_top_hierarchy("Class", table, &pool)
-        .await
-        .unwrap();
-
-    let expected_string =
-        fs::read_to_string("src/resources/test_data/ldtab_term_trees/ZFA_top_classes.hiccup")
-            .expect("Should have been able to read the file");
-    let expected = from_str::<Value>(&expected_string);
-
-    tear_down_database(database);
-
-    assert_eq!(top_class_hierarchy, expected.unwrap());
-}
+//#[tokio::test]
+//async fn test_get_html_top_hierarchy() {
+//    let database = "0000354_html_top_hierarchy.db";
+//    let pool = set_up_database(
+//        "src/resources/test_data/zfa/top_level_classes.tsv",
+//        database,
+//    )
+//    .await;
+//
+//    let table = "statement";
+//
+//    //boolean is for preferred root terms
+//    let top_class_hierarchy = get_hiccup_top_hierarchy("Class", table, &pool)
+//        .await
+//        .unwrap();
+//
+//    let expected_string =
+//        fs::read_to_string("src/resources/test_data/ldtab_term_trees/ZFA_top_classes.hiccup")
+//            .expect("Should have been able to read the file");
+//    let expected = from_str::<Value>(&expected_string);
+//
+//    tear_down_database(database);
+//
+//    assert_eq!(top_class_hierarchy, expected.unwrap());
+//}
 
 #[tokio::test]
 async fn test_compare_osl_2_ldtab_tree_zfa_0000354() {

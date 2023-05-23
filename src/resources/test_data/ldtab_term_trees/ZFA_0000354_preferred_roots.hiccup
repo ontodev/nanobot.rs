@@ -2,16 +2,12 @@
   "ul",
   [
     "li",
-    "Ontology"
-  ],
-  [
-    "li",
     [
       "a",
       {
         "resource": "owl:Class"
       },
-      "owl:Class"
+      "Class"
     ],
     [
       "ul",
