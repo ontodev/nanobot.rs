@@ -1,13 +1,14 @@
 use crate::config::{Config, ValveConfig};
 use crate::get;
 use axum::extract::{Json, Path, Query, RawQuery, State};
-use axum::http::StatusCode;
+use axum::http::{uri, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
 use enquote::unquote;
 use futures::executor::block_on;
 use html_escape::encode_text_to_string;
+use minijinja::{context, Environment};
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select};
 use ontodev_valve::{ast::Expression, update_row, validate::validate_row, CompiledCondition};
@@ -17,6 +18,7 @@ use sqlx::any::AnyPool;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::{env, fs};
 
 #[derive(Debug, PartialEq, Eq)]
 enum RequestType {
@@ -215,7 +217,7 @@ fn render_row_from_database(
         None => return Err(format!("No 'view' in {:?}", query_params).into()),
         Some(v) => v.to_string(),
     };
-    //let mut messages = None;
+    let mut messages = HashMap::new();
     let mut form_html = None;
     if request_type == RequestType::POST {
         let mut new_row = SerdeMap::new();
@@ -252,7 +254,7 @@ fn render_row_from_database(
                 Err(e) => return Err(e.into()),
             };
             tracing::info!("VALIDATED ROW: {:#?}", validated_row);
-            form_html = Some(get_row_as_form(state, config, table, &validated_row).unwrap());
+            form_html = Some(get_row_as_form(state, config, table, &validated_row)?);
         } else if action == "submit" {
             let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
             {
@@ -265,18 +267,19 @@ fn render_row_from_database(
                 return Err(e.to_string().into());
             }
 
-            let mut messages = get_messages(&validated_row);
+            messages = get_messages(&validated_row);
             //tracing::info!("GOT MESSAGES {:#?}", messages);
             if let Some(error_messages) = messages.get_mut("error") {
                 let extra_message = format!("Row updated with {} errors", error_messages.len());
                 match messages.get_mut("warn") {
                     Some(warn_messages) => warn_messages.push(extra_message),
                     None => {
-                        messages.insert("warn", vec![extra_message]);
+                        messages.insert("warn".to_string(), vec![extra_message]);
                     }
                 };
             } else {
-                messages.insert("success", vec!["Row successfully updated!".to_string()]);
+                messages
+                    .insert("success".to_string(), vec!["Row successfully updated!".to_string()]);
             }
             //tracing::info!("MESSAGES ARE NOW {:#?}", messages);
         }
@@ -335,12 +338,38 @@ fn render_row_from_database(
                 }
                 tmp
             };
-            tracing::info!("METAFIED ROW: {:#?}", metafied_row);
-            form_html = Some(get_row_as_form(state, config, table, &metafied_row).unwrap());
-            tracing::info!("FORM HTML: {}", form_html.unwrap());
+            //tracing::info!("METAFIED ROW: {:#?}", metafied_row);
+            form_html = Some(get_row_as_form(state, config, table, &metafied_row)?);
         }
-        todo!();
-        // if not form_html ... return abort ...
+        let form_html = match form_html {
+            Some(f) => f,
+            None => {
+                let error = "Something went wrong - unable to render form".to_string();
+                return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+            }
+        };
+        //tracing::info!("FORM HTML: {}", form_html);
+
+        let table_url = match term_id {
+            Some(term_id) => match uri::Builder::new()
+                .path_and_query(format!("/{}?term_id={}", table, term_id))
+                .build()
+            {
+                Ok(url) => url,
+                Err(e) => return Err(e.to_string().into()),
+            },
+            None => match uri::Builder::new()
+                .path_and_query(format!("/{}/row/{}", table, row_number))
+                .build()
+            {
+                Ok(url) => url,
+                Err(e) => return Err(e.to_string().into()),
+            },
+        };
+        tracing::info!("TABLE_URL: {}", table_url);
+        tracing::info!("MESSAGES: {:#?}", messages);
+
+        todo!(); // Do the equivalent of render_template() here.
     }
 
     // TODO: Finish this function.
@@ -352,7 +381,7 @@ fn render_row_from_database(
     .into_response())
 }
 
-fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<String>> {
+fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
     let mut messages = HashMap::new();
     for (header, details) in row {
         if header == "row_number" {
@@ -364,7 +393,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<String>> {
                 match msg.get("level") {
                     Some(level) if level == "error" => {
                         if !messages.contains_key("error") {
-                            messages.insert("error", vec![]);
+                            messages.insert("error".to_string(), vec![]);
                         }
                         let mut error_list = messages.get_mut("error").unwrap();
                         let error_msg = msg.get("message").unwrap().as_str().unwrap();
@@ -372,7 +401,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<String>> {
                     }
                     Some(level) if level == "warn" => {
                         if !messages.contains_key("warn") {
-                            messages.insert("warn", vec![]);
+                            messages.insert("warn".to_string(), vec![]);
                         }
                         let mut warn_list = messages.get_mut("warn").unwrap();
                         let warn_msg = msg.get("message").unwrap().as_str().unwrap();
@@ -380,7 +409,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<&str, Vec<String>> {
                     }
                     Some(level) if level == "info" => {
                         if !messages.contains_key("info") {
-                            messages.insert("info", vec![]);
+                            messages.insert("info".to_string(), vec![]);
                         }
                         let mut info_list = messages.get_mut("info").unwrap();
                         let info_msg = msg.get("message").unwrap().as_str().unwrap();
@@ -760,7 +789,7 @@ fn get_row_as_form(
     ]));
 
     let page_hiccup = hiccup::render(&json!(html)).unwrap();
-    tracing::info!("PAGE HICCUP: {}", page_hiccup);
+    //tracing::info!("PAGE HICCUP: {}", page_hiccup);
     Ok(page_hiccup)
 }
 

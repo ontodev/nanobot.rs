@@ -13,7 +13,7 @@ enquote = "1.1.0"
 futures = "0.3"
 html-escape = "0.2.13"
 lazy_static = "1.4.0"
-minijinja = { version = "0.26.0", features = ["json", "urlencode", "preserve_order"]}
+minijinja = { version = "0.32.0", features = ["json", "urlencode", "preserve_order"]}
 # ontodev_valve = "0.2.1"
 regex = "1.7.0"
 serde_json = { version = "1.0.89", features = ["preserve_order"] }
@@ -27,9 +27,8 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 urlencoding = "2.1.2"
 
 [dependencies.ontodev_hiccup]
-# git = "https://github.com/ontodev/hiccup.rs"
-# rev = "962f54994fd6d4c58f8c8855159d3cb6126b974b"
-path = "../hiccup.rs"
+git = "https://github.com/ontodev/hiccup.rs"
+rev = "7601d57bf564025648ba4e1a6f033e9b6753e5b2"
 
 [dependencies.ontodev_valve]
 path = "../ontodev_demo/valve.rs"

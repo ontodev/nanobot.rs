@@ -756,7 +756,7 @@ fn name_to_id(name: String) -> String {
     re.replace_all(&name, "-").to_string()
 }
 
-fn page_to_html(page: &Value) -> Result<String, GetError> {
+pub fn page_to_html(page: &Value) -> Result<String, GetError> {
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);
