@@ -73,6 +73,7 @@ async fn table(
     RawQuery(query): RawQuery,
     State(state): State<Arc<AppState>>,
 ) -> axum::response::Result<impl IntoResponse> {
+    // TODO: Does anything further from the ontodev_nanobot version of table() need to be done here?
     tracing::info!("request table {:?} {:?}", path, query);
     let mut table = path.clone();
     let mut format = "html";
@@ -186,8 +187,6 @@ fn render_row_from_database(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    tracing::info!("QUERY PARAMS: {:#?}", query_params);
-    tracing::info!("FORM PARAMS: {:#?}", form_params);
     let config = match state.config.valve.as_ref() {
         Some(c) => c,
         None => {
@@ -199,8 +198,9 @@ fn render_row_from_database(
     let pool = match state.config.pool.as_ref() {
         Some(p) => p,
         _ => {
-            let error = format!("Could not connect to database using pool {:?}", state.config.pool);
-            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+            return Err((StatusCode::BAD_REQUEST, Html("Missing database pool"))
+                .into_response()
+                .into());
         }
     };
     let mut view = match query_params.get("view") {
@@ -211,9 +211,8 @@ fn render_row_from_database(
     let mut form_html = None;
     if request_type == RequestType::POST {
         let mut new_row = SerdeMap::new();
-        let columns = get_sql_columns(table, config)?;
         // Use the list of columns for the table from the db to look up their values in the form:
-        for column in &columns {
+        for column in &get_sql_columns(table, config)? {
             if column != "row_number" {
                 let value = match form_params.get(column) {
                     Some(v) => v.to_string(),
@@ -243,7 +242,6 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            tracing::info!("VALIDATED ROW: {:#?}", validated_row);
             form_html = Some(get_row_as_form(config, table, &validated_row)?);
         } else if action == "submit" {
             let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
@@ -257,8 +255,7 @@ fn render_row_from_database(
                 return Err(e.to_string().into());
             }
 
-            messages = get_messages(&validated_row);
-            //tracing::info!("GOT MESSAGES {:#?}", messages);
+            messages = get_messages(&validated_row)?;
             if let Some(error_messages) = messages.get_mut("error") {
                 let extra_message = format!("Row updated with {} errors", error_messages.len());
                 match messages.get_mut("warn") {
@@ -271,68 +268,20 @@ fn render_row_from_database(
                 messages
                     .insert("success".to_string(), vec!["Row successfully updated!".to_string()]);
             }
-            //tracing::info!("MESSAGES ARE NOW {:#?}", messages);
         }
     }
 
     if view == "form" {
         if let None = form_html {
             let mut select = Select::new(format!("{}_view", table));
-            select.filter(vec![
-                Filter::new("row_number", "eq", json!(format!("{}", row_number))).unwrap()
-            ]);
-            //tracing::info!("RUNNING SELECT: {}", select.to_sqlite().unwrap());
-            let mut rows = select.fetch_rows_as_json(pool, &HashMap::new()).unwrap();
-            let row = &mut rows[0];
-            //tracing::info!("GOT ROW: {:#?}", row);
-            let metafied_row = {
-                // TODO: Make this block its own function.
-                let mut tmp = SerdeMap::new();
-                let mut messages = match row.get_mut("message") {
-                    Some(SerdeValue::Array(m)) => m.clone(),
-                    _ => return Err(format!("No array called 'messages' in row: {:?}", row).into()),
-                };
-                //tracing::info!("ROW MESSAGES: {:#?}", messages);
-                for (column, value) in row {
-                    if column == "message" || column == "row_number" {
-                        continue;
-                    }
-                    let mut tmp_cell = SerdeMap::new();
-                    tmp_cell.insert("value".to_string(), value.clone());
-                    let tmp_messages = {
-                        let mut tmp_messages = vec![];
-                        for m in &mut messages {
-                            //tracing::info!("MMMM: {:?}", m);
-                            if let Some(SerdeValue::String(mcol)) = m.get("column") {
-                                //tracing::info!("MCOL: {}", mcol);
-                                if mcol == column {
-                                    let m = m.as_object_mut().unwrap();
-                                    m.remove("column");
-                                    tmp_messages.push(m.clone());
-                                    // Overwrite the value in the tmp_cell:
-                                    tmp_cell.insert(
-                                        "value".to_string(),
-                                        m.get("value").unwrap().clone(),
-                                    );
-                                    m.remove("value");
-                                }
-                            }
-                        }
-                        tmp_messages
-                    };
-                    //tracing::info!("TMP MESSAGES: {:#?}", tmp_messages);
-                    tmp_cell.insert("messages".to_string(), json!(tmp_messages));
-                    tmp_cell.insert("valid".to_string(), json!(tmp_messages.is_empty()));
-                    //tracing::info!("COLUMN: {}, TMP_CELL: {:#?}", column, tmp_cell);
-                    tmp.insert(column.to_string(), json!(tmp_cell));
-                }
-                tmp
-            };
-            //tracing::info!("METAFIED ROW: {:#?}", metafied_row);
+            select.filter(vec![Filter::new("row_number", "eq", json!(format!("{}", row_number)))?]);
+            let mut rows = select.fetch_rows_as_json(pool, &HashMap::new())?;
+            let mut row = &mut rows[0];
+            let metafied_row = metafy_row(&mut row)?;
             form_html = Some(get_row_as_form(config, table, &metafied_row)?);
         }
 
-        let table_url = match term_id {
+        let _table_url = match term_id {
             Some(term_id) => match uri::Builder::new()
                 .path_and_query(format!("/{}?term_id={}", table, term_id))
                 .build()
@@ -348,8 +297,6 @@ fn render_row_from_database(
                 Err(e) => return Err(e.to_string().into()),
             },
         };
-        tracing::info!("TABLE_URL: {}", table_url);
-        tracing::info!("MESSAGES: {:#?}", messages);
     }
 
     let form_html = match form_html {
@@ -359,8 +306,9 @@ fn render_row_from_database(
             return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
         }
     };
-    //tracing::info!("FORM HTML: {}", form_html);
+
     let page = json!({
+        // TODO: What are the proper values to put in "page" and in "title"?
         "page": {
             "project_name": "Nanobot",
             "tables": {
@@ -375,18 +323,19 @@ fn render_row_from_database(
         "messages": messages,
         "row_form": form_html,
     });
-    tracing::info!("PAGE: {}", page);
-    let page_html = get::page_to_html_form(&page).unwrap();
+    let page_html = match get::page_to_html_form(&page) {
+        Ok(p) => p,
+        Err(e) => return Err(e.to_string().into()),
+    };
     Ok(Html(page_html).into_response())
 }
 
-fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
+fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> {
     let mut messages = HashMap::new();
     for (header, details) in row {
         if header == "row_number" {
             continue;
         }
-        // TODO: Remove unwraps.
         if let Some(SerdeValue::Array(row_messages)) = details.get("messages") {
             for msg in row_messages {
                 match msg.get("level") {
@@ -394,24 +343,42 @@ fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
                         if !messages.contains_key("error") {
                             messages.insert("error".to_string(), vec![]);
                         }
-                        let error_list = messages.get_mut("error").unwrap();
-                        let error_msg = msg.get("message").unwrap().as_str().unwrap();
+                        let error_list = match messages.get_mut("error") {
+                            Some(e) => e,
+                            None => return Err("No 'error' in messages".to_string()),
+                        };
+                        let error_msg = match msg.get("message").and_then(|m| m.as_str()) {
+                            Some(s) => s,
+                            None => return Err(format!("No str called 'message' in {}", msg)),
+                        };
                         error_list.push(error_msg.to_string());
                     }
                     Some(level) if level == "warn" => {
                         if !messages.contains_key("warn") {
                             messages.insert("warn".to_string(), vec![]);
                         }
-                        let warn_list = messages.get_mut("warn").unwrap();
-                        let warn_msg = msg.get("message").unwrap().as_str().unwrap();
+                        let warn_list = match messages.get_mut("warn") {
+                            Some(e) => e,
+                            None => return Err("No 'warn' in messages".to_string()),
+                        };
+                        let warn_msg = match msg.get("message").and_then(|m| m.as_str()) {
+                            Some(s) => s,
+                            None => return Err(format!("No str called 'message' in {}", msg)),
+                        };
                         warn_list.push(warn_msg.to_string());
                     }
                     Some(level) if level == "info" => {
                         if !messages.contains_key("info") {
                             messages.insert("info".to_string(), vec![]);
                         }
-                        let info_list = messages.get_mut("info").unwrap();
-                        let info_msg = msg.get("message").unwrap().as_str().unwrap();
+                        let info_list = match messages.get_mut("info") {
+                            Some(e) => e,
+                            None => return Err("No 'info' in messages".to_string()),
+                        };
+                        let info_msg = match msg.get("message").and_then(|m| m.as_str()) {
+                            Some(s) => s,
+                            None => return Err(format!("No str called 'message' in {}", msg)),
+                        };
                         info_list.push(info_msg.to_string());
                     }
                     Some(level) => tracing::warn!("Unrecognized level '{}' in {}", level, msg),
@@ -420,7 +387,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
             }
         }
     }
-    messages
+    Ok(messages)
 }
 
 fn _get_sql_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
@@ -523,18 +490,14 @@ fn get_html_type_and_values(
         }
     };
 
-    //tracing::info!("Looking for html type for datatype: {}", datatype);
-
     if let Some(html_type) = dt_config.get("HTML type").and_then(|t| t.as_str()) {
         if !html_type.is_empty() {
-            //tracing::info!("Got html type: {} and values: {:?}. Returning", html_type, new_values);
             return Ok((Some(html_type.to_string()), new_values));
         }
     }
 
     if let Some(parent) = dt_config.get("parent").and_then(|t| t.as_str()) {
         if !parent.is_empty() {
-            //tracing::info!("Could not find html type. Trying with {} and {:?}", parent, new_values);
             return get_html_type_and_values(config, parent, &new_values);
         }
     }
@@ -559,11 +522,11 @@ fn validate_table_row(
 ) -> Result<SerdeMap, String> {
     let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
         Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-        None => return Err(format!("Valve configuration is undefined in {:?}", state.config)),
+        None => return Err("Missing valve configuration".to_string()),
     };
     let pool = match state.config.pool.as_ref() {
         Some(p) => p,
-        None => return Err(format!("Pool is undefined in {:?}", state.config)),
+        None => return Err("Missing database pool".to_string()),
     };
 
     let validated_row = match row_number {
@@ -579,7 +542,7 @@ fn validate_table_row(
                     }),
                 );
             }
-            block_on(validate_row(
+            match block_on(validate_row(
                 &vconfig,
                 &dt_conds,
                 &rule_conds,
@@ -588,10 +551,12 @@ fn validate_table_row(
                 &result_row,
                 true,
                 Some(*row_number),
-            ))
-            .unwrap() // TODO: Remove unwrap
+            )) {
+                Ok(r) => r,
+                Err(e) => return Err(e.to_string()),
+            }
         }
-        None => block_on(validate_row(
+        None => match block_on(validate_row(
             &vconfig,
             &dt_conds,
             &rule_conds,
@@ -600,10 +565,75 @@ fn validate_table_row(
             row_data,
             false,
             None,
-        ))
-        .unwrap(), // TODO: Remove unwrap
+        )) {
+            Ok(r) => r,
+            Err(e) => return Err(e.to_string()),
+        },
     };
     Ok(validated_row)
+}
+
+fn stringify_messages(messages: &Vec<SerdeValue>) -> Result<String, String> {
+    let mut msg_parts = vec![];
+    for m in messages {
+        match m.as_object() {
+            None => return Err(format!("{:?} is not an object.", m)),
+            Some(message) => match message.get("message") {
+                None => return Err(format!("No 'message' in {:?}", message)),
+                Some(message) => {
+                    match message.as_str() {
+                        Some(message) => msg_parts.push(message.to_string()),
+                        None => return Err(format!("{} is not a str", message)),
+                    };
+                }
+            },
+        };
+    }
+    Ok(msg_parts.join("<br>"))
+}
+
+fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
+    let mut metafied_row = SerdeMap::new();
+    let mut messages = match row.get_mut("message") {
+        Some(SerdeValue::Array(m)) => m.clone(),
+        _ => return Err(format!("No array called 'messages' in row: {:?}", row).into()),
+    };
+    for (column, value) in row {
+        if column == "message" || column == "row_number" {
+            continue;
+        }
+        let mut metafied_cell = SerdeMap::new();
+        metafied_cell.insert("value".to_string(), value.clone());
+        let metafied_messages = {
+            let mut metafied_messages = vec![];
+            for m in &mut messages {
+                if let Some(SerdeValue::String(mcol)) = m.get("column") {
+                    if mcol == column {
+                        let m = match m.as_object_mut() {
+                            Some(m) => m,
+                            None => return Err(format!("{} is not an object", m)),
+                        };
+                        m.remove("column");
+                        metafied_messages.push(m.clone());
+                        // Overwrite the value in the metafied_cell:
+                        metafied_cell.insert(
+                            "value".to_string(),
+                            match m.get("value") {
+                                Some(v) => v.clone(),
+                                None => return Err(format!("No 'value' in {:?}", m)),
+                            },
+                        );
+                        m.remove("value");
+                    }
+                }
+            }
+            metafied_messages
+        };
+        metafied_cell.insert("messages".to_string(), json!(metafied_messages));
+        metafied_cell.insert("valid".to_string(), json!(metafied_messages.is_empty()));
+        metafied_row.insert(column.to_string(), json!(metafied_cell));
+    }
+    Ok(metafied_row)
 }
 
 fn get_row_as_form(
@@ -612,15 +642,12 @@ fn get_row_as_form(
     row_data: &SerdeMap,
 ) -> Result<String, String> {
     let mut html = vec![json!("html"), json!(["form", {"method": "post"}])];
-    tracing::info!("HTML: {:?}", html);
     let mut row_valid = None;
     let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
         if cell_header == "row_number" {
             continue;
         }
-
-        tracing::info!("GOT CELL VALUE: {:#?}", cell_value);
         let (valid, value, messages);
         match cell_value.as_object() {
             None => return Err(format!("Cell value: {:?} is not an object.", cell_value)),
@@ -653,52 +680,29 @@ fn get_row_as_form(
             row_valid = Some(false)
         }
 
-        tracing::info!("MESSAGES FOR {}.{}: {:?}", table_name, cell_header, messages);
-        let message = {
-            let mut tmp = vec![];
-            for m in messages {
-                match m.as_object() {
-                    None => return Err(format!("{:?} is not an object.", m)),
-                    Some(message) => match message.get("message") {
-                        None => return Err(format!("No 'message' in {:?}", message)),
-                        Some(message) => {
-                            match message.as_str() {
-                                Some(message) => tmp.push(message.to_string()),
-                                None => return Err(format!("{} is not a str", message)),
-                            };
-                        }
-                    },
-                };
-            }
-            tmp.join("<br>")
-        };
-        //tracing::info!("MESSAGES FOR {}.{} (as a string): {}", table_name, cell_header, message);
-
+        let message = stringify_messages(&messages)?;
         let column_config = get_column_config(table_name, cell_header, config)?;
-        //tracing::info!("COLUMN CONFIG: {:#?}", column_config);
         let description = match column_config.get("description") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
                 None => return Err(format!("Could not convert '{}' to string", d)),
                 Some(d) => d,
             },
-            None => return Err(format!("No 'description' in {:?}", column_config)),
+            None => return Err("No 'description' in column config".to_string()),
         };
         let datatype = match column_config.get("datatype") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
                 None => return Err(format!("Could not convert '{}' to string", d)),
                 Some(d) => d,
             },
-            None => return Err(format!("No 'datatype' in {:?}", column_config)),
+            None => return Err("No 'datatype' in column config".to_string()),
         };
         let structure = match column_config.get("structure") {
             Some(d) => match d.as_str() {
                 None => return Err(format!("{} is not a str", d)),
                 Some(d) => d.split('(').collect::<Vec<_>>()[0],
             },
-            None => return Err(format!("No 'structure' in {:?}", column_config)),
+            None => return Err("No 'structure' in column config".to_string()),
         };
-
-        //tracing::info!("D,D,S: {}, {}, {}", description, datatype, structure);
 
         let mut html_type;
         let mut allowed_values = None;
@@ -707,7 +711,6 @@ fn get_row_as_form(
         } else {
             (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
-        //tracing::info!("HTML TYPE IS {:?}", html_type);
 
         if allowed_values != None && html_type == None {
             html_type = Some("search".into());
@@ -784,8 +787,7 @@ fn get_row_as_form(
         ],
     ]));
 
-    let page_hiccup = hiccup::render(&json!(html)).unwrap();
-    //tracing::info!("PAGE HICCUP: {}", page_hiccup);
+    let page_hiccup = hiccup::render(&json!(html))?;
     Ok(page_hiccup)
 }
 
@@ -819,7 +821,7 @@ fn get_hiccup_form_row(
         return Err(format!("A list of allowed values is required for HTML type '{}'", html_type));
     }
 
-    // Create the header lavel for this form row:
+    // Create the header level for this form row:
     let mut header_col = vec![json!("div"), json!({"class": "col-md-3", "id": form_row_id})];
     if allow_delete {
         header_col.push(json!([
@@ -848,8 +850,6 @@ fn get_hiccup_form_row(
         ]));
     }
 
-    //tracing::info!("HEADER COL: {:#?}", header_col);
-
     // Create the value input for this form row:
     let mut classes = vec![];
     match valid {
@@ -864,10 +864,8 @@ fn get_hiccup_form_row(
         input_attrs.insert("name".to_string(), json!(header));
     }
 
-    //tracing::info!("GET HICCUP FORM ROW HTML TYPE: {}", html_type);
     let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
     if vec!["textarea", "input"].contains(&html_type) {
-        //tracing::info!("TEXTAREA OR INPUT");
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut element = vec![json!(html_type), json!(input_attrs)];
@@ -880,7 +878,6 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(element));
     } else if html_type == "select" {
-        //tracing::info!("SELECT");
         classes.insert(0, "form-select");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut select_element = vec![json!("select"), json!(input_attrs)];
@@ -917,9 +914,7 @@ fn get_hiccup_form_row(
             select_element.insert(2, json!(["option", {"value": "", "selected": true}]));
         }
         value_col.push(json!(select_element));
-        //tracing::info!("VALUE COL FOR SELECT: {:?}", value_col);
     } else if vec!["text", "number", "search"].contains(&html_type) {
-        //tracing::info!("TEXT NUMBER SEARCH");
         // TODO: Support a range restriction for 'number'
         classes.insert(0, "form-control");
         input_attrs.insert("type".to_string(), json!(html_type));
@@ -936,10 +931,7 @@ fn get_hiccup_form_row(
             }
         }
         value_col.push(json!([json!("input"), json!(input_attrs)]));
-        //tracing::info!("VALUE COL: {:#?}", value_col);
     } else if html_type == "radio" {
-        //tracing::info!("RADIO");
-        // TODO: what if value is not in allowed_values? Or what if there is no value?
         classes.insert(0, "form-check-input");
         input_attrs.insert("type".to_string(), json!(html_type));
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
@@ -949,6 +941,7 @@ fn get_hiccup_form_row(
                 let av_safe = encode_text_to_string(av, &mut empty);
                 let mut attrs_copy = input_attrs.clone();
                 attrs_copy.insert("value".to_string(), json!(av_safe));
+                // TODO: Do we need to do something in particular in the case where value is None?
                 if let Some(value) = value {
                     if value == av {
                         attrs_copy.insert("checked".to_string(), json!(true));
@@ -965,7 +958,6 @@ fn get_hiccup_form_row(
                 ]));
             }
         }
-        //tracing::info!("VALUE COL FOR RADIO: {:#?}", value_col);
 
         let mut attrs_copy = input_attrs.clone();
         attrs_copy.insert("value".to_string(), json!(""));
@@ -1008,7 +1000,6 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(e));
     } else {
-        //tracing::info!("ERROR");
         return Err(format!("'{}' form field is not supported for column '{}'", html_type, header));
     }
 
@@ -1039,7 +1030,11 @@ fn get_hiccup_form_row(
         // also the *last* element of `ann_values`.
         let mut ann_html = json!([]);
         for (ann_pred, ann_values) in annotations {
-            for av in ann_values.as_array().unwrap() {
+            let ann_values = match ann_values.as_array() {
+                Some(a) => a,
+                None => return Err(format!("{:?} is not an array", ann_values)),
+            };
+            for av in ann_values {
                 let av = match av.as_object() {
                     Some(av) => match av.get("object") {
                         Some(o) => match o.as_str() {
