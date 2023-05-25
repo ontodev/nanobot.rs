@@ -1,24 +1,22 @@
-use crate::config::{Config, ValveConfig};
-use crate::get;
-use axum::extract::{Json, Path, Query, RawQuery, State};
-use axum::http::{uri, StatusCode};
-use axum::response::{Html, IntoResponse, Redirect};
-use axum::routing::get;
-use axum::Router;
+use crate::{
+    config::{Config, ValveConfig},
+    get,
+};
+use axum::{
+    extract::{Json, Path, Query, RawQuery, State},
+    http::{uri, StatusCode},
+    response::{Html, IntoResponse, Redirect},
+    routing::get,
+    Router,
+};
 use enquote::unquote;
 use futures::executor::block_on;
 use html_escape::encode_text_to_string;
-use minijinja::{context, Environment};
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select};
-use ontodev_valve::{ast::Expression, update_row, validate::validate_row, CompiledCondition};
+use ontodev_valve::{ast::Expression, update_row, validate::validate_row};
 use serde_json::{json, Value as SerdeValue};
-use sqlx::any::AnyPool;
-
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::{env, fs};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 #[derive(Debug, PartialEq, Eq)]
 enum RequestType {
@@ -142,14 +140,6 @@ fn row(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        _ => {
-            let error = format!("Could not connect to database using pool {:?}", state.config.pool);
-            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
-        }
-    };
-
     let config = match state.config.valve.as_ref() {
         Some(c) => c,
         None => {
@@ -254,7 +244,7 @@ fn render_row_from_database(
                 Err(e) => return Err(e.into()),
             };
             tracing::info!("VALIDATED ROW: {:#?}", validated_row);
-            form_html = Some(get_row_as_form(state, config, table, &validated_row)?);
+            form_html = Some(get_row_as_form(config, table, &validated_row)?);
         } else if action == "submit" {
             let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
             {
@@ -316,7 +306,7 @@ fn render_row_from_database(
                             if let Some(SerdeValue::String(mcol)) = m.get("column") {
                                 //tracing::info!("MCOL: {}", mcol);
                                 if mcol == column {
-                                    let mut m = m.as_object_mut().unwrap();
+                                    let m = m.as_object_mut().unwrap();
                                     m.remove("column");
                                     tmp_messages.push(m.clone());
                                     // Overwrite the value in the tmp_cell:
@@ -339,7 +329,7 @@ fn render_row_from_database(
                 tmp
             };
             //tracing::info!("METAFIED ROW: {:#?}", metafied_row);
-            form_html = Some(get_row_as_form(state, config, table, &metafied_row)?);
+            form_html = Some(get_row_as_form(config, table, &metafied_row)?);
         }
 
         let table_url = match term_id {
@@ -404,7 +394,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
                         if !messages.contains_key("error") {
                             messages.insert("error".to_string(), vec![]);
                         }
-                        let mut error_list = messages.get_mut("error").unwrap();
+                        let error_list = messages.get_mut("error").unwrap();
                         let error_msg = msg.get("message").unwrap().as_str().unwrap();
                         error_list.push(error_msg.to_string());
                     }
@@ -412,7 +402,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
                         if !messages.contains_key("warn") {
                             messages.insert("warn".to_string(), vec![]);
                         }
-                        let mut warn_list = messages.get_mut("warn").unwrap();
+                        let warn_list = messages.get_mut("warn").unwrap();
                         let warn_msg = msg.get("message").unwrap().as_str().unwrap();
                         warn_list.push(warn_msg.to_string());
                     }
@@ -420,7 +410,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
                         if !messages.contains_key("info") {
                             messages.insert("info".to_string(), vec![]);
                         }
-                        let mut info_list = messages.get_mut("info").unwrap();
+                        let info_list = messages.get_mut("info").unwrap();
                         let info_msg = msg.get("message").unwrap().as_str().unwrap();
                         info_list.push(info_msg.to_string());
                     }
@@ -433,7 +423,7 @@ fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {
     messages
 }
 
-fn get_sql_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
+fn _get_sql_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
     match config
         .config
         .get("table")
@@ -455,7 +445,7 @@ fn get_sql_columns(table: &str, config: &ValveConfig) -> Result<Vec<String>, Str
         .and_then(|t| t.get("column"))
         .and_then(|c| c.as_object())
         .and_then(|c| Some(c.iter()))
-        .and_then(|c| Some(c.map(|(k, v)| k.clone())))
+        .and_then(|c| Some(c.map(|(k, _)| k.clone())))
         .and_then(|c| Some(c.collect::<Vec<_>>()))
     {
         None => Err(format!("Unable to retrieve columns of '{}' from valve configuration.", table)),
@@ -617,7 +607,6 @@ fn validate_table_row(
 }
 
 fn get_row_as_form(
-    state: &Arc<AppState>,
     config: &ValveConfig,
     table_name: &str,
     row_data: &SerdeMap,
@@ -632,9 +621,7 @@ fn get_row_as_form(
         }
 
         tracing::info!("GOT CELL VALUE: {:#?}", cell_value);
-        let mut valid = false;
-        let mut value = json!("");
-        let messages;
+        let (valid, value, messages);
         match cell_value.as_object() {
             None => return Err(format!("Cell value: {:?} is not an object.", cell_value)),
             Some(o) => {
@@ -675,7 +662,7 @@ fn get_row_as_form(
                     Some(message) => match message.get("message") {
                         None => return Err(format!("No 'message' in {:?}", message)),
                         Some(message) => {
-                            let message = match message.as_str() {
+                            match message.as_str() {
                                 Some(message) => tmp.push(message.to_string()),
                                 None => return Err(format!("{} is not a str", message)),
                             };
@@ -687,7 +674,6 @@ fn get_row_as_form(
         };
         //tracing::info!("MESSAGES FOR {}.{} (as a string): {}", table_name, cell_header, message);
 
-        let mut html_type = Some("text".into());
         let column_config = get_column_config(table_name, cell_header, config)?;
         //tracing::info!("COLUMN CONFIG: {:#?}", column_config);
         let description = match column_config.get("description") {
@@ -714,6 +700,7 @@ fn get_row_as_form(
 
         //tracing::info!("D,D,S: {}, {}, {}", description, datatype, structure);
 
+        let mut html_type;
         let mut allowed_values = None;
         if vec!["from", "in", "tree", "under"].contains(&structure) {
             html_type = Some("search".into());
@@ -735,8 +722,7 @@ fn get_row_as_form(
             _ => readonly = false,
         };
 
-        let mut hiccup_form_row = get_hiccup_form_row(
-            state,
+        let hiccup_form_row = get_hiccup_form_row(
             cell_header,
             &None,
             &allowed_values,
@@ -751,6 +737,7 @@ fn get_row_as_form(
             form_row_id,
         )?;
         html.push(json!(hiccup_form_row));
+        form_row_id += 1;
     }
 
     let submit_cls = match row_valid {
@@ -803,7 +790,6 @@ fn get_row_as_form(
 }
 
 fn get_hiccup_form_row(
-    mut state: &Arc<AppState>,
     header: &str,
     allow_delete: &Option<bool>,
     allowed_values: &Option<Vec<String>>,
@@ -815,7 +801,7 @@ fn get_hiccup_form_row(
     readonly: &Option<bool>,
     valid: &Option<bool>,
     value: &Option<SerdeValue>,
-    mut form_row_id: usize,
+    form_row_id: usize,
 ) -> Result<Vec<SerdeValue>, String> {
     let allow_delete = match allow_delete {
         None => false,
@@ -843,7 +829,6 @@ fn get_hiccup_form_row(
             json!("&nbsp"),
         ]));
     }
-    form_row_id += 1;
 
     match display_header {
         Some(d) => header_col.push(json!([json!("b"), json!(d)])),
@@ -1043,22 +1028,6 @@ fn get_hiccup_form_row(
         }
         _ => (),
     };
-
-    ////////////////////////////////////////////
-    // Remove these statements later:
-    let mut annotations = SerdeMap::new();
-    let my_leg = json!([
-        {"object": "Pep \"Mr. Blue\" Guardiola"},
-        {"object": "Kevin De Bruyne"},
-    ]);
-    let my_arm = json!([
-        {"object": "Jürgen \"Mr. Red\" Klopp"},
-        {"object": "Trent Alexander-Arnold"},
-    ]);
-    annotations.insert("MyFoot".to_string(), my_leg);
-    annotations.insert("MyHand".to_string(), my_arm);
-    let annotations = Some(annotations);
-    ////////////////////////////////////////////
 
     if let Some(annotations) = annotations {
         // TODO: This code is weird. It seems like ann_html is assigned on every iteration,
