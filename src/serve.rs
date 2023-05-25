@@ -421,8 +421,6 @@ fn get_sql_columns(table: &str, config: &ValveConfig) -> Result<Vec<String>, Str
 }
 
 fn get_column_config(table: &str, column: &str, config: &ValveConfig) -> Result<SerdeMap, String> {
-    //tracing::info!("VALVE CONFIG: {:#?}", config.config);
-    //tracing::info!("TABLE: {}, COLUMN: {}", table, column);
     match config
         .config
         .get("table")
@@ -1045,7 +1043,6 @@ fn get_hiccup_form_row(
                     },
                     None => return Err(format!("{:?} is not an object.", av)),
                 };
-                //tracing::info!("AV FOR {}: {}", ann_pred, av);
                 ann_html = json!([
                     "div",
                     {
@@ -1081,7 +1078,6 @@ fn get_hiccup_form_row(
                         ],
                     ],
                 ]);
-                //tracing::info!("ANN HTML: {}", ann_html);
             }
         }
         value_col.push(ann_html);
