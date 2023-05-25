@@ -341,14 +341,6 @@ fn render_row_from_database(
             //tracing::info!("METAFIED ROW: {:#?}", metafied_row);
             form_html = Some(get_row_as_form(state, config, table, &metafied_row)?);
         }
-        let form_html = match form_html {
-            Some(f) => f,
-            None => {
-                let error = "Something went wrong - unable to render form".to_string();
-                return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
-            }
-        };
-        //tracing::info!("FORM HTML: {}", form_html);
 
         let table_url = match term_id {
             Some(term_id) => match uri::Builder::new()
@@ -368,17 +360,34 @@ fn render_row_from_database(
         };
         tracing::info!("TABLE_URL: {}", table_url);
         tracing::info!("MESSAGES: {:#?}", messages);
-
-        todo!(); // Do the equivalent of render_template() here.
     }
 
-    // TODO: Finish this function.
-
-    Ok(Html(format!(
-        "What can I do for you, your table '{}' and your row number {} today, sir?\n",
-        table, row_number,
-    ))
-    .into_response())
+    let form_html = match form_html {
+        Some(f) => f,
+        None => {
+            let error = "Something went wrong - unable to render form".to_string();
+            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+        }
+    };
+    //tracing::info!("FORM HTML: {}", form_html);
+    let page = json!({
+        "page": {
+            "project_name": "Nanobot",
+            "tables": {
+                "table": "/table",
+                "column": "/column",
+                "datatype": "/datatype",
+                "message": "/message",
+                "penguin": "/penguin"
+            },
+        },
+        "title": "table",
+        "messages": messages,
+        "row_form": form_html,
+    });
+    tracing::info!("PAGE: {}", page);
+    let page_html = get::page_to_html_form(&page).unwrap();
+    Ok(Html(page_html).into_response())
 }
 
 fn get_messages(row: &SerdeMap) -> HashMap<String, Vec<String>> {

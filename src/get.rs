@@ -197,7 +197,7 @@ pub async fn get_rows(
                     Ok(pretty_json) => Ok(pretty_json),
                     Err(e) => return Err(GetError::new(e.to_string())),
                 },
-                "html" => page_to_html(&page),
+                "html" => page_to_html_table(&page),
                 &_ => Err(GetError::new(format!(
                     "Shape '{}' does not support format '{}'",
                     shape, format
@@ -756,7 +756,7 @@ fn name_to_id(name: String) -> String {
     re.replace_all(&name, "-").to_string()
 }
 
-pub fn page_to_html(page: &Value) -> Result<String, GetError> {
+pub fn page_to_html_table(page: &Value) -> Result<String, GetError> {
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);
@@ -768,6 +768,27 @@ pub fn page_to_html(page: &Value) -> Result<String, GetError> {
     }
 
     let template = match env.get_template("table.html") {
+        Ok(t) => t,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    match template.render(page) {
+        Ok(p) => Ok(p),
+        Err(e) => return Err(GetError::new(e.to_string())),
+    }
+}
+
+pub fn page_to_html_form(page: &Value) -> Result<String, GetError> {
+    let mut env = Environment::new();
+    env.add_filter("level_to_bootstrap", level_to_bootstrap);
+    env.add_filter("id", name_to_id);
+    if let Err(e) = env.add_template("page.html", include_str!("resources/page.html")) {
+        return Err(GetError::new(e.to_string()));
+    }
+    if let Err(e) = env.add_template("form.html", include_str!("resources/form.html")) {
+        return Err(GetError::new(e.to_string()));
+    }
+
+    let template = match env.get_template("form.html") {
         Ok(t) => t,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
