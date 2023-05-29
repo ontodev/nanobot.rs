@@ -672,12 +672,6 @@ fn get_row_as_form(
             _ => (),
         };
 
-        if valid && row_valid == None {
-            row_valid = Some(true)
-        } else if !valid {
-            row_valid = Some(false)
-        }
-
         let message = stringify_messages(&messages)?;
         let column_config = get_column_config(table_name, cell_header, config)?;
         let description = match column_config.get("description") {
