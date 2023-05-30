@@ -2632,7 +2632,7 @@ pub async fn get_html_term_tree(
     pool: &SqlitePool,
 ) -> Result<String, TreeViewError> {
     let hiccup = get_hiccup_term_tree(entity, table, pool).await?;
-    let html = hiccup::render(&hiccup, 0);
+    let html = hiccup::render(&hiccup);
     Ok(html)
 }
 

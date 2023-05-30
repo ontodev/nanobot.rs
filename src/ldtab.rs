@@ -670,7 +670,7 @@ pub async fn get_predicate_map_html(
         || subject.eq("rdfs:Datatype")
     {
         let hiccup = json!(["ul", ["p", {"class":"lead"}, "Hello! This is an ontology browser."], ["p", "An ontology is a terminology system designed for both humans and machines to read. Click the links on the left to browse the hierarchy of terms. Terms have parent terms, child terms, annotations, and logical axioms. The page for each term is also machine-readable using RDFa."]]);
-        let html = hiccup::render(&hiccup, 0);
+        let html = hiccup::render(&hiccup);
 
         return Ok(html);
     }
@@ -683,7 +683,7 @@ pub async fn get_predicate_map_html(
         predicate_order_end,
     )
     .await?;
-    let html = hiccup::render(&hiccup, 0);
+    let html = hiccup::render(&hiccup);
 
     Ok(html)
 }
