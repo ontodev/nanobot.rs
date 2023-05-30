@@ -4,7 +4,7 @@ use crate::{
 };
 use axum::{
     extract::{Json, Path, Query, RawQuery, State},
-    http::{uri, StatusCode},
+    http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::get,
     Router,
@@ -73,7 +73,6 @@ async fn table(
     RawQuery(query): RawQuery,
     State(state): State<Arc<AppState>>,
 ) -> axum::response::Result<impl IntoResponse> {
-    // TODO: Does anything further from the ontodev_nanobot version of table() need to be done here?
     tracing::info!("request table {:?} {:?}", path, query);
     let mut table = path.clone();
     let mut format = "html";
@@ -167,20 +166,11 @@ fn row(
         }
     };
 
-    render_row_from_database(
-        &table,
-        &None,
-        row_number,
-        state,
-        query_params,
-        form_params,
-        request_type,
-    )
+    render_row_from_database(&table, row_number, state, query_params, form_params, request_type)
 }
 
 fn render_row_from_database(
     table: &str,
-    term_id: &Option<String>,
     row_number: u32,
     state: &Arc<AppState>,
     query_params: &RequestParams,
@@ -212,7 +202,7 @@ fn render_row_from_database(
     if request_type == RequestType::POST {
         let mut new_row = SerdeMap::new();
         // Use the list of columns for the table from the db to look up their values in the form:
-        for column in &get_sql_columns(table, config)? {
+        for column in &get_columns(table, config)? {
             if column != "row_number" {
                 let value = match form_params.get(column) {
                     Some(v) => v.to_string(),
@@ -280,23 +270,6 @@ fn render_row_from_database(
             let metafied_row = metafy_row(&mut row)?;
             form_html = Some(get_row_as_form(config, table, &metafied_row)?);
         }
-
-        let _table_url = match term_id {
-            Some(term_id) => match uri::Builder::new()
-                .path_and_query(format!("/{}?term_id={}", table, term_id))
-                .build()
-            {
-                Ok(url) => url,
-                Err(e) => return Err(e.to_string().into()),
-            },
-            None => match uri::Builder::new()
-                .path_and_query(format!("/{}/row/{}", table, row_number))
-                .build()
-            {
-                Ok(url) => url,
-                Err(e) => return Err(e.to_string().into()),
-            },
-        };
     }
 
     let form_html = match form_html {
@@ -307,19 +280,21 @@ fn render_row_from_database(
         }
     };
 
+    let table_map = {
+        let mut table_map = SerdeMap::new();
+        for table in get_tables(config)? {
+            table_map.insert(table.to_string(), json!(format!("/{}", table)));
+        }
+        json!(table_map)
+    };
+
     let page = json!({
-        // TODO: What are the proper values to put in "page" and in "title"?
         "page": {
             "project_name": "Nanobot",
-            "tables": {
-                "table": "/table",
-                "column": "/column",
-                "datatype": "/datatype",
-                "message": "/message",
-                "penguin": "/penguin"
-            },
+            "tables": table_map,
         },
         "title": "table",
+        "subtitle": format!(r#"<a href="/{}/row/{}">Return to row</a>"#, table, row_number),
         "messages": messages,
         "row_form": form_html,
     });
@@ -390,7 +365,7 @@ fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> 
     Ok(messages)
 }
 
-fn _get_sql_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
+fn get_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
     match config
         .config
         .get("table")
@@ -398,11 +373,11 @@ fn _get_sql_tables(config: &ValveConfig) -> Result<Vec<String>, String> {
         .and_then(|t| Some(t.keys().cloned().collect::<Vec<_>>()))
     {
         Some(tables) => Ok(tables),
-        None => Err(format!("Unable to retrieve table config from valve config: {:#?}", config)),
+        None => Err(format!("No object named 'table' in valve config")),
     }
 }
 
-fn get_sql_columns(table: &str, config: &ValveConfig) -> Result<Vec<String>, String> {
+fn get_columns(table: &str, config: &ValveConfig) -> Result<Vec<String>, String> {
     match config
         .config
         .get("table")
@@ -504,7 +479,7 @@ fn get_html_type_and_values(
 }
 
 fn is_ontology(table: &str, config: &ValveConfig) -> Result<bool, String> {
-    let columns = get_sql_columns(table, config)?;
+    let columns = get_columns(table, config)?;
     Ok(columns.contains(&"subject".to_string())
         && columns.contains(&"predicate".to_string())
         && columns.contains(&"object".to_string())
@@ -721,7 +696,6 @@ fn get_row_as_form(
             cell_header,
             &None,
             &allowed_values,
-            &None,
             &Some(description),
             &None,
             &html_type,
@@ -787,7 +761,6 @@ fn get_hiccup_form_row(
     header: &str,
     allow_delete: &Option<bool>,
     allowed_values: &Option<Vec<String>>,
-    annotations: &Option<SerdeMap>,
     description: &Option<String>,
     display_header: &Option<String>,
     html_type: &Option<String>,
@@ -1011,71 +984,6 @@ fn get_hiccup_form_row(
         }
         _ => (),
     };
-
-    if let Some(annotations) = annotations {
-        // TODO: This code is weird. It seems like ann_html is assigned on every iteration,
-        // but then the value is thrown away at the end of each iteration. It could be that there
-        // is a bug and that the statement:
-        //   `value_col.push(ann_html);`
-        // should happen inside one of the for loops. Otherwise this code is extremely inefficient,
-        // and the best thing to do is just to take the *last* tuple in `annotations` and
-        // also the *last* element of `ann_values`.
-        let mut ann_html = json!([]);
-        for (ann_pred, ann_values) in annotations {
-            let ann_values = match ann_values.as_array() {
-                Some(a) => a,
-                None => return Err(format!("{:?} is not an array", ann_values)),
-            };
-            for av in ann_values {
-                let av = match av.as_object() {
-                    Some(av) => match av.get("object") {
-                        Some(o) => match o.as_str() {
-                            Some(s) => s,
-                            None => return Err(format!("{:?} is not a str", o)),
-                        },
-                        None => return Err(format!("No 'object' in {:?}", av)),
-                    },
-                    None => return Err(format!("{:?} is not an object.", av)),
-                };
-                ann_html = json!([
-                    "div",
-                    {
-                        "class": "row justify-content-end",
-                        "style": "padding-right: 0px; padding-top: 5px;",
-                    },
-                    [
-                        "div",
-                        {"class": "col-sm-9"},
-                        [
-                            "div",
-                            {"class": "row"},
-                            [
-                                "label",
-                                {
-                                    "class": "col-sm-2 col-form-label",
-                                    "style": "padding-left: 20px !important;",
-                                },
-                                format!("{}", ann_pred),
-                            ],
-                            [
-                                "div",
-                                {"class": "col-sm-10", "style": "padding-right: 0px !important;"},
-                                [
-                                    "input",
-                                    {
-                                        "type": "text",
-                                        "class": "form-control",
-                                        "value": format!("{}", av.replace('"', "&quot;")),
-                                    },
-                                ],
-                            ],
-                        ],
-                    ],
-                ]);
-            }
-        }
-        value_col.push(ann_html);
-    }
 
     Ok(vec![json!("div"), json!({"class": "row py-1"}), json!(header_col), json!(value_col)])
 }
