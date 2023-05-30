@@ -429,11 +429,9 @@ fn get_html_type_and_values(
     };
 
     let mut new_values = vec![];
+    tracing::info!("DT CONDS: {:#?}", config.datatype_conditions);
     match values {
         None => match config.datatype_conditions.get(datatype) {
-            None => {
-                return Err(format!("Could not retrieve datatype condition for '{}'", datatype))
-            }
             Some(compiled_condition) => match &compiled_condition.parsed {
                 Expression::Function(name, args) if name == "in" => {
                     for arg in args {
@@ -452,6 +450,7 @@ fn get_html_type_and_values(
                 }
                 _ => (),
             },
+            _ => (),
         },
         Some(values) => new_values = values.to_vec(),
     };
@@ -569,6 +568,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
     let mut metafied_row = SerdeMap::new();
     let mut messages = match row.get_mut("message") {
         Some(SerdeValue::Array(m)) => m.clone(),
+        Some(SerdeValue::Null) => vec![],
         _ => return Err(format!("No array called 'messages' in row: {:?}", row).into()),
     };
     for (column, value) in row {
@@ -848,6 +848,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!([html_type, input_attrs]));
     } else if html_type == "textarea" {
+        // TODO: Verify that this html type is being handled correctly.
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut element = vec![json!(html_type), json!(input_attrs)];
@@ -860,6 +861,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(element));
     } else if html_type == "select" {
+        // TODO: Verify that this html type is being handled correctly.
         classes.insert(0, "form-select");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut select_element = vec![json!("select"), json!(input_attrs)];
@@ -897,6 +899,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(select_element));
     } else if vec!["text", "number", "search"].contains(&html_type) {
+        // TODO: Verify that this html type is being handled correctly.
         // TODO: Support a range restriction for 'number'
         classes.insert(0, "form-control");
         input_attrs.insert("type".to_string(), json!(html_type));
@@ -914,6 +917,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!([json!("input"), json!(input_attrs)]));
     } else if html_type == "radio" {
+        // TODO: Verify that this html type is being handled correctly.
         classes.insert(0, "form-check-input");
         input_attrs.insert("type".to_string(), json!(html_type));
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
