@@ -753,6 +753,8 @@ fn get_row_as_form(
         ],
     ]));
 
+    tracing::debug!("HICCUP: {:#?}", html);
+
     let page_hiccup = hiccup::render(&json!(html))?;
     Ok(page_hiccup)
 }
@@ -830,7 +832,22 @@ fn get_hiccup_form_row(
     }
 
     let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
-    if vec!["textarea", "input"].contains(&html_type) {
+
+    if html_type == "input" {
+        classes.insert(0, "form-control");
+        input_attrs.insert("class".to_string(), json!(classes.join(" ")));
+        if let Some(value) = value {
+            match value.as_str() {
+                Some(v) => {
+                    let mut empty = String::new();
+                    let value = encode_text_to_string(v, &mut empty);
+                    input_attrs.insert("value".to_string(), json!(value));
+                }
+                None => return Err(format!("Value '{}' is not a string", value)),
+            }
+        }
+        value_col.push(json!([html_type, input_attrs]));
+    } else if html_type == "textarea" {
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut element = vec![json!(html_type), json!(input_attrs)];
