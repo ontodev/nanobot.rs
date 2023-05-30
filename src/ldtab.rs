@@ -45,6 +45,22 @@ impl From<LDTabError> for Error {
     }
 }
 
+/// Given a str for a CURIE/IRI, return the CURIE as a String,
+/// or return the IRI without angle brackets.
+///
+/// # Examples
+///
+/// encode_iri("obo:RO_0002131") returns "obo:RO_0002131"
+/// encode_iri(<http://purl.obolibrary.org/obo/ZFA_0000496>) returns "http://purl.obolibrary.org/obo/ZFA_0000496"
+pub fn encode_iri(entity: &str) -> String {
+    if entity.starts_with("<") && entity.ends_with(">") {
+        let entity_len = entity.len();
+        entity[1..entity_len-1].to_string()
+    } else {
+        String::from(entity)
+    }
+}
+
 /// Given a set of CURIEs, return the set of all used prefixes.
 ///
 /// # Example
@@ -395,7 +411,7 @@ fn ldtab_iri_2_hiccup(
         None => String::from(entity),
     };
     //hiccup-style encoding
-    json!(["a", {"property" : property, "resource" : value["object"]}, label ])
+    json!(["a", {"property" : property, "resource" : value["object"]}, encode_iri(&label) ])
 }
 
 /// Given a property, an LDTab value with type _JSON,
@@ -640,7 +656,7 @@ pub async fn get_predicate_map_hiccup(
         //build HTML (encoded via JSON hiccup)
         let mut outer_list_element = Vec::new();
         outer_list_element.push(json!("li"));
-        outer_list_element.push(json!(["a", { "resource": key.clone() }, key_label]));
+        outer_list_element.push(json!(["a", { "resource": key.clone() }, encode_iri(&key_label)]));
 
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));

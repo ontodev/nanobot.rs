@@ -32,6 +32,22 @@ pub enum OWLEntityType {
     Datatype,
 }
 
+/// Given a str for a CURIE/IRI, return the CURIE as a String,
+/// or return the IRI without angle brackets.
+///
+/// # Examples
+///
+/// encode_iri("obo:RO_0002131") returns "obo:RO_0002131"
+/// encode_iri(<http://purl.obolibrary.org/obo/ZFA_0000496>) returns "http://purl.obolibrary.org/obo/ZFA_0000496"
+pub fn encode_iri(entity: &str) -> String {
+    if entity.starts_with("<") && entity.ends_with(">") {
+        let entity_len = entity.len();
+        entity[1..entity_len-1].to_string()
+    } else {
+        String::from(entity)
+    }
+}
+
 /// Given a CURIE/IRI for a property (note that we don't check the rdf:type)
 /// and a connection to an LDTab database,
 /// return a map capturing (transitive) information about the 'subPropertyOf' relationship.
@@ -156,7 +172,7 @@ pub async fn get_immediate_property_children_tree(
             //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
         };
         let element =
-            json!({"curie" : sub, "label" : label, "property" : SUBPROPERTY, "children" : []});
+            json!({"curie" : sub, "label" : encode_iri(label), "property" : SUBPROPERTY, "children" : []});
         children.push(element);
     }
 
@@ -299,7 +315,7 @@ pub async fn get_rich_json_property_tree_view(
             Some(l) => l,
             None => entity,
         };
-        tree = json!([{"curie": entity, "label":label, "property": SUBPROPERTY, "children" : [] }]);
+        tree = json!([{"curie": entity, "label":encode_iri(label), "property": SUBPROPERTY, "children" : [] }]);
     }
 
     //sort tree by label
@@ -1091,8 +1107,13 @@ pub fn build_rich_tree_branch(
         }
     }
 
+    let label = match curie_2_label.get(to_insert) {
+        Some(l) => l,
+        None => to_insert,
+    };
+
     Ok(
-        json!({"curie" : to_insert, "label" : curie_2_label.get(to_insert), "property" : relation, "children" : children_vec}),
+        json!({"curie" : to_insert, "label" : encode_iri(label), "property" : relation, "children" : children_vec}),
     )
 }
 
@@ -1524,7 +1545,7 @@ pub async fn get_immediate_children_tree(
             None => &sub,
             //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
         };
-        let element = json!({"curie" : sub, "label" : label, "property" : IS_A, "children" : []});
+        let element = json!({"curie" : sub, "label" : encode_iri(label), "property" : IS_A, "children" : []});
         children.push(element);
     }
 
@@ -1536,7 +1557,7 @@ pub async fn get_immediate_children_tree(
                 //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
             };
             let element =
-                json!({"curie" : sub, "label" : label, "property" : relations[n], "children" : []});
+                json!({"curie" : sub, "label" : encode_iri(label), "property" : relations[n], "children" : []});
             children.push(element);
         }
     }
@@ -1940,7 +1961,7 @@ pub async fn get_rich_json_tree_view(
             Some(l) => l,
             None => entity,
         };
-        tree = json!([{"curie": entity, "label":label, "property": IS_A, "children" : [] }]);
+        tree = json!([{"curie": entity, "label":encode_iri(label), "property": IS_A, "children" : [] }]);
     }
 
     //sort tree by label
@@ -2448,10 +2469,10 @@ pub async fn get_hiccup_top_class_hierarchy(
     for entity in &entities {
         let mut root_tree = match entity_2_label.get(entity) {
             Some(label) => {
-                json!({"curie":entity, "label":label, "property" : IS_A, "children" : []})
+                json!({"curie":entity, "label":encode_iri(label), "property" : IS_A, "children" : []})
             }
             None => {
-                json!({"curie":entity, "label":entity, "property" : IS_A, "children" : []})
+                json!({"curie":entity, "label":encode_iri(entity), "property" : IS_A, "children" : []})
             }
         };
 
@@ -2528,10 +2549,10 @@ pub async fn get_hiccup_top_property_hierarchy(
     for entity in &entities {
         let mut root_tree = match entity_2_label.get(entity) {
             Some(label) => {
-                json!({"curie":entity, "label":label, "property" : SUBPROPERTY, "children" : []})
+                json!({"curie":entity, "label":encode_iri(label), "property" : SUBPROPERTY, "children" : []})
             }
             None => {
-                json!({"curie":entity, "label":entity, "property" : SUBPROPERTY, "children" : []})
+                json!({"curie":entity, "label":encode_iri(entity), "property" : SUBPROPERTY, "children" : []})
             }
         };
 
