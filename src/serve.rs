@@ -429,7 +429,6 @@ fn get_html_type_and_values(
     };
 
     let mut new_values = vec![];
-    tracing::info!("DT CONDS: {:#?}", config.datatype_conditions);
     match values {
         None => match config.datatype_conditions.get(datatype) {
             Some(compiled_condition) => match &compiled_condition.parsed {
@@ -614,7 +613,7 @@ fn get_row_as_form(
     table_name: &str,
     row_data: &SerdeMap,
 ) -> Result<String, String> {
-    let mut html = vec![json!("html"), json!(["form", {"method": "post"}])];
+    let mut html = vec![json!("form"), json!({"method": "post"})];
     let mut row_valid = None;
     let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
@@ -753,8 +752,6 @@ fn get_row_as_form(
         ],
     ]));
 
-    tracing::debug!("HICCUP: {:#?}", html);
-
     let page_hiccup = hiccup::render(&json!(html))?;
     Ok(page_hiccup)
 }
@@ -848,7 +845,6 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!([html_type, input_attrs]));
     } else if html_type == "textarea" {
-        // TODO: Verify that this html type is being handled correctly.
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut element = vec![json!(html_type), json!(input_attrs)];
@@ -861,7 +857,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(element));
     } else if html_type == "select" {
-        // TODO: Verify that this html type is being handled correctly.
+        // TODO: This html type will need to be re-implemented (later).
         classes.insert(0, "form-select");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut select_element = vec![json!("select"), json!(input_attrs)];
@@ -899,7 +895,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!(select_element));
     } else if vec!["text", "number", "search"].contains(&html_type) {
-        // TODO: Verify that this html type is being handled correctly.
+        // TODO: This html type will need to be re-implemented (later).
         // TODO: Support a range restriction for 'number'
         classes.insert(0, "form-control");
         input_attrs.insert("type".to_string(), json!(html_type));
@@ -917,7 +913,7 @@ fn get_hiccup_form_row(
         }
         value_col.push(json!([json!("input"), json!(input_attrs)]));
     } else if html_type == "radio" {
-        // TODO: Verify that this html type is being handled correctly.
+        // TODO: This html type will need to be re-implemented (later).
         classes.insert(0, "form-check-input");
         input_attrs.insert("type".to_string(), json!(html_type));
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));

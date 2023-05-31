@@ -28,7 +28,7 @@ pub async fn get_table_from_pool(
     if select.filter.len() == 0 {
         match select.offset {
             Some(offset) if offset > 0 => {
-                let filter = match Filter::new(default_order_by, "ge", json!(offset)) {
+                let filter = match Filter::new(default_order_by, "gte", json!(offset)) {
                     Err(e) => return Err(e),
                     Ok(f) => f,
                 };
