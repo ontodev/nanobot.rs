@@ -55,7 +55,7 @@ impl From<LDTabError> for Error {
 pub fn encode_iri(entity: &str) -> String {
     if entity.starts_with("<") && entity.ends_with(">") {
         let entity_len = entity.len();
-        entity[1..entity_len-1].to_string()
+        entity[1..entity_len - 1].to_string()
     } else {
         String::from(entity)
     }

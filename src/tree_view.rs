@@ -42,7 +42,7 @@ pub enum OWLEntityType {
 pub fn encode_iri(entity: &str) -> String {
     if entity.starts_with("<") && entity.ends_with(">") {
         let entity_len = entity.len();
-        entity[1..entity_len-1].to_string()
+        entity[1..entity_len - 1].to_string()
     } else {
         String::from(entity)
     }
@@ -171,8 +171,7 @@ pub async fn get_immediate_property_children_tree(
             None => &sub,
             //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
         };
-        let element =
-            json!({"curie" : sub, "label" : encode_iri(label), "property" : SUBPROPERTY, "children" : []});
+        let element = json!({"curie" : sub, "label" : encode_iri(label), "property" : SUBPROPERTY, "children" : []});
         children.push(element);
     }
 
@@ -1545,7 +1544,8 @@ pub async fn get_immediate_children_tree(
             None => &sub,
             //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
         };
-        let element = json!({"curie" : sub, "label" : encode_iri(label), "property" : IS_A, "children" : []});
+        let element =
+            json!({"curie" : sub, "label" : encode_iri(label), "property" : IS_A, "children" : []});
         children.push(element);
     }
 
@@ -1556,8 +1556,7 @@ pub async fn get_immediate_children_tree(
                 None => &sub,
                 //None => return Err(TreeViewError::TreeFormat(format!("No label for {}", sub))),
             };
-            let element =
-                json!({"curie" : sub, "label" : encode_iri(label), "property" : relations[n], "children" : []});
+            let element = json!({"curie" : sub, "label" : encode_iri(label), "property" : relations[n], "children" : []});
             children.push(element);
         }
     }
