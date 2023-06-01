@@ -3,7 +3,7 @@ use crate::{
     get,
 };
 use axum::{
-    extract::{Json, Path, Query, RawQuery, State},
+    extract::{Form, Path, Query, RawQuery, State},
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::get,
@@ -112,7 +112,7 @@ async fn post_row(
     Path((table, row_number)): Path<(String, String)>,
     State(state): State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
-    Json(form_params): Json<RequestParams>,
+    Form(form_params): Form<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!(
         "request row POST {:?} {:?} {:?} {:?}",

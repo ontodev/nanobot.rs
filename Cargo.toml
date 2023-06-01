@@ -16,7 +16,7 @@ lazy_static = "1.4.0"
 minijinja = { version = "0.32.0", features = ["json", "urlencode", "preserve_order"]}
 # ontodev_valve = "0.2.1"
 regex = "1.7.0"
-serde_json = { version = "1.0.89", features = ["preserve_order"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
 serde = { version = "1.0.148", features = ["derive"] }
 sqlx = { version = "0.6", features = [ "runtime-async-std-rustls", "any", "postgres", "sqlite" ] }
 tabwriter = { version = "1.2.1" }
@@ -31,7 +31,9 @@ git = "https://github.com/ontodev/hiccup.rs"
 rev = "7601d57bf564025648ba4e1a6f033e9b6753e5b2"
 
 [dependencies.ontodev_valve]
-path = "../ontodev_demo/valve.rs"
+# path = "../ontodev_demo/valve.rs"
+git = "https://github.com/ontodev/valve.rs"
+rev = "ebc0ae5b5d9f615f7e34c2e7d3de7abb49e8669f"
 
 [dependencies.ontodev_sqlrest]
 git = "https://github.com/ontodev/sqlrest.rs"
