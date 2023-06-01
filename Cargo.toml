@@ -36,8 +36,9 @@ git = "https://github.com/ontodev/valve.rs"
 rev = "ebc0ae5b5d9f615f7e34c2e7d3de7abb49e8669f"
 
 [dependencies.ontodev_sqlrest]
+# path = "../sqlrest.rs"
 git = "https://github.com/ontodev/sqlrest.rs"
-rev = "750c459c47b702761e05f88c58315dc0660daad1"
+rev = "48b8a58944a59e742c7b4f1e686dfdaee8c8d450"
 
 [build-dependencies]
 cc = "1.0"
