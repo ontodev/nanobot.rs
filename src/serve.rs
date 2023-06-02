@@ -802,10 +802,21 @@ fn get_hiccup_form_row(
     };
 
     if let Some(description) = description {
+        // TODO: Make a decision whether to use the commented out code below, which does not
+        // use javascript to render tooltips, or the code just below it that does.
+        // If we end up using pure html then remove the lines of javascript in page.html that
+        // are used to enable tooltips.
+        // header_col.push(json!([
+        //     json!("span"),
+        //     json!({
+        //         "title": description,
+        //     }),
+        //     json!(["i", {"class": "bi-question-circle"}]),
+        // ]));
         header_col.push(json!([
-            json!("button"),
+            json!("button"), // TODO: Why is this a button?
             json!({
-                "class": "btn",
+                "class": "btn", // TODO: Why is this a button?
                 "data-bs-toggle": "tooltip",
                 "data-bs-placement": "right",
                 "title": description,
