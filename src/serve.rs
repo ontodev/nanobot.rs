@@ -833,28 +833,39 @@ fn get_hiccup_form_row(
     if html_type == "input" {
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
-        if let Some(value) = value {
-            match value.as_str() {
-                Some(v) => {
-                    let mut empty = String::new();
-                    let value = encode_text_to_string(v, &mut empty);
-                    input_attrs.insert("value".to_string(), json!(value));
-                }
-                None => return Err(format!("Value '{}' is not a string", value)),
+        match value {
+            Some(SerdeValue::String(value)) => {
+                let mut empty = String::new();
+                let value = encode_text_to_string(value, &mut empty);
+                input_attrs.insert("value".to_string(), json!(value));
             }
-        }
+            Some(SerdeValue::Number(value)) => {
+                input_attrs.insert("value".to_string(), json!(value));
+            }
+            Some(SerdeValue::Bool(value)) => {
+                input_attrs.insert("value".to_string(), json!(value));
+            }
+            _ => (),
+        };
         value_col.push(json!([html_type, input_attrs]));
     } else if html_type == "textarea" {
         classes.insert(0, "form-control");
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         let mut element = vec![json!(html_type), json!(input_attrs)];
-        if let Some(value) = value {
-            if let Some(v) = value.as_str() {
+        match value {
+            Some(SerdeValue::String(value)) => {
                 let mut empty = String::new();
-                let value = encode_text_to_string(v, &mut empty);
+                let value = encode_text_to_string(value, &mut empty);
                 element.push(json!(value));
             }
-        }
+            Some(SerdeValue::Number(value)) => {
+                element.push(json!(value));
+            }
+            Some(SerdeValue::Bool(value)) => {
+                element.push(json!(value));
+            }
+            _ => (),
+        };
         value_col.push(json!(element));
     } else if html_type == "select" {
         // TODO: This html type will need to be re-implemented (later).
@@ -904,13 +915,20 @@ fn get_hiccup_form_row(
             input_attrs.insert("id".to_string(), json!(format!("{}-typeahead-form", header)));
         }
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
-        if let Some(value) = value {
-            if let Some(v) = value.as_str() {
+        match value {
+            Some(SerdeValue::String(value)) => {
                 let mut empty = String::new();
-                let value = encode_text_to_string(v, &mut empty);
+                let value = encode_text_to_string(value, &mut empty);
                 input_attrs.insert("value".to_string(), json!(value));
             }
-        }
+            Some(SerdeValue::Number(value)) => {
+                input_attrs.insert("value".to_string(), json!(value));
+            }
+            Some(SerdeValue::Bool(value)) => {
+                input_attrs.insert("value".to_string(), json!(value));
+            }
+            _ => (),
+        };
         value_col.push(json!([json!("input"), json!(input_attrs)]));
     } else if html_type == "radio" {
         // TODO: This html type will need to be re-implemented (later).
@@ -956,16 +974,32 @@ fn get_hiccup_form_row(
             Err(e) => return Err(e.to_string()),
         };
 
-        if let Some(value) = value {
-            if let Some(value) = value.as_str() {
-                if let Some(allowed_values) = allowed_values {
+        if let Some(allowed_values) = allowed_values {
+            match value {
+                Some(SerdeValue::String(value)) => {
+                    if !allowed_values.contains(&value) {
+                        attrs_copy.insert("checked".to_string(), json!(true));
+                        let mut empty = String::new();
+                        let value = encode_text_to_string(value, &mut empty);
+                        input_attrs.insert("value".to_string(), json!(value));
+                    }
+                }
+                Some(SerdeValue::Number(value)) => {
                     if !allowed_values.contains(&value.to_string()) {
                         attrs_copy.insert("checked".to_string(), json!(true));
                         input_attrs.insert("value".to_string(), json!(value));
                     }
                 }
-            }
+                Some(SerdeValue::Bool(value)) => {
+                    if !allowed_values.contains(&value.to_string()) {
+                        attrs_copy.insert("checked".to_string(), json!(true));
+                        input_attrs.insert("value".to_string(), json!(value));
+                    }
+                }
+                _ => (),
+            };
         }
+
         let mut e = vec![
             json!("div"),
             json!(["input", attrs_copy]),

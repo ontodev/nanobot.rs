@@ -38,7 +38,7 @@ rev = "ebc0ae5b5d9f615f7e34c2e7d3de7abb49e8669f"
 [dependencies.ontodev_sqlrest]
 # path = "../sqlrest.rs"
 git = "https://github.com/ontodev/sqlrest.rs"
-rev = "48b8a58944a59e742c7b4f1e686dfdaee8c8d450"
+rev = "0750f96dac942ec2aaaa9e0bb12b5c5ce4b1d2bc"
 
 [build-dependencies]
 cc = "1.0"
