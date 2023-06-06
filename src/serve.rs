@@ -263,6 +263,14 @@ fn render_row_from_database(
 
     if view == "form" {
         if let None = form_html {
+            if table == "message" {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Html("Editing the message table is not possible"),
+                )
+                    .into_response()
+                    .into());
+            }
             let mut select = Select::new(format!("{}_view", table));
             select.filter(vec![Filter::new("row_number", "eq", json!(format!("{}", row_number)))?]);
             let mut rows = select.fetch_rows_as_json(pool, &HashMap::new())?;
@@ -408,7 +416,10 @@ fn get_column_config(table: &str, column: &str, config: &ValveConfig) -> Result<
         .and_then(|c| c.as_object())
     {
         Some(c) => Ok(c.clone()),
-        None => Err("Unable to retrieve column config from Valve configuration".to_string()),
+        None => Err(format!(
+            "Unable to retrieve column config for '{}.{}' from Valve configuration",
+            table, column
+        )),
     }
 }
 
@@ -653,7 +664,7 @@ fn get_row_as_form(
                 None => return Err(format!("Could not convert '{}' to string", d)),
                 Some(d) => d,
             },
-            None => return Err("No 'description' in column config".to_string()),
+            None => cell_header.to_string(),
         };
         let datatype = match column_config.get("datatype") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
@@ -667,7 +678,7 @@ fn get_row_as_form(
                 None => return Err(format!("{} is not a str", d)),
                 Some(d) => d.split('(').collect::<Vec<_>>()[0],
             },
-            None => return Err("No 'structure' in column config".to_string()),
+            None => "",
         };
 
         let mut html_type;
@@ -802,6 +813,7 @@ fn get_hiccup_form_row(
     };
 
     if let Some(description) = description {
+        // Tooltip:
         header_col.push(json!([
             json!("span"),
             json!({

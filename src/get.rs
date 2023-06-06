@@ -5,11 +5,11 @@
 use crate::config::Config;
 use crate::sql::{
     get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
-    rows_to_map, LIMIT_DEFAULT, LIMIT_MAX,
+    LIMIT_DEFAULT, LIMIT_MAX,
 };
 use enquote::unquote;
 use minijinja::Environment;
-use ontodev_sqlrest::{Filter, Select};
+use ontodev_sqlrest::Select;
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Map, Value};
 use sqlx::any::AnyPool;
@@ -74,8 +74,58 @@ pub async fn get_rows(
     format: &str,
 ) -> Result<String, GetError> {
     // Get all the tables
-    let mut select = Select::new("\"table\"");
-    select.select(vec!["\"table\"", "\"path\"", "\"type\"", "\"description\""]);
+    let table_map =
+        match config.valve.as_ref().and_then(|v| v.config.get("table")).and_then(|t| t.as_object())
+        {
+            Some(table_map) => table_map,
+            None => return Err(GetError::new(format!("No object named 'table' in valve config"))),
+        };
+
+    let unquoted_table = unquote(&base_select.table).unwrap_or(base_select.table.to_string());
+    if !table_map.contains_key(&unquoted_table) {
+        return Err(GetError::new(format!("Invalid table '{}'", &base_select.table)));
+    }
+
+    // Get the columns for the selected table
+    let column_config = match config
+        .valve
+        .as_ref()
+        .and_then(|v| v.config.get("table"))
+        .and_then(|t| t.as_object())
+        .and_then(|t| t.get(&unquoted_table))
+        .and_then(|t| t.as_object())
+        .and_then(|t| t.get("column"))
+        .and_then(|c| c.as_object())
+    {
+        None => {
+            return Err(GetError::new(format!(
+                "Unable to retrieve columns of '{}' from valve configuration.",
+                unquoted_table
+            )))
+        }
+        Some(v) => v,
+    };
+
+    let mut columns: Vec<String> = vec![];
+    let mut column_rows = vec![];
+    for (column, row) in column_config {
+        let unquoted_column = unquote(&column).unwrap_or(column.to_string());
+        columns.push(format!("\"{}\"", unquoted_column));
+        let row = match row.as_object() {
+            Some(row) => row.clone(),
+            None => return Err(GetError::new(format!("{:?} is not an object", row))),
+        };
+        column_rows.push(row);
+    }
+
+    let mut select = Select::clone(&base_select);
+    select.select(columns);
+    match select.limit {
+        Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
+        Some(l) if l > 0 => select.limit(l),
+        _ => select.limit(LIMIT_DEFAULT),
+    };
+
     let pool = match config.pool.as_ref() {
         Some(p) => p,
         _ => {
@@ -84,87 +134,6 @@ pub async fn get_rows(
                 config.pool
             )))
         }
-    };
-
-    let table_rows = match get_table_from_pool(&pool, &select).await {
-        Ok(tr) => tr,
-        Err(e) => return Err(GetError::new(e.to_string())),
-    };
-    let table_map = match rows_to_map(table_rows, "table") {
-        Ok(tm) => tm,
-        Err(e) => return Err(GetError::new(e)),
-    };
-    let unquoted_table = unquote(&base_select.table).unwrap_or(base_select.table.to_string());
-    if !table_map.contains_key(&unquoted_table) {
-        return Err(GetError::new(format!("Invalid table '{}'", &base_select.table)));
-    }
-
-    // Get the columns for the selected table
-    let mut base_select = base_select.clone();
-    if base_select.select.is_empty() {
-        if let Err(e) = base_select.select_all(pool) {
-            return Err(GetError::new(e.to_string()));
-        }
-    }
-    let base_columns = base_select
-        .select
-        .iter()
-        .map(|s| {
-            let column = unquote(&s.expression).unwrap_or(s.expression.to_string());
-            let column = format!("'{}'", column);
-            column
-        })
-        .collect::<Vec<_>>();
-
-    let mut select = Select::new("\"column\"");
-    select
-        .select(vec![
-            "\"column\"",
-            "\"nulltype\"",
-            "\"datatype\"",
-            "\"structure\"",
-            "\"description\"",
-        ])
-        .filter(vec![
-            match Filter::new("\"table\"", "eq", json!(format!("'{}'", unquoted_table))) {
-                Ok(f) => f,
-                Err(e) => return Err(GetError::new(e)),
-            },
-            match Filter::new("\"column\"", "in", json!(base_columns)) {
-                Ok(f) => f,
-                Err(e) => return Err(GetError::new(e)),
-            },
-        ]);
-
-    let column_rows = match get_table_from_pool(&pool, &select).await {
-        Ok(cr) => cr,
-        Err(e) => return Err(GetError::new(e.to_string())),
-    };
-
-    let mut columns: Vec<String> = vec![];
-    let mut columns_to_append = vec![];
-    for row in &column_rows {
-        match row.get("column") {
-            None => return Err(GetError::new("No column 'column' in row.".to_string())),
-            Some(column) => match column.as_str() {
-                None => {
-                    return Err(GetError::new(format!("Could not convert '{}' to str", column)))
-                }
-                Some(column) => {
-                    let unquoted_column = unquote(&column).unwrap_or(column.to_string());
-                    columns_to_append.push(format!("\"{}\"", unquoted_column));
-                }
-            },
-        };
-    }
-    columns.append(&mut columns_to_append);
-
-    let mut select = Select::clone(&base_select);
-    select.select(columns);
-    match select.limit {
-        Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
-        Some(l) if l > 0 => select.limit(l),
-        _ => select.limit(LIMIT_DEFAULT),
     };
 
     match shape {
@@ -262,13 +231,25 @@ async fn get_page(
     let start = std::time::Instant::now();
     // Query the table view instead of the base table, which includes conflict rows and the
     // message column:
-    let mut view_select = Select { table: format!("{}_view", unquoted_table), ..select.clone() };
+    let db_object;
+    if unquoted_table == "message" {
+        db_object = unquoted_table.to_string();
+    } else {
+        db_object = format!("{}_view", unquoted_table);
+    }
+    let mut view_select = Select { table: db_object, ..select.clone() };
     let curr_cols = view_select.select.to_vec();
-    view_select.select(vec!["row_number"]);
+    if unquoted_table == "message" {
+        view_select.select(vec!["message_id"]);
+    } else {
+        view_select.select(vec!["row_number"]);
+    }
     for col in &curr_cols {
         view_select.add_explicit_select(col);
     }
-    view_select.add_select("message");
+    if unquoted_table != "message" {
+        view_select.add_select("message");
+    }
 
     // If we're filtering for rows with messages:
     if filter_messages {
@@ -291,7 +272,7 @@ async fn get_page(
     for row in &value_rows {
         let mut crow: Map<String, Value> = Map::new();
         for (k, v) in row.iter() {
-            if k == "message" {
+            if unquoted_table != "message" && k == "message" {
                 continue;
             }
             let mut cell: Map<String, Value> = Map::new();
@@ -299,7 +280,9 @@ async fn get_page(
 
             // handle the value
             cell.insert("value".to_string(), v.clone());
-            if k == "row_number" {
+            if (unquoted_table != "message" && k == "row_number")
+                || (unquoted_table == "message" && k == "message_id")
+            {
                 cell.insert("datatype".to_string(), Value::String("integer".to_string()));
                 crow.insert(k.to_string(), Value::Object(cell));
                 continue;
@@ -347,13 +330,39 @@ async fn get_page(
                 cell.insert("datatype".to_string(), datatype.clone());
             }
             // handle structure
-            let structure = match column_map.get(k) {
-                Some(column) => match column.get("structure") {
-                    Some(structure) => structure,
-                    None => {
-                        return Err(GetError::new(format!("No 'structure' entry in {:?}", column)))
+            match column_map.get(k) {
+                Some(column) => {
+                    let default_structure = json!("");
+                    let structure = column.get("structure").unwrap_or(&default_structure);
+                    if structure == "from(table.table)" {
+                        let href = format!("/table?table=eq.{}", {
+                            match v.as_str() {
+                                Some(s) => s.to_string(),
+                                None => {
+                                    return Err(GetError::new(format!(
+                                        "Could not convert '{}' to str",
+                                        v
+                                    )))
+                                }
+                            }
+                        });
+                        cell.insert("href".to_string(), Value::String(href));
+                    } else if k == "table" && unquoted_table == "table" {
+                        // In the 'table' table, link to the other tables
+                        let href = format!("/{}", {
+                            match v.as_str() {
+                                Some(s) => s.to_string(),
+                                None => {
+                                    return Err(GetError::new(format!(
+                                        "Could not convert '{}' to str",
+                                        v
+                                    )))
+                                }
+                            }
+                        });
+                        cell.insert("href".to_string(), Value::String(href));
                     }
-                },
+                }
                 None => {
                     return Err(GetError::new(format!(
                         "No key '{}' in column_map {:?}",
@@ -361,28 +370,6 @@ async fn get_page(
                     )))
                 }
             };
-            if structure == "from(table.table)" {
-                let href = format!("/table?table=eq.{}", {
-                    match v.as_str() {
-                        Some(s) => s.to_string(),
-                        None => {
-                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
-                        }
-                    }
-                });
-                cell.insert("href".to_string(), Value::String(href));
-            } else if k == "table" && unquoted_table == "table" {
-                // In the 'table' table, link to the other tables
-                let href = format!("/{}", {
-                    match v.as_str() {
-                        Some(s) => s.to_string(),
-                        None => {
-                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
-                        }
-                    }
-                });
-                cell.insert("href".to_string(), Value::String(href));
-            }
 
             if classes.len() > 0 {
                 cell.insert("classes".to_string(), json!(classes));
@@ -392,138 +379,160 @@ async fn get_page(
         }
 
         let mut error_values = HashMap::new();
-        if let Some(input_messages) = row.get("message") {
-            let input_messages = match input_messages {
-                Value::Array(value) => value.clone(),
-                Value::String(value) => {
-                    let value = unquote(&value).unwrap_or(value.to_string());
-                    match serde_json::from_str::<Value>(value.as_str()) {
-                        Err(e) => return Err(GetError::new(e.to_string())),
-                        Ok(value) => match value.as_array() {
-                            None => {
-                                return Err(GetError::new(format!(
-                                    "Value '{}' is not an array.",
-                                    value
-                                )))
-                            }
-                            Some(value) => value.to_vec(),
-                        },
-                    }
-                }
-                Value::Null => vec![],
-                _ => {
-                    return Err(GetError::new(format!(
-                        "'{}' is not a Value String or Value Array",
-                        input_messages
-                    )))
-                }
-            };
-            let mut output_messages: HashMap<&str, Vec<Map<String, Value>>> = HashMap::new();
-            let mut max_level: usize = 0;
-            let mut message_level = "info".to_string();
-            for message in &input_messages {
-                let mut m = Map::new();
-                let message_map = match message.as_object() {
-                    Some(o) => o,
-                    None => return Err(GetError::new(format!("{:?} is not an object.", message))),
-                };
-                for (key, value) in message_map.iter() {
-                    if key != "column" && key != "value" {
-                        m.insert(key.clone(), value.clone());
-                    }
-                }
-                let column = match message_map.get("column") {
-                    Some(c) => match c.as_str() {
-                        Some(s) => s,
-                        None => {
-                            return Err(GetError::new(format!("Could not convert '{}' to str", c)))
-                        }
-                    },
-                    None => {
-                        return Err(GetError::new(format!("No 'column' key in {:?}", message_map)))
-                    }
-                };
-                let value = match message.get("value") {
-                    Some(v) => match v.as_str() {
-                        Some(s) => s,
-                        None => {
-                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
-                        }
-                    },
-                    None => {
-                        return Err(GetError::new(format!("No 'value' key in {:?}", message_map)))
-                    }
-                };
-                error_values.insert(column.clone(), value);
-                if let Some(v) = output_messages.get_mut(&column) {
-                    v.push(m);
-                } else {
-                    output_messages.insert(column, vec![m]);
-                }
-
-                let level = match message.get("level") {
-                    Some(v) => match v.as_str() {
-                        Some(s) => s.to_string(),
-                        None => {
-                            return Err(GetError::new(format!("Could not convert '{}' to str", v)))
-                        }
-                    },
-                    None => {
-                        return Err(GetError::new(format!("No 'level' key in {:?}", message_map)))
-                    }
-                };
-                let lvl = level_to_int(&level);
-                if lvl > max_level {
-                    max_level = lvl;
-                    message_level = level;
-                }
-            }
-
-            for (column, messages) in &output_messages {
-                if let Some(cell) = crow.get_mut(column.clone()) {
-                    if let Some(cell) = cell.as_object_mut() {
-                        cell.remove("nulltype");
-                        let mut new_classes = vec![];
-                        if let Some(classes) = cell.get_mut("classes") {
-                            match classes.as_array() {
+        if unquoted_table != "message" {
+            if let Some(input_messages) = row.get("message") {
+                let input_messages = match input_messages {
+                    Value::Array(value) => value.clone(),
+                    Value::String(value) => {
+                        let value = unquote(&value).unwrap_or(value.to_string());
+                        match serde_json::from_str::<Value>(value.as_str()) {
+                            Err(e) => return Err(GetError::new(e.to_string())),
+                            Ok(value) => match value.as_array() {
                                 None => {
                                     return Err(GetError::new(format!(
-                                        "{:?} is not an array",
-                                        classes
+                                        "Value '{}' is not an array.",
+                                        value
                                     )))
                                 }
-                                Some(classes_array) => {
-                                    for class in classes_array {
-                                        match class.as_str() {
-                                            None => {
-                                                return Err(GetError::new(format!(
-                                                    "Could not convert '{}' to str",
-                                                    class
-                                                )))
-                                            }
-                                            Some(s) => {
-                                                if s.to_string() != "bg-null" {
-                                                    new_classes.push(class.clone());
-                                                }
-                                            }
-                                        };
-                                    }
-                                }
-                            };
+                                Some(value) => value.to_vec(),
+                            },
                         }
-                        let value = match error_values.get(column) {
-                            Some(v) => v,
+                    }
+                    Value::Null => vec![],
+                    _ => {
+                        return Err(GetError::new(format!(
+                            "'{}' is not a Value String or Value Array",
+                            input_messages
+                        )))
+                    }
+                };
+                let mut output_messages: HashMap<&str, Vec<Map<String, Value>>> = HashMap::new();
+                let mut max_level: usize = 0;
+                let mut message_level = "info".to_string();
+                for message in &input_messages {
+                    let mut m = Map::new();
+                    let message_map = match message.as_object() {
+                        Some(o) => o,
+                        None => {
+                            return Err(GetError::new(format!("{:?} is not an object.", message)))
+                        }
+                    };
+                    for (key, value) in message_map.iter() {
+                        if key != "column" && key != "value" {
+                            m.insert(key.clone(), value.clone());
+                        }
+                    }
+                    let column = match message_map.get("column") {
+                        Some(c) => match c.as_str() {
+                            Some(s) => s,
                             None => {
                                 return Err(GetError::new(format!(
-                                    "No '{}' in {:?}",
-                                    column, error_values
+                                    "Could not convert '{}' to str",
+                                    c
                                 )))
                             }
-                        };
-                        cell.insert("value".to_string(), json!(value));
-                        cell.insert("classes".to_string(), json!(new_classes));
-                        cell.insert("message_level".to_string(), json!(message_level));
-                        cell.insert("messages".to_string(), json!(messages));
+                        },
+                        None => {
+                            return Err(GetError::new(format!(
+                                "No 'column' key in {:?}",
+                                message_map
+                            )))
+                        }
+                    };
+                    let value = match message.get("value") {
+                        Some(v) => match v.as_str() {
+                            Some(s) => s,
+                            None => {
+                                return Err(GetError::new(format!(
+                                    "Could not convert '{}' to str",
+                                    v
+                                )))
+                            }
+                        },
+                        None => {
+                            return Err(GetError::new(format!(
+                                "No 'value' key in {:?}",
+                                message_map
+                            )))
+                        }
+                    };
+                    error_values.insert(column.clone(), value);
+                    if let Some(v) = output_messages.get_mut(&column) {
+                        v.push(m);
+                    } else {
+                        output_messages.insert(column, vec![m]);
+                    }
+
+                    let level = match message.get("level") {
+                        Some(v) => match v.as_str() {
+                            Some(s) => s.to_string(),
+                            None => {
+                                return Err(GetError::new(format!(
+                                    "Could not convert '{}' to str",
+                                    v
+                                )))
+                            }
+                        },
+                        None => {
+                            return Err(GetError::new(format!(
+                                "No 'level' key in {:?}",
+                                message_map
+                            )))
+                        }
+                    };
+                    let lvl = level_to_int(&level);
+                    if lvl > max_level {
+                        max_level = lvl;
+                        message_level = level;
+                    }
+                }
+
+                for (column, messages) in &output_messages {
+                    if let Some(cell) = crow.get_mut(column.clone()) {
+                        if let Some(cell) = cell.as_object_mut() {
+                            cell.remove("nulltype");
+                            let mut new_classes = vec![];
+                            if let Some(classes) = cell.get_mut("classes") {
+                                match classes.as_array() {
+                                    None => {
+                                        return Err(GetError::new(format!(
+                                            "{:?} is not an array",
+                                            classes
+                                        )))
+                                    }
+                                    Some(classes_array) => {
+                                        for class in classes_array {
+                                            match class.as_str() {
+                                                None => {
+                                                    return Err(GetError::new(format!(
+                                                        "Could not convert '{}' to str",
+                                                        class
+                                                    )))
+                                                }
+                                                Some(s) => {
+                                                    if s.to_string() != "bg-null" {
+                                                        new_classes.push(class.clone());
+                                                    }
+                                                }
+                                            };
+                                        }
+                                    }
+                                };
+                            }
+                            let value = match error_values.get(column) {
+                                Some(v) => v,
+                                None => {
+                                    return Err(GetError::new(format!(
+                                        "No '{}' in {:?}",
+                                        column, error_values
+                                    )))
+                                }
+                            };
+                            cell.insert("value".to_string(), json!(value));
+                            cell.insert("classes".to_string(), json!(new_classes));
+                            cell.insert("message_level".to_string(), json!(message_level));
+                            cell.insert("messages".to_string(), json!(messages));
+                        }
                     }
                 }
             }
@@ -534,7 +543,7 @@ async fn get_page(
 
     let mut counts = Map::new();
     let count = {
-        if filter_messages {
+        if unquoted_table != "message" && filter_messages {
             match message_counts.get("message_row").and_then(|m| m.as_u64()) {
                 Some(m) => m as usize,
                 None => {
