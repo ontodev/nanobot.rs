@@ -47,7 +47,7 @@ pub async fn app(config: &Config) -> Result<String, String> {
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        .route("/:table", get(table))
+        .route("/:table", get(get_table).post(post_table))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
         .with_state(shared_state);
 
@@ -68,12 +68,31 @@ async fn root() -> impl IntoResponse {
     Redirect::permanent("/table")
 }
 
-async fn table(
+async fn post_table(
     Path(path): Path<String>,
-    RawQuery(query): RawQuery,
-    State(state): State<Arc<AppState>>,
+    state: State<Arc<AppState>>,
+    Query(query_params): Query<RequestParams>,
+    Form(form_params): Form<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
-    tracing::info!("request table {:?} {:?}", path, query);
+    table(&path, &state, &query_params, &form_params, RequestType::POST).await
+}
+
+async fn get_table(
+    Path(path): Path<String>,
+    State(state): State<Arc<AppState>>,
+    Query(query_params): Query<RequestParams>,
+) -> axum::response::Result<impl IntoResponse> {
+    table(&path, &state, &query_params, &RequestParams::new(), RequestType::GET).await
+}
+
+async fn table(
+    path: &String,
+    state: &Arc<AppState>,
+    query_params: &RequestParams,
+    form_params: &RequestParams,
+    request_type: RequestType,
+) -> axum::response::Result<impl IntoResponse> {
+    tracing::info!("request table GET {:?} {:?}", path, query_params);
     let mut table = path.clone();
     let mut format = "html";
     if path.ends_with(".pretty.json") {
@@ -83,15 +102,37 @@ async fn table(
         table = path.replace(".json", "");
         format = "json";
     }
-    let url = match query {
-        Some(q) => format!("{}?{}", table, q),
-        None => table.clone(),
+
+    let mut view = match query_params.get("view") {
+        Some(view) => view.to_string(),
+        None => "".to_string(),
     };
 
+    if request_type == RequestType::POST {
+        todo!();
+    }
+
+    if view == "form" {
+        todo!();
+    }
+
+    // TODO: Remove this comment later. The code below corresponds to the
+    // "Otherwise render default sprocket table" code in run.py
+    let url = {
+        let url = query_params
+            .iter()
+            .filter(|(k, _)| **k != "view".to_string())
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>();
+        if !url.is_empty() {
+            format!("{}?{}", table, url.join("&"))
+        } else {
+            table.to_string()
+        }
+    };
     tracing::info!("URL: {}", url);
     let select = parse(&url)?;
     tracing::info!("select {:?}", select);
-
     match get::get_rows(&state.config, &select, "page", &format).await {
         Ok(x) => match format {
             "html" => Ok(Html(x).into_response()),
