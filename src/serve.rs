@@ -1,9 +1,10 @@
 use crate::{
     config::{Config, ValveConfig},
     get,
+    sql::{LIMIT_DEFAULT, LIMIT_MAX},
 };
 use axum::{
-    extract::{Form, Path, Query, RawQuery, State},
+    extract::{Form, Json, Path, Query, RawQuery, State},
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::get,
@@ -14,7 +15,7 @@ use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select};
-use ontodev_valve::{ast::Expression, update_row, validate::validate_row};
+use ontodev_valve::{ast::Expression, insert_new_row, update_row, validate::validate_row};
 use serde_json::{json, Value as SerdeValue};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -72,7 +73,8 @@ async fn post_table(
     Path(path): Path<String>,
     state: State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
-    Form(form_params): Form<RequestParams>,
+    //Form(form_params): Form<RequestParams>,
+    Json(form_params): Json<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     table(&path, &state, &query_params, &form_params, RequestType::POST).await
 }
@@ -102,14 +104,70 @@ async fn table(
         table = path.replace(".json", "");
         format = "json";
     }
-
+    let config = match state.config.valve.as_ref() {
+        Some(c) => c,
+        None => {
+            return Err((StatusCode::BAD_REQUEST, Html("Valve config missing"))
+                .into_response()
+                .into());
+        }
+    };
     let mut view = match query_params.get("view") {
         Some(view) => view.to_string(),
         None => "".to_string(),
     };
 
+    let mut form_html = None;
+    let columns = get_columns(&table, config)?;
     if request_type == RequestType::POST {
-        todo!();
+        // Override view, which isn't passed in POST:
+        view = String::from("form");
+        let mut new_row = SerdeMap::new();
+        //tracing::info!("FORM PARAMS: {:#?}", form_params);
+        for column in &columns {
+            if column != "row_number" {
+                let value = match form_params.get(column) {
+                    Some(v) => v.to_string(),
+                    None => {
+                        let other_column = format!("{}_other", column);
+                        form_params.get(&other_column).unwrap_or(&String::from("")).to_string()
+                    }
+                };
+                new_row.insert(column.to_string(), value.into());
+            }
+        }
+
+        //tracing::info!("NEW ROW: {:#?}", new_row);
+        let action = match form_params.get("action") {
+            None => return Err(format!("No 'action' in {:?}", form_params).into()),
+            Some(v) => v,
+        };
+        let validated_row = match validate_table_row(&table, &new_row, &None, state) {
+            Ok(v) => v,
+            Err(e) => return Err(e.into()),
+        };
+        //tracing::info!("VALIDATED ROW: {:#?}", validated_row);
+        if action == "validate" {
+            form_html = Some(get_row_as_form(config, &table, &validated_row)?);
+        } else if action == "submit" {
+            let pool = match state.config.pool.as_ref() {
+                Some(p) => p,
+                None => return Err("Missing database pool".to_string().into()),
+            };
+            let row_number =
+                match insert_new_row(&config.config, pool, &table, &validated_row).await {
+                    Ok(n) => n,
+                    Err(e) => return Err(e.to_string().into()),
+                };
+            let offset = row_number / LIMIT_DEFAULT as u32;
+            let offset = offset * LIMIT_DEFAULT as u32;
+            tracing::info!("OFFSET: {}", offset);
+            let blah = format!(
+                r#"The insert operation succeeded. Click <a href="/{}?offset={}">here go back to the table</a>"#,
+                table, offset
+            );
+            return Ok(Html(blah).into_response());
+        }
     }
 
     if view == "form" {
@@ -552,46 +610,48 @@ fn validate_table_row(
         None => return Err("Missing database pool".to_string()),
     };
 
-    let validated_row = match row_number {
-        Some(row_number) => {
-            let mut result_row = SerdeMap::new();
-            for (column, value) in row_data.iter() {
-                result_row.insert(
-                    column.to_string(),
-                    json!({
-                        "value": value.clone(),
-                        "valid": true,
-                        "messages": Vec::<SerdeMap>::new(),
-                    }),
-                );
+    let validated_row = {
+        let mut result_row = SerdeMap::new();
+        for (column, value) in row_data.iter() {
+            result_row.insert(
+                column.to_string(),
+                json!({
+                    "value": value.clone(),
+                    "valid": true,
+                    "messages": Vec::<SerdeMap>::new(),
+                }),
+            );
+        }
+        match row_number {
+            Some(row_number) => {
+                match block_on(validate_row(
+                    &vconfig,
+                    &dt_conds,
+                    &rule_conds,
+                    &pool,
+                    table_name,
+                    &result_row,
+                    true,
+                    Some(*row_number),
+                )) {
+                    Ok(r) => r,
+                    Err(e) => return Err(e.to_string()),
+                }
             }
-            match block_on(validate_row(
+            None => match block_on(validate_row(
                 &vconfig,
                 &dt_conds,
                 &rule_conds,
                 &pool,
                 table_name,
                 &result_row,
-                true,
-                Some(*row_number),
+                false,
+                None,
             )) {
                 Ok(r) => r,
                 Err(e) => return Err(e.to_string()),
-            }
+            },
         }
-        None => match block_on(validate_row(
-            &vconfig,
-            &dt_conds,
-            &rule_conds,
-            &pool,
-            table_name,
-            row_data,
-            false,
-            None,
-        )) {
-            Ok(r) => r,
-            Err(e) => return Err(e.to_string()),
-        },
     };
     Ok(validated_row)
 }
