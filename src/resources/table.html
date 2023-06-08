@@ -138,6 +138,12 @@
     </div>
   </div>
 
+  {% if table.table != "message" %}
+    <div class="row">
+      <a class="btn btn-large btn-outline-primary" href="/{{ table.table }}?view=form">Add a new row</a>
+    </div>
+  {% endif %}
+
   <table class="table">
     <tr>
       <th/>

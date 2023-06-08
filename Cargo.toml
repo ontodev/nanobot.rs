@@ -28,17 +28,17 @@ urlencoding = "2.1.2"
 
 [dependencies.ontodev_hiccup]
 git = "https://github.com/ontodev/hiccup.rs"
-rev = "7601d57bf564025648ba4e1a6f033e9b6753e5b2"
+rev = "fb8bfe02fc36389c89d335d81488d7d1da719c1f"
 
 [dependencies.ontodev_valve]
 # path = "../ontodev_demo/valve.rs"
 git = "https://github.com/ontodev/valve.rs"
-rev = "03a0a99c7b60d031f7230c8194e3f602f73b95f8"
+rev = "ba8ee1de1370bfba00f46961443a55b7d81e88d2"
 
 [dependencies.ontodev_sqlrest]
 # path = "../sqlrest.rs"
 git = "https://github.com/ontodev/sqlrest.rs"
-rev = "0750f96dac942ec2aaaa9e0bb12b5c5ce4b1d2bc"
+rev = "750c459c47b702761e05f88c58315dc0660daad1"
 
 [build-dependencies]
 cc = "1.0"

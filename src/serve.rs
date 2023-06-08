@@ -1,10 +1,10 @@
 use crate::{
     config::{Config, ValveConfig},
     get,
-    sql::{LIMIT_DEFAULT, LIMIT_MAX},
+    sql::LIMIT_DEFAULT,
 };
 use axum::{
-    extract::{Form, Json, Path, Query, RawQuery, State},
+    extract::{Form, Path, Query, State},
     http::StatusCode,
     response::{Html, IntoResponse, Redirect},
     routing::get,
@@ -73,9 +73,14 @@ async fn post_table(
     Path(path): Path<String>,
     state: State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
-    //Form(form_params): Form<RequestParams>,
-    Json(form_params): Json<RequestParams>,
+    Form(form_params): Form<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
+    tracing::info!(
+        "request table POST {:?}, Query Params: {:?}, Form Params: {:?}",
+        path,
+        query_params,
+        form_params
+    );
     table(&path, &state, &query_params, &form_params, RequestType::POST).await
 }
 
@@ -84,6 +89,7 @@ async fn get_table(
     State(state): State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
+    tracing::info!("request table GET {:?} {:?}", path, query_params);
     table(&path, &state, &query_params, &RequestParams::new(), RequestType::GET).await
 }
 
@@ -94,7 +100,6 @@ async fn table(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    tracing::info!("request table GET {:?} {:?}", path, query_params);
     let mut table = path.clone();
     let mut format = "html";
     if path.ends_with(".pretty.json") {
@@ -123,7 +128,6 @@ async fn table(
         // Override view, which isn't passed in POST:
         view = String::from("form");
         let mut new_row = SerdeMap::new();
-        //tracing::info!("FORM PARAMS: {:#?}", form_params);
         for column in &columns {
             if column != "row_number" {
                 let value = match form_params.get(column) {
@@ -137,7 +141,6 @@ async fn table(
             }
         }
 
-        //tracing::info!("NEW ROW: {:#?}", new_row);
         let action = match form_params.get("action") {
             None => return Err(format!("No 'action' in {:?}", form_params).into()),
             Some(v) => v,
@@ -146,7 +149,6 @@ async fn table(
             Ok(v) => v,
             Err(e) => return Err(e.into()),
         };
-        //tracing::info!("VALIDATED ROW: {:#?}", validated_row);
         if action == "validate" {
             form_html = Some(get_row_as_form(config, &table, &validated_row)?);
         } else if action == "submit" {
@@ -154,55 +156,110 @@ async fn table(
                 Some(p) => p,
                 None => return Err("Missing database pool".to_string().into()),
             };
-            let row_number =
-                match insert_new_row(&config.config, pool, &table, &validated_row).await {
-                    Ok(n) => n,
-                    Err(e) => return Err(e.to_string().into()),
-                };
-            let offset = row_number / LIMIT_DEFAULT as u32;
-            let offset = offset * LIMIT_DEFAULT as u32;
-            tracing::info!("OFFSET: {}", offset);
-            let blah = format!(
-                r#"The insert operation succeeded. Click <a href="/{}?offset={}">here go back to the table</a>"#,
-                table, offset
+            let offset = {
+                let row_number =
+                    match insert_new_row(&config.config, pool, &table, &validated_row).await {
+                        Ok(n) => n,
+                        Err(e) => return Err(e.to_string().into()),
+                    };
+                let pages = row_number / LIMIT_DEFAULT as u32;
+                pages * LIMIT_DEFAULT as u32
+            };
+            let html = format!(
+                r#"<script>
+                      var timer = setTimeout(function() {{
+                        window.location.replace("/{table}?offset={offset}");
+                      }}, 1000);
+                   </script>
+                   The insert operation succeeded. If you are not automatically redirected, click
+                   <a href="/{table}?offset={offset}">here</a> to go back to {table}"#,
+                table = table,
+                offset = offset,
             );
-            return Ok(Html(blah).into_response());
+            return Ok(Html(html).into_response());
         }
     }
 
     if view == "form" {
-        todo!();
-    }
-
-    // TODO: Remove this comment later. The code below corresponds to the
-    // "Otherwise render default sprocket table" code in run.py
-    let url = {
-        let url = query_params
-            .iter()
-            .filter(|(k, _)| **k != "view".to_string())
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<_>>();
-        if !url.is_empty() {
-            format!("{}?{}", table, url.join("&"))
-        } else {
-            table.to_string()
+        if table == "message" {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Html("Editing the message table is not possible"),
+            )
+                .into_response()
+                .into());
         }
-    };
-    tracing::info!("URL: {}", url);
-    let select = parse(&url)?;
-    tracing::info!("select {:?}", select);
-    match get::get_rows(&state.config, &select, "page", &format).await {
-        Ok(x) => match format {
-            "html" => Ok(Html(x).into_response()),
-            "json" => {
-                Ok(([("content-type", "application/json; charset=utf-8")], x).into_response())
+        if let None = form_html {
+            let mut new_row = SerdeMap::new();
+            for column in &columns {
+                if column != "row_number" {
+                    let value = query_params.get(column).unwrap_or(&String::from("")).to_string();
+                    let valid = matches_nulltype(&table, &column, &value, config)?;
+                    new_row.insert(
+                        column.to_string(),
+                        json!({
+                            "value": value,
+                            "valid": valid,
+                            "messages": [],
+                        }),
+                    );
+                }
             }
-            "pretty.json" => Ok(x.into_response()),
-            _ => unreachable!("Unsupported format"),
-        },
-        Err(x) => {
-            tracing::info!("Get Error: {:?}", x);
-            Ok((StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response())
+            form_html = Some(get_row_as_form(config, &table, &new_row)?);
+        }
+
+        let table_map = {
+            let mut table_map = SerdeMap::new();
+            for table in get_tables(config)? {
+                table_map.insert(table.to_string(), json!(format!("/{}", table)));
+            }
+            json!(table_map)
+        };
+
+        let page = json!({
+            "page": {
+                "project_name": "Nanobot",
+                "tables": table_map,
+            },
+            "title": "table",
+            "subtitle": format!(r#"<a href="/{}">Return to table</a>"#, table),
+            "messages": [],
+            "row_form": form_html,
+        });
+        let page_html = match get::page_to_html_form(&page) {
+            Ok(p) => p,
+            Err(e) => return Err(e.to_string().into()),
+        };
+        Ok(Html(page_html).into_response())
+    } else {
+        let url = {
+            let url = query_params
+                .iter()
+                .filter(|(k, _)| **k != "view".to_string())
+                .map(|(k, v)| format!("{}={}", k, v))
+                .collect::<Vec<_>>();
+            if !url.is_empty() {
+                format!("{}?{}", table, url.join("&"))
+            } else {
+                table.to_string()
+            }
+        };
+        tracing::info!("URL: {}", url);
+        let select = parse(&url)?;
+        tracing::info!("select {:?}", select);
+        match get::get_rows(&state.config, &select, "page", &format).await {
+            Ok(x) => match format {
+                "html" => Ok(Html(x).into_response()),
+                "json" => {
+                    Ok(([("content-type", "application/json; charset=utf-8")], x).into_response())
+                }
+                "pretty.json" => Ok(x.into_response()),
+                _ => unreachable!("Unsupported format"),
+            },
+            Err(x) => {
+                tracing::info!("Get Error: {:?}", x);
+                Ok((StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response())
+            }
         }
     }
 }
@@ -214,7 +271,7 @@ async fn post_row(
     Form(form_params): Form<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!(
-        "request row POST {:?} {:?} {:?} {:?}",
+        "request row POST {:?} {:?}, Query Params: {:?}, Form Params: {:?}",
         table,
         row_number,
         query_params,
@@ -410,6 +467,34 @@ fn render_row_from_database(
         Err(e) => return Err(e.to_string().into()),
     };
     Ok(Html(page_html).into_response())
+}
+
+fn matches_nulltype(
+    table: &str,
+    column: &str,
+    value: &str,
+    config: &ValveConfig,
+) -> Result<bool, String> {
+    let column_config = get_column_config(table, column, config)?;
+    let nulltype = match column_config.get("nulltype") {
+        Some(dt) => match dt.as_str() {
+            Some(s) => s,
+            None => return Err(format!("Nulltype in '{}' is not a string", dt)),
+        },
+        // If there is no nulltype for this column, check that the value is not an empty string.
+        None => return Ok(value != ""),
+    };
+
+    let datatype_conditions = &config.datatype_conditions;
+    match datatype_conditions.get(nulltype) {
+        Some(datatype_condition) => {
+            let compiled_cond = &datatype_condition.compiled;
+            return Ok(compiled_cond(value));
+        }
+        // If there is no datatype condition corresponding to the nulltype (e.g., if nultype is
+        // "text"), then all values will be accepted:
+        None => return Ok(true),
+    };
 }
 
 fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> {
