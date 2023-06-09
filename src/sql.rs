@@ -16,7 +16,7 @@ pub async fn get_table_from_pool(
     // Order by row_number/row by default
     let default_order_by;
     if unquote(&select.table).unwrap_or(select.table.to_string()) == "message" {
-        default_order_by = "row";
+        default_order_by = "message_id";
     } else {
         default_order_by = "row_number";
     }
@@ -24,11 +24,11 @@ pub async fn get_table_from_pool(
         select.order_by(vec![default_order_by]);
     }
 
-    // For basic queries, use row_number/row instead of offset
+    // For basic queries, use row_number/message_id instead of offset
     if select.filter.len() == 0 {
         match select.offset {
             Some(offset) if offset > 0 => {
-                let filter = match Filter::new(default_order_by, "ge", json!(offset)) {
+                let filter = match Filter::new(default_order_by, "gt", json!(offset)) {
                     Err(e) => return Err(e),
                     Ok(f) => f,
                 };
@@ -60,69 +60,57 @@ pub async fn get_count_from_pool(pool: &AnyPool, select: &Select) -> Result<usiz
     };
 
     let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
-    let conflict_select =
-        Select { table: format!("\"{}_conflict\"", unquoted_table), ..select.clone() };
-    let sql = match conflict_select.to_sql_count(&db_type) {
-        Ok(sql) => sql,
-        Err(e) => return Err(sqlx::Error::Configuration(e.into())),
-    };
-    let row = match sqlx::query(&sql).fetch_one(pool).await {
-        Ok(row) => row,
-        Err(e) => return Err(e),
-    };
-    let conflict_count: usize = match usize::try_from(row.get::<i64, &str>("count")) {
-        Ok(count) => count,
-        Err(e) => return Err(sqlx::Error::Decode(e.into())),
+    let conflict_count = {
+        if unquoted_table != "message" {
+            let conflict_select =
+                Select { table: format!("\"{}_conflict\"", unquoted_table), ..select.clone() };
+            let sql = match conflict_select.to_sql_count(&db_type) {
+                Ok(sql) => sql,
+                Err(e) => return Err(sqlx::Error::Configuration(e.into())),
+            };
+            let row = match sqlx::query(&sql).fetch_one(pool).await {
+                Ok(row) => row,
+                Err(e) => return Err(e),
+            };
+            let conflict_count: usize = match usize::try_from(row.get::<i64, &str>("count")) {
+                Ok(count) => count,
+                Err(e) => return Err(sqlx::Error::Decode(e.into())),
+            };
+            conflict_count
+        } else {
+            0
+        }
     };
     Ok(value_count + conflict_count)
 }
 
 pub async fn get_total_from_pool(pool: &AnyPool, table: &String) -> Result<usize, sqlx::Error> {
     let unquoted_table = unquote(&table).unwrap_or(table.to_string());
-
     let select = Select::new(format!("\"{}\"", unquoted_table));
-    let db_type = match get_db_type(pool) {
-        Ok(db_type) => db_type,
-        Err(e) => return Err(sqlx::Error::Configuration(e.into())),
-    };
-    let sql = match select.to_sql_count(&db_type) {
-        Ok(sql) => sql,
-        Err(e) => return Err(sqlx::Error::Configuration(e.into())),
-    };
-    let row = match sqlx::query(&sql).fetch_one(pool).await {
-        Ok(row) => row,
-        Err(e) => return Err(e),
-    };
-    let value_count: usize = match usize::try_from(row.get::<i64, &str>("count")) {
-        Ok(count) => count,
-        Err(e) => return Err(sqlx::Error::Decode(e.into())),
-    };
-
-    let select = Select::new(format!("\"{}_conflict\"", unquoted_table));
-    let sql = match select.to_sql_count(&db_type) {
-        Ok(sql) => sql,
-        Err(e) => return Err(sqlx::Error::Configuration(e.into())),
-    };
-    let row = match sqlx::query(&sql).fetch_one(pool).await {
-        Ok(row) => row,
-        Err(e) => return Err(e),
-    };
-    let conflict_count: usize = match usize::try_from(row.get::<i64, &str>("count")) {
-        Ok(count) => count,
-        Err(e) => return Err(sqlx::Error::Decode(e.into())),
-    };
-
-    Ok(value_count + conflict_count)
+    get_count_from_pool(pool, &select).await
 }
 
 pub async fn get_message_counts_from_pool(
     pool: &AnyPool,
     table: &String,
 ) -> Result<Map<String, Value>, sqlx::Error> {
-    let sql = {
-        if pool.any_kind() == AnyKind::Sqlite {
-            format!(
-                r#"SELECT json_object(
+    if table == "message" {
+        Ok(json!({
+            "message": 0,
+            "message_row": 0,
+            "error": 0,
+            "warn": 0,
+            "info": 0,
+            "update": 0,
+        })
+        .as_object()
+        .unwrap()
+        .clone())
+    } else {
+        let sql = {
+            if pool.any_kind() == AnyKind::Sqlite {
+                format!(
+                    r#"SELECT json_object(
                   'message', COUNT(),
                   'message_row', COUNT(DISTINCT row),
                   'error', SUM(level = 'error'),
@@ -132,11 +120,11 @@ pub async fn get_message_counts_from_pool(
                 ) AS json_result
                 FROM message
                 WHERE "table" = '{}'"#,
-                table
-            )
-        } else {
-            format!(
-                r#"SELECT JSON_ARRAY_ELEMENTS("json_agg")::TEXT AS "json_result"
+                    table
+                )
+            } else {
+                format!(
+                    r#"SELECT JSON_ARRAY_ELEMENTS("json_agg")::TEXT AS "json_result"
                    FROM (
                        SELECT JSON_AGG(t1) AS "json_agg"
                        FROM (
@@ -151,20 +139,21 @@ pub async fn get_message_counts_from_pool(
                            WHERE "table" = '{}'
                        ) t1
                    ) t2"#,
-                table
-            )
-        }
-    };
-    let row = match sqlx::query(&sql).fetch_one(pool).await {
-        Ok(row) => row,
-        Err(e) => return Err(e),
-    };
-    let result: &str = row.get("json_result");
-    let map = match from_str::<Map<String, Value>>(&result) {
-        Ok(m) => m,
-        Err(e) => return Err(sqlx::Error::Decode(e.into())),
-    };
-    Ok(map)
+                    table
+                )
+            }
+        };
+        let row = match sqlx::query(&sql).fetch_one(pool).await {
+            Ok(row) => row,
+            Err(e) => return Err(e),
+        };
+        let result: &str = row.get("json_result");
+        let map = match from_str::<Map<String, Value>>(&result) {
+            Ok(m) => m,
+            Err(e) => return Err(sqlx::Error::Decode(e.into())),
+        };
+        Ok(map)
+    }
 }
 
 pub fn rows_to_map(

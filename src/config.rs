@@ -1,9 +1,15 @@
+use ontodev_valve::{
+    get_compiled_datatype_conditions, get_compiled_rule_conditions,
+    get_parsed_structure_conditions, valve, valve_grammar::StartParser, ColumnRule,
+    CompiledCondition, ParsedStructure, ValveCommand,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::Value as SerdeValue;
 use sqlx::{
     any::{AnyConnectOptions, AnyKind, AnyPool, AnyPoolOptions},
     query as sqlx_query,
 };
-use std::{fs, str::FromStr};
+use std::{collections::HashMap, fs, str::FromStr};
 use toml::map::Map;
 use toml::Value;
 
@@ -15,14 +21,25 @@ pub enum Debug {
 }
 
 #[derive(Clone, Debug)]
+pub struct ValveConfig {
+    pub config: SerdeMap,
+    pub datatype_conditions: HashMap<String, CompiledCondition>,
+    pub rule_conditions: HashMap<String, HashMap<String, Vec<ColumnRule>>>,
+    pub structure_conditions: HashMap<String, ParsedStructure>,
+}
+
+#[derive(Clone, Debug)]
 pub struct Config {
     pub name: String,
     pub version: String,
     pub edition: String,
     pub connection: String,
     pub pool: Option<AnyPool>,
+    pub valve: Option<ValveConfig>,
     pub debug: Debug,
 }
+
+pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 impl Config {
     pub async fn new() -> Result<Config, String> {
@@ -59,6 +76,7 @@ impl Config {
             //not set in default_config.toml
             connection: default_connection,
             pool: None,
+            valve: None,
             debug: Debug::INFO,
         };
 
@@ -118,6 +136,29 @@ impl Config {
             }
         }
         self.pool = Some(pool);
+        Ok(self)
+    }
+
+    pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
+        // TODO: Make the path configurable:
+        let path = "src/schema/table.tsv";
+        match valve(path, &self.connection, &ValveCommand::Config, false, "table").await {
+            Err(_) => return Err(format!("Could not load from '{}'", path)),
+            Ok(v) => {
+                let v: SerdeMap = serde_json::from_str(&v).unwrap();
+                let parser = StartParser::new();
+                let d = get_compiled_datatype_conditions(&v, &parser);
+                let r = get_compiled_rule_conditions(&v, d.clone(), &parser);
+                let p = get_parsed_structure_conditions(&v, &parser);
+                self.valve = Some(ValveConfig {
+                    config: v,
+                    datatype_conditions: d,
+                    rule_conditions: r,
+                    structure_conditions: p,
+                });
+            }
+        };
+
         Ok(self)
     }
 

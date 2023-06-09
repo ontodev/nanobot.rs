@@ -1,5 +1,5 @@
 use crate::config::Config;
-use ontodev_valve::configure_and_or_load;
+use ontodev_valve::{valve, ValveCommand};
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -180,10 +180,11 @@ pub async fn init(config: &Config) -> Result<String, String> {
 
     // load tables into database
     let path = "src/schema/table.tsv";
-    match configure_and_or_load(path, &database, true, false).await {
+    match valve(path, &database, &ValveCommand::Load, false, "table").await {
         Err(_x) => return Err(format!("Could not load from '{}'", path)),
         Ok(_x) => {}
     }
+
     tracing::info!("Loaded '{}' using '{}'", database, path);
 
     Ok(String::from("Initialized a Nanobot project"))

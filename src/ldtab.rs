@@ -462,12 +462,7 @@ fn ldtab_value_2_hiccup(
                 list_element.push(ldtab_iri_2_hiccup(property, value, iri_2_label));
             }
             "_JSON" => {
-                list_element.push(ldtab_json_2_hiccup(
-                    property,
-                    value,
-                    iri_2_label,
-                    iri_2_type,
-                ));
+                list_element.push(ldtab_json_2_hiccup(property, value, iri_2_label, iri_2_type));
             }
             _ => {
                 list_element.push(ldtab_literal_2_hiccup(value));
@@ -661,16 +656,13 @@ pub async fn get_predicate_map_html(
     predicate_order_start: &Vec<String>,
     predicate_order_end: &Vec<String>,
 ) -> Result<String, Error> {
-    let hiccup = get_predicate_map_hiccup(
-        subject,
-        table,
-        pool,
-        predicate_order_start,
-        predicate_order_end,
-    )
-    .await?;
-    let html = hiccup::render(&hiccup, 0);
-
+    let hiccup =
+        get_predicate_map_hiccup(subject, table, pool, predicate_order_start, predicate_order_end)
+            .await?;
+    let html = match hiccup::render(&hiccup) {
+        Ok(x) => x,
+        Err(x) => x,
+    };
     Ok(html)
 }
 
@@ -810,11 +802,8 @@ mod tests {
     async fn test_get_prefix_hash_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let mut curies = HashSet::new();
         curies.insert(String::from("obo:ZFA_0000354"));
@@ -823,14 +812,9 @@ mod tests {
         let prefix_hash_map = get_prefix_hash_map(&curies, &pool).await.unwrap();
 
         let mut expected = HashMap::new();
-        expected.insert(
-            String::from("obo"),
-            String::from("http://purl.obolibrary.org/obo/"),
-        );
-        expected.insert(
-            String::from("rdfs"),
-            String::from("http://www.w3.org/2000/01/rdf-schema#"),
-        );
+        expected.insert(String::from("obo"), String::from("http://purl.obolibrary.org/obo/"));
+        expected
+            .insert(String::from("rdfs"), String::from("http://www.w3.org/2000/01/rdf-schema#"));
         assert_eq!(prefix_hash_map, expected);
     }
 
@@ -838,11 +822,8 @@ mod tests {
     async fn test_get_prefix_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let mut curies = HashSet::new();
         curies.insert(String::from("obo:ZFA_0000354"));
@@ -872,11 +853,8 @@ mod tests {
     async fn test_get_label_hash_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let table = "statement";
 
@@ -895,11 +873,8 @@ mod tests {
     async fn test_get_label_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let table = "statement";
 
@@ -930,11 +905,8 @@ mod tests {
     async fn test_get_type_hash_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let table = "statement";
 
@@ -955,17 +927,12 @@ mod tests {
     async fn test_get_property_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let table = "statement";
 
-        let property_map = get_property_map("obo:ZFA_0000354", &table, &pool)
-            .await
-            .unwrap();
+        let property_map = get_property_map("obo:ZFA_0000354", &table, &pool).await.unwrap();
         let expected = json!({"obo:IAO_0000115":[{"object":"Compound organ that consists of gill filaments, gill lamellae, gill rakers and pharyngeal arches 3-7. The gills are responsible for primary gas exchange between the blood and the surrounding water.","datatype":"xsd:string","annotation":{"oboInOwl:hasDbXref":[{"datatype":"xsd:string","meta":"owl:Axiom","object":"http:http://www.briancoad.com/Dictionary/DicPics/gill.htm"}]}}],"oboInOwl:hasDbXref":[{"object":"TAO:0000354","datatype":"xsd:string"}],"rdfs:subClassOf":[{"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000272"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"},{"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"},{"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002202"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001107"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"},{"object":"obo:ZFA_0000496","datatype":"_IRI"},{"object":{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]},"datatype":"_JSON"}],"oboInOwl:id":[{"object":"ZFA:0000354","datatype":"xsd:string"}],"rdf:type":[{"object":"owl:Class","datatype":"_IRI"}],"rdfs:label":[{"object":"gill","datatype":"xsd:string"}],"oboInOwl:hasOBONamespace":[{"object":"zebrafish_anatomy","datatype":"xsd:string"}],"oboInOwl:hasExactSynonym":[{"object":"gills","datatype":"xsd:string","annotation":{"oboInOwl:hasSynonymType":[{"datatype":"_IRI","meta":"owl:Axiom","object":"obo:zfa#PLURAL"}]}}]});
 
         assert_eq!(property_map, expected);
@@ -990,10 +957,7 @@ mod tests {
     #[test]
     fn test_ldtab_json_2_hiccup() {
         let mut label_map = HashMap::new();
-        label_map.insert(
-            String::from("obo:ZFA_0000272"),
-            String::from("respiratory system"),
-        );
+        label_map.insert(String::from("obo:ZFA_0000272"), String::from("respiratory system"));
 
         let mut type_map: HashMap<String, HashSet<String>> = HashMap::new();
         let mut types = HashSet::new();
@@ -1015,20 +979,15 @@ mod tests {
     async fn test_ldtab_row_2_predicate_json_shape() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let query = "SELECT * FROM statement WHERE predicate='rdfs:label'";
         let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(&pool).await.unwrap();
         let row = &rows[0]; //NB: there is a unique row (with rdfs:label)
         let json_shape = ldtab_row_2_predicate_json_shape(row);
-        let expected = (
-            String::from("rdfs:label"),
-            json!({"object":"gill","datatype":"xsd:string"}),
-        );
+        let expected =
+            (String::from("rdfs:label"), json!({"object":"gill","datatype":"xsd:string"}));
         assert_eq!(json_shape, expected);
     }
 
@@ -1036,11 +995,8 @@ mod tests {
     async fn test_sort_predicate_map_by_label() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&connection_string)
-            .await
-            .unwrap();
+        let pool: SqlitePool =
+            SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
         let subject = "obo:ZFA_0000354";
         let table = "statement";
