@@ -57,47 +57,48 @@ async fn main() {
         .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
-    let exit_result =
-        match matches.subcommand() {
-            Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
-                Some(x) => {
-                    //update config
-                    config.connection(x);
+    let exit_result = match matches.subcommand() {
+        Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
+            Some(x) => {
+                //update config
+                config.connection(x);
 
-                    init::init(&config).await
-                }
-                _ => init::init(&config).await,
-            },
-            Some(("config", _sub_matches)) => config::config("nanobot.toml"),
-            Some(("get", sub_matches)) => {
-                let table = match sub_matches.get_one::<String>("TABLE") {
-                    Some(x) => x,
-                    _ => panic!("No table given"),
-                };
-                let shape = match sub_matches.get_one::<String>("shape") {
-                    Some(x) => x,
-                    _ => "value_rows",
-                };
-                let format = match sub_matches.get_one::<String>("format") {
-                    Some(x) => x,
-                    _ => "text",
-                };
-                let result =
-                    match get::get_table(config.start_pool().await.unwrap(), table, shape, format)
-                        .await
-                    {
-                        Ok(x) => x,
-                        Err(x) => format!("ERROR: {:?}", x),
-                    };
-                Ok(result)
+                init::init(&config).await
             }
-            Some(("serve", _sub_matches)) => {
-                serve::app(config.start_pool().await.unwrap().load_valve_config().await.unwrap())
-            }
-            _ => unreachable!(
-                "Exhausted list of subcommands and subcommand_required prevents `None`"
-            ),
-        };
+            _ => init::init(&config).await,
+        },
+        Some(("config", _sub_matches)) => config::config("nanobot.toml"),
+        Some(("get", sub_matches)) => {
+            let table = match sub_matches.get_one::<String>("TABLE") {
+                Some(x) => x,
+                _ => panic!("No table given"),
+            };
+            let shape = match sub_matches.get_one::<String>("shape") {
+                Some(x) => x,
+                _ => "value_rows",
+            };
+            let format = match sub_matches.get_one::<String>("format") {
+                Some(x) => x,
+                _ => "text",
+            };
+            let result = match get::get_table(
+                config.start_pool().await.unwrap().load_valve_config().await.unwrap(),
+                table,
+                shape,
+                format,
+            )
+            .await
+            {
+                Ok(x) => x,
+                Err(x) => format!("ERROR: {:?}", x),
+            };
+            Ok(result)
+        }
+        Some(("serve", _sub_matches)) => {
+            serve::app(config.start_pool().await.unwrap().load_valve_config().await.unwrap())
+        }
+        _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
+    };
 
     //print exit message
     match exit_result {
