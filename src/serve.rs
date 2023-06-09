@@ -260,6 +260,7 @@ async fn table(
                 "tables": table_map,
             },
             "title": "table",
+            "table_name": table,
             "subtitle": format!(r#"<a href="/{}">Return to table</a>"#, table),
             "messages": [],
             "row_form": form_html,
