@@ -226,7 +226,7 @@ pub async fn add_property_grandchildren(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<(), TreeViewError> {
-    let mut children_array = match children.as_array_mut() {
+    let children_array = match children.as_array_mut() {
         Some(array) => array,
         None => {
             return Err(TreeViewError::TreeFormat(format!(
@@ -287,7 +287,7 @@ pub async fn get_rich_json_property_tree_view(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<Value, TreeViewError> {
-    let mut property_hierarchy_map = get_property_2_subproperty_map(entity, table, pool).await?;
+    let property_hierarchy_map = get_property_2_subproperty_map(entity, table, pool).await?;
     let mut property_2_hierarchy_map = HashMap::new();
     property_2_hierarchy_map.insert(String::from(SUBPROPERTY), property_hierarchy_map);
 
@@ -351,10 +351,7 @@ pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewErro
             }
         },
         _ => {
-            return Err(TreeViewError::LDTab(format!(
-                "Not an LDTab object: {}",
-                value.to_string()
-            )))
+            return Err(TreeViewError::LDTab(format!("Not an LDTab object: {}", value.to_string())))
         }
     }
 }
@@ -372,10 +369,7 @@ pub fn get_ldtab_array_at(value: &Value, index: usize) -> Result<Value, TreeView
     match value {
         Value::Array(array) => Ok(array[index].clone()),
         _ => {
-            return Err(TreeViewError::LDTab(format!(
-                "Not an LDTab array: {}",
-                value.to_string()
-            )))
+            return Err(TreeViewError::LDTab(format!("Not an LDTab array: {}", value.to_string())))
         }
     }
 }
@@ -408,10 +402,7 @@ pub fn get_ldtab_value_as_string(value: &Value) -> Result<String, TreeViewError>
     match value.as_str() {
         Some(string) => Ok(String::from(string)),
         None => {
-            return Err(TreeViewError::LDTab(format!(
-                "Not an LDTab string: {}",
-                value.to_string()
-            )))
+            return Err(TreeViewError::LDTab(format!("Not an LDTab string: {}", value.to_string())))
         }
     }
 }
@@ -1615,7 +1606,7 @@ pub async fn add_grandchildren(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<(), TreeViewError> {
-    let mut grand_children = match children.as_array_mut() {
+    let grand_children = match children.as_array_mut() {
         Some(array) => array,
         None => {
             return Err(TreeViewError::TreeFormat(format!(
@@ -1796,10 +1787,8 @@ pub async fn get_preferred_roots(
     pool: &SqlitePool,
 ) -> Result<HashSet<String>, TreeViewError> {
     let mut preferred_roots = HashSet::new();
-    let query = format!(
-        "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
-        table = table,
-    );
+    let query =
+        format!("SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'", table = table,);
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let object: &str = row.get("object");
@@ -2360,7 +2349,7 @@ pub async fn get_hiccup_property_tree(
 }
 
 /// Build database query for top level entities.
-pub async fn build_top_level_query(case: OWLEntityType, table: &str, pool: &SqlitePool) -> String {
+pub async fn build_top_level_query(case: OWLEntityType, table: &str, _pool: &SqlitePool) -> String {
     let mut top = "";
     let mut relation = "";
     let mut rdf_type = "";
@@ -2564,24 +2553,21 @@ pub async fn get_hiccup_top_property_hierarchy(
     }
 
     let owl_property_children = Value::Array(top_hierarchy_nodes);
-    let mut top_hierarchy_tree = json!("to be modified");
-    match case {
+    let top_hierarchy_tree = match case {
         OWLEntityType::AnnotationProperty => {
-            top_hierarchy_tree = json!([{"curie":"owl:AnnotationProperty", "label":"Annotation Property", "property":SUBPROPERTY, "children": owl_property_children }]);
+            json!([{"curie":"owl:AnnotationProperty", "label":"Annotation Property", "property":SUBPROPERTY, "children": owl_property_children }])
         }
         OWLEntityType::DataProperty => {
-            top_hierarchy_tree = json!([{"curie":"owl:DataProperty", "label":"Data Property", "property":SUBPROPERTY, "children": owl_property_children }]);
+            json!([{"curie":"owl:DataProperty", "label":"Data Property", "property":SUBPROPERTY, "children": owl_property_children }])
         }
         OWLEntityType::ObjectProperty => {
-            top_hierarchy_tree = json!([{"curie":"owl:ObjectProperty", "label":"Object Property", "property":SUBPROPERTY, "children": owl_property_children }]);
+            json!([{"curie":"owl:ObjectProperty", "label":"Object Property", "property":SUBPROPERTY, "children": owl_property_children }])
         }
-        _ => {
-            return Err(TreeViewError::Unknown(format!(
-                "Expected property type but got {:?}",
-                case
-            )))
-        }
-    }
+        _ => json!("ERROR"),
+    };
+    if top_hierarchy_tree == json!("FAILED") {
+        return Err(TreeViewError::Unknown(format!("Expected property type but got {:?}", case)));
+    };
 
     let sorted = sort_rich_tree_by_label(&top_hierarchy_tree)?;
     let hiccup = tree_2_hiccup("owl:Class", &sorted)?;
@@ -2624,7 +2610,7 @@ pub async fn get_type(
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     for row in rows {
-        let entity: &str = row.get("subject");
+        // let entity: &str = row.get("subject");
         let rdf_type: &str = row.get("object");
         match rdf_type {
             "owl:Ontology" => return Ok(OWLEntityType::Ontology),
@@ -2652,7 +2638,10 @@ pub async fn get_html_term_tree(
     pool: &SqlitePool,
 ) -> Result<String, TreeViewError> {
     let hiccup = get_hiccup_term_tree(entity, table, pool).await?;
-    let html = hiccup::render(&hiccup);
+    let html = match hiccup::render(&hiccup) {
+        Ok(x) => x,
+        Err(x) => x,
+    };
     Ok(html)
 }
 
@@ -2747,8 +2736,7 @@ pub async fn get_hiccup_term_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashSet;
 
     #[test]
     fn test_build_label_query_for() {

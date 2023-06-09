@@ -193,10 +193,7 @@ pub fn build_is_a_branch(
 
     //leaf case
     if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        json_map.insert(
-            String::from(to_insert),
-            Value::String(String::from("owl:Nothing")),
-        );
+        json_map.insert(String::from(to_insert), Value::String(String::from("owl:Nothing")));
         Value::Object(json_map)
     } else {
         json!({ to_insert: json_map })
@@ -264,10 +261,8 @@ pub fn build_part_of_branch(
 
     //leaf case
     if !class_2_subclasses.contains_key(to_insert) & !class_2_parts.contains_key(to_insert) {
-        json_map.insert(
-            format!("partOf {}", to_insert),
-            Value::String(String::from("owl:Nothing")),
-        );
+        json_map
+            .insert(format!("partOf {}", to_insert), Value::String(String::from("owl:Nothing")));
         Value::Object(json_map)
     } else {
         json!({ format!("partOf {}", to_insert): json_map })
@@ -513,12 +508,7 @@ pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
     match json_tree {
         Value::Object(map) => {
             for (k, v) in map {
-                res.push(format!(
-                    "{}- {}{}",
-                    indentation,
-                    k,
-                    json_tree_2_text(v, indent + 1)
-                ));
+                res.push(format!("{}- {}{}", indentation, k, json_tree_2_text(v, indent + 1)));
             }
 
             let mut result = String::from("");

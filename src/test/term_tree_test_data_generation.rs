@@ -350,11 +350,7 @@ pub async fn get_hierarchy_maps(
     table: &str,
     pool: &SqlitePool,
 ) -> Result<
-    (
-        HashMap<String, HashSet<String>>,
-        HashMap<String, HashSet<String>>,
-        HashSet<String>,
-    ),
+    (HashMap<String, HashSet<String>>, HashMap<String, HashSet<String>>, HashSet<String>),
     sqlx::Error,
 > {
     //both maps are build by iteratively querying for
@@ -424,14 +420,10 @@ pub async fn get_label(
     pool: &SqlitePool,
 ) -> Result<(String, HashSet<String>), LabelNotFound> {
     let mut row_strings: HashSet<String> = HashSet::new();
-    let query = format!(
-        "SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'",
-        table, entity
-    );
-    let rows: Vec<SqliteRow> = sqlx::query(&query)
-        .fetch_all(pool)
-        .await
-        .map_err(|_| LabelNotFound)?;
+    let query =
+        format!("SELECT * FROM {} WHERE subject='{}' AND predicate='rdfs:label'", table, entity);
+    let rows: Vec<SqliteRow> =
+        sqlx::query(&query).fetch_all(pool).await.map_err(|_| LabelNotFound)?;
     //NB: this should be a singleton
     for row in rows {
         //let subject: &str = row.get("subject");
@@ -568,11 +560,7 @@ pub async fn get_html_top_hierarchy(
     if !Path::new(output).exists() {
         File::create(output)?;
     }
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open(output)
-        .unwrap();
+    let mut file = OpenOptions::new().write(true).append(true).open(output).unwrap();
     for row in row_strings {
         if let Err(e) = writeln!(file, "{}", row) {
             eprintln!("Couldn't write to file: {}", e);
@@ -648,11 +636,7 @@ pub async fn get_rich_json_tree_view(
     if !Path::new(output).exists() {
         File::create(output)?;
     }
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open(output)
-        .unwrap();
+    let mut file = OpenOptions::new().write(true).append(true).open(output).unwrap();
     for row in rows {
         if let Err(e) = writeln!(file, "{}", row) {
             eprintln!("Couldn't write to file: {}", e);

@@ -11,11 +11,8 @@ use std::io::BufReader;
 async fn set_up_database(tsv: &str, db: &str) -> SqlitePool {
     let test_database = format!("src/resources/.tmp/{}", db);
     let connection_string = format!("sqlite://{}?mode=rwc", test_database);
-    let pool: SqlitePool = SqlitePoolOptions::new()
-        .max_connections(5)
-        .connect(&connection_string)
-        .await
-        .unwrap();
+    let pool: SqlitePool =
+        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
 
     let statement_query = r#"CREATE TABLE statement (
   'transaction' INTEGER NOT NULL,
@@ -57,9 +54,8 @@ async fn test_get_rich_json_tree_view() {
     let rels = vec!["obo:BFO_0000050"];
 
     //boolean flag is for preferred_roots
-    let rich_hierarchy = get_rich_json_tree_view(subject, &rels, false, table, &pool)
-        .await
-        .unwrap();
+    let rich_hierarchy =
+        get_rich_json_tree_view(subject, &rels, false, table, &pool).await.unwrap();
 
     let expected_string =
         fs::read_to_string("src/resources/test_data/ldtab_term_trees/ZFA_0000354.json")
@@ -81,9 +77,7 @@ async fn test_get_hiccup_class_tree() {
     let rels = vec!["obo:BFO_0000050"];
 
     //boolean is for preferred root terms
-    let hiccup = get_hiccup_class_tree(&subject, &rels, false, table, &pool)
-        .await
-        .unwrap();
+    let hiccup = get_hiccup_class_tree(&subject, &rels, false, table, &pool).await.unwrap();
 
     let expected_string =
         fs::read_to_string("src/resources/test_data/ldtab_term_trees/ZFA_0000354.hiccup")
@@ -105,9 +99,7 @@ async fn test_get_hiccup_class_tree_with_preferred_roots() {
     let rels = vec!["obo:BFO_0000050"];
 
     //boolean is for preferred root terms
-    let hiccup = get_hiccup_class_tree(&subject, &rels, true, table, &pool)
-        .await
-        .unwrap();
+    let hiccup = get_hiccup_class_tree(&subject, &rels, true, table, &pool).await.unwrap();
 
     let expected_string = fs::read_to_string(
         "src/resources/test_data/ldtab_term_trees/ZFA_0000354_preferred_roots.hiccup",

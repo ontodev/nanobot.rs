@@ -8,14 +8,15 @@ pub mod sql;
 #[async_std::main]
 async fn main() {
     // initialize configuration
-    let mut config: config::Config = config::Config::new().await;
+    let mut config: config::Config = config::Config::new().await.unwrap();
 
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        // .with_max_level(tracing::Level::INFO)
+        //.with_max_level(tracing::Level::INFO)
         .with_max_level(tracing::Level::WARN)
+        //.with_max_level(tracing::Level::DEBUG)
         // completes the builder.
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -80,14 +81,22 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result = match get::get_table(config.start_pool().await, table, shape, format).await
+            let result = match get::get_table(
+                config.start_pool().await.unwrap().load_valve_config().await.unwrap(),
+                table,
+                shape,
+                format,
+            )
+            .await
             {
                 Ok(x) => x,
                 Err(x) => format!("ERROR: {:?}", x),
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(config.start_pool().await),
+        Some(("serve", _sub_matches)) => {
+            serve::app(config.start_pool().await.unwrap().load_valve_config().await.unwrap())
+        }
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
