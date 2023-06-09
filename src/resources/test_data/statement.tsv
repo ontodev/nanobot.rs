@@ -1,0 +1,21 @@
+assertion	retraction	graph	subject	predicate	object	datatype	annotation
+1	0	graph	obo:ZFA_0000354	obo:IAO_0000115	Compound organ that consists of gill filaments, gill lamellae, gill rakers and pharyngeal arches 3-7. The gills are responsible for primary gas exchange between the blood and the surrounding water.	xsd:string	{"oboInOwl:hasDbXref":[{"datatype":"xsd:string","meta":"owl:Axiom","object":"http:http://www.briancoad.com/Dictionary/DicPics/gill.htm"}]}
+1	0	graph	obo:ZFA_0000354	oboInOwl:hasDbXref	TAO:0000354	xsd:string	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:BFO_0000050"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0000272"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000354	oboInOwl:id	ZFA:0000354	xsd:string	
+1	0	graph	obo:ZFA_0000354	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000354	rdfs:label	gill	xsd:string	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002497"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000044"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002202"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFA_0001107"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	obo:ZFA_0000496	_IRI	
+1	0	graph	obo:ZFA_0000354	rdfs:subClassOf	{"owl:onProperty":[{"datatype":"_IRI","object":"obo:RO_0002496"}],"owl:someValuesFrom":[{"datatype":"_IRI","object":"obo:ZFS_0000000"}],"rdf:type":[{"datatype":"_IRI","object":"owl:Restriction"}]}	_JSON	
+1	0	graph	obo:ZFA_0000354	oboInOwl:hasOBONamespace	zebrafish_anatomy	xsd:string	
+1	0	graph	obo:ZFA_0000354	oboInOwl:hasExactSynonym	gills	xsd:string	{"oboInOwl:hasSynonymType":[{"datatype":"_IRI","meta":"owl:Axiom","object":"obo:zfa#PLURAL"}]}
+1	0	graph	obo:ZFS_0000000	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFS_0000044	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFS_0000044	rdfs:label	adult	xsd:string	
+1	0	graph	obo:ZFS_0000000	rdfs:label	Unknown	xsd:string	
+1	0	graph	obo:ZFA_0001107	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000272	rdf:type	owl:Class	_IRI	
+1	0	graph	obo:ZFA_0000272	rdfs:label	respiratory system	xsd:string	
+1	0	graph	obo:ZFA_0001107	rdfs:label	internal gill bud	xsd:string	
