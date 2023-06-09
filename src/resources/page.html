@@ -284,50 +284,48 @@
             <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.11.1/typeahead.bundle.min.js">
             </script>
             <script>
-            // TODO (Work in progress): Configure typeahead for data table autocomplete
-            function configure_typeahead_form(node) {
-              if (!node.id || !node.id.endsWith("-typeahead-form")) {
-                return;
-              }
-              var col = node.id.split("-")[0];
-              var bloodhound = new Bloodhound({
-                datumTokenizer: Bloodhound.tokenizers.obj.nonword('label'),
-                queryTokenizer: Bloodhound.tokenizers.nonword,
-                sorter: function(a, b) {
-                  return a.order - b.order;
-                },
-                // IF POSSIBLE DO NOT MIX JINJA W/ JAVASCRIPT CODE.
-                remote: {
-                  url: `/{{ table_name }}?text=%QUERY&column=${col}&format=json`,
-                  wildcard: '%QUERY',
-                  transform : function(response) {
-                    return bloodhound.sorter(response);
-                  }
+              function configure_typeahead_form(node, table) {
+                if (!node.id || !node.id.endsWith("-typeahead-form")) {
+                  return;
                 }
-              });
-              $(node).typeahead({
-                minLength: 0,
-                hint: false,
-                highlight: true
-              }, {
-                name: "{{ table_name }}",
-                source: bloodhound,
-                display: function(item) {
-                  return item.label;
-                },
-                limit: 40
-            	});
-            	$(node).bind('click', function(e) {
-            		$(node).select();
-            	});
-            	var cls = node.className;
-            	if (cls.includes("is-invalid")) {
-            		var parent = node.parentElement;
-            		var parentCls = parent.className;
-            		parent.className = parentCls + " is-invalid";
-            	}
-            }
-            $('.typeahead').each(function() { configure_typeahead_form(this); });
+                var col = node.id.split("-")[0];
+                var bloodhound = new Bloodhound({
+                  datumTokenizer: Bloodhound.tokenizers.obj.nonword('label'),
+                  queryTokenizer: Bloodhound.tokenizers.nonword,
+                  sorter: function(a, b) {
+                    return a.order - b.order;
+                  },
+                  remote: {
+                    url: `/${table}?text=%QUERY&column=${col}&format=json`,
+                    wildcard: '%QUERY',
+                    transform : function(response) {
+                      return bloodhound.sorter(response);
+                    }
+                  }
+                });
+                $(node).typeahead({
+                  minLength: 0,
+                  hint: false,
+                  highlight: true
+                }, {
+                  name: `${table}`,
+                  source: bloodhound,
+                  display: function(item) {
+                    return item.label;
+                  },
+                  limit: 40
+                });
+                $(node).bind('click', function(e) {
+                  $(node).select();
+                });
+                var cls = node.className;
+                if (cls.includes("is-invalid")) {
+                  var parent = node.parentElement;
+                  var parentCls = parent.className;
+                  parent.className = parentCls + " is-invalid";
+                }
+              }
+              $('.typeahead').each(function() { configure_typeahead_form(this, "{{ table_name }}"); });
             </script>
   </body>
 </html>
