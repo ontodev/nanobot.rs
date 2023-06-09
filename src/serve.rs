@@ -1,10 +1,11 @@
 use crate::config::Config;
-use crate::{get, sql};
+use crate::get;
 use axum::extract::{Path, RawQuery, State};
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Redirect};
 use axum::routing::get;
 use axum::Router;
+use ontodev_sqlrest::parse;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -30,10 +31,9 @@ pub async fn app(config: &Config) -> Result<String, String> {
     // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::info!("listening on {}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    if let Err(e) = axum::Server::bind(&addr).serve(app.into_make_service()).await {
+        return Err(e.to_string());
+    }
 
     let hello = String::from("Hello, world!");
     Ok(hello)
@@ -48,7 +48,7 @@ async fn table(
     Path(path): Path<String>,
     RawQuery(query): RawQuery,
     State(state): State<Arc<AppState>>,
-) -> impl IntoResponse {
+) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("request table {:?} {:?}", path, query);
     let mut table = path.clone();
     let mut format = "html";
@@ -65,18 +65,21 @@ async fn table(
     };
 
     tracing::info!("URL: {}", url);
-    let select = sql::parse(&url);
+    let select = parse(&url)?;
     tracing::info!("select {:?}", select);
+
     match get::get_rows(&state.config, &select, "page", &format).await {
         Ok(x) => match format {
-            "html" => Html(x).into_response(),
-            "json" => ([("content-type", "application/json; charset=utf-8")], x).into_response(),
-            "pretty.json" => x.into_response(),
+            "html" => Ok(Html(x).into_response()),
+            "json" => {
+                Ok(([("content-type", "application/json; charset=utf-8")], x).into_response())
+            }
+            "pretty.json" => Ok(x.into_response()),
             _ => unreachable!("Unsupported format"),
         },
         Err(x) => {
             tracing::info!("Get Error: {:?}", x);
-            (StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response()
+            Ok((StatusCode::NOT_FOUND, Html("404 Not Found".to_string())).into_response())
         }
     }
 }

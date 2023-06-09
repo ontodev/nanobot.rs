@@ -8,14 +8,15 @@ pub mod sql;
 #[async_std::main]
 async fn main() {
     // initialize configuration
-    let mut config: config::Config = config::Config::new().await;
+    let mut config: config::Config = config::Config::new().await.unwrap();
 
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        // .with_max_level(tracing::Level::INFO)
+        //.with_max_level(tracing::Level::INFO)
         .with_max_level(tracing::Level::WARN)
+        //.with_max_level(tracing::Level::DEBUG)
         // completes the builder.
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
@@ -56,40 +57,45 @@ async fn main() {
         .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
-    let exit_result = match matches.subcommand() {
-        Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
-            Some(x) => {
-                //update config
-                config.connection(x);
+    let exit_result =
+        match matches.subcommand() {
+            Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
+                Some(x) => {
+                    //update config
+                    config.connection(x);
 
-                init::init(&config).await
+                    init::init(&config).await
+                }
+                _ => init::init(&config).await,
+            },
+            Some(("config", _sub_matches)) => config::config("nanobot.toml"),
+            Some(("get", sub_matches)) => {
+                let table = match sub_matches.get_one::<String>("TABLE") {
+                    Some(x) => x,
+                    _ => panic!("No table given"),
+                };
+                let shape = match sub_matches.get_one::<String>("shape") {
+                    Some(x) => x,
+                    _ => "value_rows",
+                };
+                let format = match sub_matches.get_one::<String>("format") {
+                    Some(x) => x,
+                    _ => "text",
+                };
+                let result =
+                    match get::get_table(config.start_pool().await.unwrap(), table, shape, format)
+                        .await
+                    {
+                        Ok(x) => x,
+                        Err(x) => format!("ERROR: {:?}", x),
+                    };
+                Ok(result)
             }
-            _ => init::init(&config).await,
-        },
-        Some(("config", _sub_matches)) => config::config("nanobot.toml"),
-        Some(("get", sub_matches)) => {
-            let table = match sub_matches.get_one::<String>("TABLE") {
-                Some(x) => x,
-                _ => panic!("No table given"),
-            };
-            let shape = match sub_matches.get_one::<String>("shape") {
-                Some(x) => x,
-                _ => "value_rows",
-            };
-            let format = match sub_matches.get_one::<String>("format") {
-                Some(x) => x,
-                _ => "text",
-            };
-            let result = match get::get_table(config.start_pool().await, table, shape, format).await
-            {
-                Ok(x) => x,
-                Err(x) => format!("ERROR: {:?}", x),
-            };
-            Ok(result)
-        }
-        Some(("serve", _sub_matches)) => serve::app(config.start_pool().await),
-        _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
-    };
+            Some(("serve", _sub_matches)) => serve::app(config.start_pool().await.unwrap()),
+            _ => unreachable!(
+                "Exhausted list of subcommands and subcommand_required prevents `None`"
+            ),
+        };
 
     //print exit message
     match exit_result {
