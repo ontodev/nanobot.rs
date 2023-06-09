@@ -45,6 +45,22 @@ impl From<LDTabError> for Error {
     }
 }
 
+/// Given a str for a CURIE/IRI, return the CURIE as a String,
+/// or return the IRI without angle brackets.
+///
+/// # Examples
+///
+/// encode_iri("obo:RO_0002131") returns "obo:RO_0002131"
+/// encode_iri(<http://purl.obolibrary.org/obo/ZFA_0000496>) returns "http://purl.obolibrary.org/obo/ZFA_0000496"
+pub fn encode_iri(entity: &str) -> String {
+    if entity.starts_with("<") && entity.ends_with(">") {
+        let entity_len = entity.len();
+        entity[1..entity_len - 1].to_string()
+    } else {
+        String::from(entity)
+    }
+}
+
 /// Given a set of CURIEs, return the set of all used prefixes.
 ///
 /// # Example
@@ -395,7 +411,7 @@ fn ldtab_iri_2_hiccup(
         None => String::from(entity),
     };
     //hiccup-style encoding
-    json!(["a", {"property" : property, "resource" : value["object"]}, label ])
+    json!(["a", {"property" : property, "resource" : value["object"]}, encode_iri(&label) ])
 }
 
 /// Given a property, an LDTab value with type _JSON,
@@ -635,7 +651,7 @@ pub async fn get_predicate_map_hiccup(
         //build HTML (encoded via JSON hiccup)
         let mut outer_list_element = Vec::new();
         outer_list_element.push(json!("li"));
-        outer_list_element.push(json!(["a", { "resource": key.clone() }, key_label]));
+        outer_list_element.push(json!(["a", { "resource": key.clone() }, encode_iri(&key_label)]));
 
         let mut inner_list = Vec::new();
         inner_list.push(json!("ul"));
@@ -656,6 +672,23 @@ pub async fn get_predicate_map_html(
     predicate_order_start: &Vec<String>,
     predicate_order_end: &Vec<String>,
 ) -> Result<String, Error> {
+    //handle top level
+    if subject.eq("owl:Class")
+        || subject.eq("owl:AnnotationProperty")
+        || subject.eq("owl:DataProperty")
+        || subject.eq("owl:ObjectProperty")
+        || subject.eq("owl:Individual")
+        || subject.eq("rdfs:Datatype")
+    {
+        let hiccup = json!(["ul", ["p", {"class":"lead"}, "Hello! This is an ontology browser."], ["p", "An ontology is a terminology system designed for both humans and machines to read. Click the links on the left to browse the hierarchy of terms. Terms have parent terms, child terms, annotations, and logical axioms. The page for each term is also machine-readable using RDFa."]]);
+        let html = match hiccup::render(&hiccup) {
+            Ok(x) => x,
+            Err(x) => x,
+        };
+
+        return Ok(html);
+    }
+
     let hiccup =
         get_predicate_map_hiccup(subject, table, pool, predicate_order_start, predicate_order_end)
             .await?;
