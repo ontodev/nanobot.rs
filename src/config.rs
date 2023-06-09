@@ -1,6 +1,7 @@
 use ontodev_valve::{
-    get_compiled_datatype_conditions, get_compiled_rule_conditions, valve,
-    valve_grammar::StartParser, ColumnRule, CompiledCondition, ValveCommand,
+    get_compiled_datatype_conditions, get_compiled_rule_conditions,
+    get_parsed_structure_conditions, valve, valve_grammar::StartParser, ColumnRule,
+    CompiledCondition, ParsedStructure, ValveCommand,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as SerdeValue;
@@ -24,6 +25,7 @@ pub struct ValveConfig {
     pub config: SerdeMap,
     pub datatype_conditions: HashMap<String, CompiledCondition>,
     pub rule_conditions: HashMap<String, HashMap<String, Vec<ColumnRule>>>,
+    pub structure_conditions: HashMap<String, ParsedStructure>,
 }
 
 #[derive(Clone, Debug)]
@@ -147,8 +149,13 @@ impl Config {
                 let parser = StartParser::new();
                 let d = get_compiled_datatype_conditions(&v, &parser);
                 let r = get_compiled_rule_conditions(&v, d.clone(), &parser);
-                self.valve =
-                    Some(ValveConfig { config: v, datatype_conditions: d, rule_conditions: r });
+                let p = get_parsed_structure_conditions(&v, &parser);
+                self.valve = Some(ValveConfig {
+                    config: v,
+                    datatype_conditions: d,
+                    rule_conditions: r,
+                    structure_conditions: p,
+                });
             }
         };
 

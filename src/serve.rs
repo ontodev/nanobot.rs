@@ -6,7 +6,7 @@ use crate::{
 use axum::{
     extract::{Form, Path, Query, State},
     http::StatusCode,
-    response::{Html, IntoResponse, Redirect},
+    response::{Html, IntoResponse, Json, Redirect},
     routing::get,
     Router,
 };
@@ -15,7 +15,11 @@ use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select};
-use ontodev_valve::{ast::Expression, insert_new_row, update_row, validate::validate_row};
+use ontodev_valve::{
+    ast::Expression,
+    insert_new_row, update_row,
+    validate::{get_matching_values, validate_row},
+};
 use serde_json::{json, Value as SerdeValue};
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
@@ -117,9 +121,47 @@ async fn table(
                 .into());
         }
     };
+    let pool = match state.config.pool.as_ref() {
+        Some(p) => p,
+        None => return Err("Missing database pool".to_string().into()),
+    };
     let mut view = match query_params.get("view") {
         Some(view) => view.to_string(),
         None => "".to_string(),
+    };
+
+    // Handle requests related to typeahead, used for autocomplete in data forms:
+    match query_params.get("format") {
+        Some(format) if format == "json" => match query_params.get("column") {
+            None => return Err((
+                StatusCode::BAD_REQUEST,
+                Html(
+                    "For format=json, column is also required (e.g., /table?format=json&column=foo)"
+                        .to_string(),
+                ),
+            )
+                .into_response()
+                .into()),
+            Some(column_name) => match get_matching_values(
+                &config.config,
+                &config.datatype_conditions,
+                &config.structure_conditions,
+                pool,
+                &table,
+                column_name,
+                query_params.get("text").and_then(|t| Some(t.as_str())),
+            )
+            .await
+            {
+                Ok(r) => return Ok(Json(r).into_response()),
+                Err(e) => {
+                    return Err((StatusCode::BAD_REQUEST, Html(e.to_string()))
+                        .into_response()
+                        .into())
+                }
+            },
+        },
+        _ => (),
     };
 
     let mut form_html = None;
@@ -152,10 +194,6 @@ async fn table(
         if action == "validate" {
             form_html = Some(get_row_as_form(config, &table, &validated_row)?);
         } else if action == "submit" {
-            let pool = match state.config.pool.as_ref() {
-                Some(p) => p,
-                None => return Err("Missing database pool".to_string().into()),
-            };
             let offset = {
                 let row_number =
                     match insert_new_row(&config.config, pool, &table, &validated_row).await {
