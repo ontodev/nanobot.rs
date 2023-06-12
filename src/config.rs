@@ -147,9 +147,9 @@ impl Config {
             Ok(v) => {
                 let v: SerdeMap = serde_json::from_str(&v).unwrap();
                 let parser = StartParser::new();
-                let d = get_compiled_datatype_conditions(&v, &parser)?;
-                let r = get_compiled_rule_conditions(&v, d.clone(), &parser)?;
-                let p = get_parsed_structure_conditions(&v, &parser)?;
+                let d = get_compiled_datatype_conditions(&v, &parser);
+                let r = get_compiled_rule_conditions(&v, d.clone(), &parser);
+                let p = get_parsed_structure_conditions(&v, &parser);
                 self.valve = Some(ValveConfig {
                     config: v,
                     datatype_conditions: d,
