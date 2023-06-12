@@ -143,7 +143,9 @@ impl Config {
         // TODO: Make the path configurable:
         let path = "src/schema/table.tsv";
         match valve(path, &self.connection, &ValveCommand::Config, false, "table").await {
-            Err(_) => return Err(format!("Could not load from '{}'", path)),
+            Err(e) => {
+                return Err(format!("Unable to load from table ({}) for reason: {}", path, e))
+            }
             Ok(v) => {
                 let v: SerdeMap = serde_json::from_str(&v).unwrap();
                 let parser = StartParser::new();
