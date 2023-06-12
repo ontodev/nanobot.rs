@@ -1,0 +1,632 @@
+[
+  "ul",
+  [
+    "li",
+    [
+      "a",
+      {
+        "resource": "owl:Class"
+      },
+      "Class"
+    ],
+    [
+      "ul",
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0100000"
+          },
+          "zebrafish anatomical entity"
+        ],
+        [
+          "ul",
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0000037",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "anatomical structure"
+            ],
+            [
+              "ul",
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001512",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "anatomical group"
+                ],
+                [
+                  "ul",
+                  [
+                    "li",
+                    [
+                      "a",
+                      {
+                        "resource": "obo:ZFA_0001439",
+                        "about": "obo:ZFA_0001512",
+                        "rev": "rdfs:subClassOf"
+                      },
+                      "anatomical system"
+                    ],
+                    [
+                      "ul",
+                      [
+                        "li",
+                        [
+                          "a",
+                          {
+                            "resource": "obo:ZFA_0000272",
+                            "about": "obo:ZFA_0001439",
+                            "rev": "rdfs:subClassOf"
+                          },
+                          "respiratory system"
+                        ],
+                        [
+                          "ul",
+                          [
+                            "li",
+                            [
+                              "a",
+                              {
+                                "resource": "obo:ZFA_0000354",
+                                "about": "obo:ZFA_0000272",
+                                "rev": "obo:BFO_0000050"
+                              },
+                              "gill"
+                            ],
+                            [
+                              "ul",
+                              {
+                                "id": "children"
+                              },
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0000716",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "afferent branchial artery"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  },
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005012",
+                                        "about": "obo:ZFA_0000716",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "afferent filamental artery"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005013",
+                                        "about": "obo:ZFA_0000716",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "concurrent branch afferent branchial artery"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005014",
+                                        "about": "obo:ZFA_0000716",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "recurrent branch afferent branchial artery"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ]
+                                ]
+                              ],
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0000319",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "branchiostegal membrane"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  }
+                                ]
+                              ],
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0000202",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "efferent branchial artery"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  },
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005018",
+                                        "about": "obo:ZFA_0000202",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "efferent filamental artery"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ]
+                                ]
+                              ],
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0000667",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "gill filament"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  },
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0000666",
+                                        "about": "obo:ZFA_0000667",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "filamental artery"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ]
+                                ]
+                              ],
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0005324",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "gill ionocyte"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  }
+                                ]
+                              ],
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0000211",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "gill lamella"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  },
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005015",
+                                        "about": "obo:ZFA_0000211",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "afferent lamellar arteriole"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005019",
+                                        "about": "obo:ZFA_0000211",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "efferent lamellar arteriole"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ]
+                                ]
+                              ],
+                              [
+                                "li",
+                                [
+                                  "a",
+                                  {
+                                    "resource": "obo:ZFA_0001613",
+                                    "about": "obo:ZFA_0000354",
+                                    "rev": "obo:BFO_0000050"
+                                  },
+                                  "pharyngeal arch 3-7"
+                                ],
+                                [
+                                  "ul",
+                                  {
+                                    "id": "children"
+                                  },
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0000172",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "branchial muscle"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0005390",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "gill ray"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0001606",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "rdfs:subClassOf"
+                                      },
+                                      "pharyngeal arch 3"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0000095",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "obo:BFO_0000050"
+                                      },
+                                      "pharyngeal arch 3-7 skeleton"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0001607",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "rdfs:subClassOf"
+                                      },
+                                      "pharyngeal arch 4"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0001608",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "rdfs:subClassOf"
+                                      },
+                                      "pharyngeal arch 5"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0001609",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "rdfs:subClassOf"
+                                      },
+                                      "pharyngeal arch 6"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ],
+                                  [
+                                    "li",
+                                    [
+                                      "a",
+                                      {
+                                        "resource": "obo:ZFA_0001610",
+                                        "about": "obo:ZFA_0001613",
+                                        "rev": "rdfs:subClassOf"
+                                      },
+                                      "pharyngeal arch 7"
+                                    ],
+                                    [
+                                      "ul",
+                                      {
+                                        "id": "children"
+                                      }
+                                    ]
+                                  ]
+                                ]
+                              ]
+                            ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000496",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "compound organ"
+                ],
+                [
+                  "ul",
+                  [
+                    "li",
+                    [
+                      "a",
+                      {
+                        "resource": "obo:ZFA_0000354",
+                        "about": "obo:ZFA_0000496",
+                        "rev": "rdfs:subClassOf"
+                      },
+                      "gill"
+                    ],
+                    [
+                      "ul",
+                      {
+                        "id": "children"
+                      }
+                    ]
+                  ]
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001094",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "whole organism"
+                ],
+                [
+                  "ul",
+                  [
+                    "li",
+                    [
+                      "a",
+                      {
+                        "resource": "obo:ZFA_0001439",
+                        "about": "obo:ZFA_0001094",
+                        "rev": "obo:BFO_0000050"
+                      },
+                      "anatomical system"
+                    ],
+                    [
+                      "ul",
+                      [
+                        "li",
+                        [
+                          "a",
+                          {
+                            "resource": "obo:ZFA_0000272",
+                            "about": "obo:ZFA_0001439",
+                            "rev": "rdfs:subClassOf"
+                          },
+                          "respiratory system"
+                        ],
+                        [
+                          "ul",
+                          [
+                            "li",
+                            [
+                              "a",
+                              {
+                                "resource": "obo:ZFA_0000354",
+                                "about": "obo:ZFA_0000272",
+                                "rev": "obo:BFO_0000050"
+                              },
+                              "gill"
+                            ],
+                            [
+                              "ul",
+                              {
+                                "id": "children"
+                              }
+                            ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ],
+                  [
+                    "li",
+                    [
+                      "a",
+                      {
+                        "resource": "obo:ZFA_0000496",
+                        "about": "obo:ZFA_0001094",
+                        "rev": "obo:BFO_0000050"
+                      },
+                      "compound organ"
+                    ],
+                    [
+                      "ul",
+                      [
+                        "li",
+                        [
+                          "a",
+                          {
+                            "resource": "obo:ZFA_0000354",
+                            "about": "obo:ZFA_0000496",
+                            "rev": "rdfs:subClassOf"
+                          },
+                          "gill"
+                        ],
+                        [
+                          "ul",
+                          {
+                            "id": "children"
+                          }
+                        ]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+]

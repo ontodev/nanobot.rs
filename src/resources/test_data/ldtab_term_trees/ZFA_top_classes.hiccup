@@ -1,0 +1,4573 @@
+[
+  "ul",
+  [
+    "li",
+    [
+      "a",
+      {
+        "resource": "owl:Class"
+      },
+      "Class"
+    ],
+    [
+      "ul",
+      {
+        "id": "children"
+      },
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000460",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "Mauthner axon"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFS_0100000",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "Stages"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          },
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000044",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Adult"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000008",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:128-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000011",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:1k-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000009",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:256-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000016",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:30%-epiboly"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000010",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:512-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000015",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:Dome"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000012",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:High"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000013",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:Oblong"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000014",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Blastula:Sphere"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000005",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Cleavage:16-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000002",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Cleavage:2-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000006",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Cleavage:32-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000003",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Cleavage:4-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000007",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Cleavage:64-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000004",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Cleavage:8-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000017",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Gastrula:50%-epiboly"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000020",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Gastrula:75%-epiboly"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000021",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Gastrula:90%-epiboly"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000022",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Gastrula:Bud"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000018",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Gastrula:Germ-ring"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000019",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Gastrula:Shield"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000033",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Hatching:Long-pec"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000034",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Hatching:Pec-fin"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000042",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Juvenile:Days 30-44"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000043",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Juvenile:Days 45-89"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000036",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Day 4"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000037",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Day 5"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000038",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Day 6"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000040",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Days 14-20"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000041",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Days 21-29"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000039",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Days 7-13"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000035",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Larval:Protruding-mouth"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000032",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Pharyngula:High-pec"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000030",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Pharyngula:Prim-15"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000031",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Pharyngula:Prim-25"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000029",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Pharyngula:Prim-5"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000023",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Segmentation:1-4 somites"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000025",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Segmentation:10-13 somites"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000026",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Segmentation:14-19 somites"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000027",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Segmentation:20-25 somites"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000028",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Segmentation:26+ somites"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000024",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Segmentation:5-9 somites"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000000",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Unknown"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFS_0000001",
+                "about": "obo:ZFS_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "Zygote:1-cell"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ]
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001160",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "adult"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000015",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "anatomical set"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000169",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "antorbital"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001532",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "axial bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001548",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "axial fin bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000171",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "basisphenoid"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000624",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "brachium conjunctivum"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001544",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "chondrocranium bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001545",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "cranial bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001254",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "cranial motoneurons"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000644",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "dental plate"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001547",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "dermatocranium bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000337",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "dermopalatine"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005071",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "distal conduction system"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000348",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "duodenum"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000103",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "embryo"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000203",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "epicentrals"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000875",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "facial neural crest"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001553",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "fin bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000214",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "hypobranchial vessel"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000336",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "hypural arches"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000367",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "infraorbital bridge"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000373",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "juvenile"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000224",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "larva"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000375",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "last preural centrum"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000104",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "lateral cells"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005318",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "lymph node"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000544",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "medial pterygiophores anal fin"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000911",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "medial pterygiophores dorsal fin"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001275",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "mentomeckelian"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000127",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "mesenchyme condensations"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009161",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "metanephric mesenchyme stem cell"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009172",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "non-visual cell (sensu Vertebrata)"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000002",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000002"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000021",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000021"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000025",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000025"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000055",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000055"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000057",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000057"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000061",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000061"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000065",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000065"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000087",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000087"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000129",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000129"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000134",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000134"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000139",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000139"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000145",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000145"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000147",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000147"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000187",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000187"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000198",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000198"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000218",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000218"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000273",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000273"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000283",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000283"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000361",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000361"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000377",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000377"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000378",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000378"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000409",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000409"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000432",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000432"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000478",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000478"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000483",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000483"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000489",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000489"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000515",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000515"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000562",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000562"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000572",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000572"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000584",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000584"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000613",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000613"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000625",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000625"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000659",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000659"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000675",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000675"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000736",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000736"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000942",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000942"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000945",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0000945"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001087",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001087"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001088",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001088"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001090",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001090"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001091",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001091"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001092",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001092"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001102",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001102"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001103",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001103"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001219",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001219"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001255",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001255"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001337",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001337"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001352",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001352"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001353",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001353"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001354",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001354"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001380",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001380"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001398",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001398"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001413",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001413"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001661",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001661"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001664",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0001664"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005182",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005182"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005228",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005228"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005330",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005330"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0005493",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0005493"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0007007",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0007007"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009008",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009008"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009192",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009192"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009197",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009197"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009208",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009208"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009340",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009340"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009341",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009341"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009373",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009373"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009377",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009377"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009378",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009378"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009381",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009381"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009382",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obo:ZFA_0009382"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0009122",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "obsolete_auditory hair cell"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000251",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "opercular-branchiostegal series"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001549",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "paired fin bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001196",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "pars tuberalis"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001002",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "peripheral motor axons"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001546",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "pharyngeal arch bone"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001248",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "pharyngobranchial 1"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001253",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "pharyngobranchial 2+3"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001618",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "pons"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001474",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive cardinal organ"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000820",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive neuron neural tube"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001475",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive organ"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001476",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "presumptive organ system"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000070",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "sensory axons peripheral"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000437",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "stomach"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000289",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "supramaxillae"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000596",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "supraorbital series"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0000699",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "ural ossification"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0001333",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "visceral organ"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          }
+        ]
+      ],
+      [
+        "li",
+        [
+          "a",
+          {
+            "resource": "obo:ZFA_0100000",
+            "about": "owl:Class",
+            "rev": "rdfs:subClassOf"
+          },
+          "zebrafish anatomical entity"
+        ],
+        [
+          "ul",
+          {
+            "id": "children"
+          },
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0001689",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "anatomical line"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              },
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005570",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "corneo-scleral junction"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001388",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "epithelial mesenchymal boundary"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001367",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "forebrain midbrain boundary"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007027",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "forebrain midbrain boundary neural keel"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007020",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "forebrain midbrain boundary neural plate"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007033",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "forebrain midbrain boundary neural rod"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007040",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "forebrain midbrain boundary neural tube"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000042",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "midbrain hindbrain boundary"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007045",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "midbrain hindbrain boundary neural keel"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007044",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "midbrain hindbrain boundary neural plate"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007046",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "midbrain hindbrain boundary neural rod"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007047",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "midbrain hindbrain boundary neural tube"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001343",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "telencephalon diencephalon boundary"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001344",
+                    "about": "obo:ZFA_0001689",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "zona limitans intrathalamica"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ]
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0001643",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "anatomical space"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              },
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005876",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "anterior chamber eye"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005163",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "bile canaliculus"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007073",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "blood sinus cavity"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001075",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "choroidal fissure"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000330",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "cloacal chamber"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005536",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "fontanel"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005386",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "foramen"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005388",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "fossa"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005389",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "gill opening"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005782",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "intestinal opening"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000695",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "labial cavity"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005736",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "lacuna"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005735",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "lacunocanalicular canal"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000231",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "lateral recess"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005930",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "lumen"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000130",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "olfactory pit"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001654",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "opercular cavity"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000049",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "optic recess"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001027",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "oral cavity"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005558",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "orbit"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001655",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "pericardial cavity"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005459",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "perilymphatic space"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001656",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "pleuroperitoneal cavity"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005449",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "pore"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005338",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "posterior recess"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005312",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "pronephric capsular space"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001055",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "pronephric duct opening"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001283",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "pupil"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005283",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "renal capsular space"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005884",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "seminiferous tubule lumen"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005895",
+                    "about": "obo:ZFA_0001643",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "trigeminal-facial chamber"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ]
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0000037",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "anatomical structure"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              },
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000382",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "acellular anatomical structure"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0007114",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "anatomical conduit"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001512",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "anatomical group"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0009000",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "cell"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005499",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "circulus"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000496",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "compound organ"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001105",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "embryonic structure"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000020",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "extraembryonic structure"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001690",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "groove"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001488",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "multi-tissue structure"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005593",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "neuraxis flexure"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001308",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "organism subdivision"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001477",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "portion of tissue"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005899",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "scale focus"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001094",
+                    "about": "obo:ZFA_0000037",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "whole organism"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ]
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0005594",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "anatomical surface"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              },
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001462",
+                    "about": "obo:ZFA_0005594",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "somite border"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ]
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0001487",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "portion of organism substance"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              },
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005564",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "aqueous humor"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005857",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "bile"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0000007",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "blood"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005654",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "blood plasma"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001626",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "cerebral spinal fluid"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005803",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "cupula"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005414",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "endolymph"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005800",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "extracellular lipid lamellae"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005658",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "lymph"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0001617",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "otolith"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005413",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "perilymph"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005154",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "synovial fluid"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005913",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "urine"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005561",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "vitreous"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ],
+              [
+                "li",
+                [
+                  "a",
+                  {
+                    "resource": "obo:ZFA_0005573",
+                    "about": "obo:ZFA_0001487",
+                    "rev": "rdfs:subClassOf"
+                  },
+                  "zonule"
+                ],
+                [
+                  "ul",
+                  {
+                    "id": "children"
+                  }
+                ]
+              ]
+            ]
+          ],
+          [
+            "li",
+            [
+              "a",
+              {
+                "resource": "obo:ZFA_0001093",
+                "about": "obo:ZFA_0100000",
+                "rev": "rdfs:subClassOf"
+              },
+              "unspecified"
+            ],
+            [
+              "ul",
+              {
+                "id": "children"
+              }
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+]
