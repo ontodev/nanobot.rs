@@ -410,6 +410,43 @@ fn render_row_from_database(
         Some(v) => v.to_string(),
     };
 
+    // Handle requests related to typeahead, used for autocomplete in data forms:
+    // TODO: There is an almost identical block of code in the table() route. We should refactor
+    // so that it is in its own function.
+    match query_params.get("format") {
+        Some(format) if format == "json" => match query_params.get("column") {
+            None => {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Html(
+                        "For format=json, column is also required \
+                     (e.g., /table/row/1?format=json&column=foo)"
+                            .to_string(),
+                    ),
+                )
+                    .into_response()
+                    .into())
+            }
+            Some(column_name) => match block_on(get_matching_values(
+                &config.config,
+                &config.datatype_conditions,
+                &config.structure_conditions,
+                pool,
+                &table,
+                column_name,
+                query_params.get("text").and_then(|t| Some(t.as_str())),
+            )) {
+                Ok(r) => return Ok(Json(r).into_response()),
+                Err(e) => {
+                    return Err((StatusCode::BAD_REQUEST, Html(e.to_string()))
+                        .into_response()
+                        .into())
+                }
+            },
+        },
+        _ => (),
+    };
+
     // Handle POST request to validate or update the row in the table:
     let mut messages = HashMap::new();
     let mut form_html = None;
@@ -520,6 +557,7 @@ fn render_row_from_database(
             "tables": table_map,
         },
         "title": "table",
+        "table_name": table,
         "subtitle": format!(r#"<a href="/{}/row/{}">Return to row</a>"#, table, row_number),
         "messages": messages,
         "row_form": form_html,
