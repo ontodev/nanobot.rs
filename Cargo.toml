@@ -36,7 +36,7 @@ rev = "fb8bfe02fc36389c89d335d81488d7d1da719c1f"
 [dependencies.ontodev_valve]
 # path = "../ontodev_demo/valve.rs"
 git = "https://github.com/ontodev/valve.rs"
-rev = "b6701d1d63b09832cbdf482b40eb19f98dd7fdce"
+rev = "91c8907743f126c3fa560b40a78dd0f0d6cb0fef"
 
 [dependencies.ontodev_sqlrest]
 # path = "../sqlrest.rs"
