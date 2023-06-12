@@ -227,10 +227,13 @@ async fn get_page(
         column_map.insert(key, Value::Object(r));
     }
 
+    // We will need the table name without quotes for lookup purposes:
     let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
+    // For calculating processing time:
     let start = std::time::Instant::now();
-    // Query the table view instead of the base table, which includes conflict rows and the
-    // message column:
+
+    // If the table is anything other than the message table, query its corresponding view instead
+    // of the table itself. The view includes conflict rows and the message column:
     let db_object;
     if unquoted_table == "message" {
         db_object = unquoted_table.to_string();
@@ -239,6 +242,7 @@ async fn get_page(
     }
     let mut view_select = Select { table: db_object, ..select.clone() };
     let curr_cols = view_select.select.to_vec();
+    // Explicitly include the row_number / message_id column:
     if unquoted_table == "message" {
         view_select.select(vec!["message_id"]);
     } else {
@@ -247,11 +251,12 @@ async fn get_page(
     for col in &curr_cols {
         view_select.add_explicit_select(col);
     }
+    // If this isn't the message table, explicitly include the message column from the table's view:
     if unquoted_table != "message" {
         view_select.add_select("message");
     }
 
-    // If we're filtering for rows with messages:
+    // Only apply the limit to the view query if we're filtering for rows with messages:
     if filter_messages {
         if let Some(limit) = select.limit {
             view_select.limit(limit);
@@ -263,6 +268,7 @@ async fn get_page(
         Ok(value_rows) => value_rows,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
+    // Get the number of messages of each type:
     let message_counts = match get_message_counts_from_pool(&pool, &unquoted_table).await {
         Ok(message_counts) => message_counts,
         Err(e) => return Err(GetError::new(e.to_string())),
@@ -278,8 +284,11 @@ async fn get_page(
             let mut cell: Map<String, Value> = Map::new();
             let mut classes: Vec<String> = vec![];
 
-            // handle the value
+            // Add the value to the cell
             cell.insert("value".to_string(), v.clone());
+
+            // Row numbers and message ids have an integer datatype but otherwise do not need to be
+            // processed, so we continue:
             if (unquoted_table != "message" && k == "row_number")
                 || (unquoted_table == "message" && k == "message_id")
             {
@@ -288,7 +297,7 @@ async fn get_page(
                 continue;
             }
 
-            // handle null and nulltype
+            // Handle null and nulltype
             if v.is_null() {
                 classes.push("bg-null".to_string());
                 match column_map.get(k) {
@@ -308,7 +317,7 @@ async fn get_page(
                 };
             }
 
-            // handle datatype
+            // Handle the datatype:
             if !cell.contains_key("nulltype") {
                 let datatype = match column_map.get(k) {
                     Some(column) => match column.get("datatype") {
@@ -329,7 +338,7 @@ async fn get_page(
                 };
                 cell.insert("datatype".to_string(), datatype.clone());
             }
-            // handle structure
+            // Handle structure
             match column_map.get(k) {
                 Some(column) => {
                     let default_structure = json!("");
@@ -378,6 +387,7 @@ async fn get_page(
             crow.insert(k.to_string(), Value::Object(cell));
         }
 
+        // Handle messages associated with the row:
         let mut error_values = HashMap::new();
         if unquoted_table != "message" {
             if let Some(input_messages) = row.get("message") {
@@ -766,6 +776,8 @@ fn name_to_id(name: String) -> String {
 }
 
 pub fn page_to_html_table(page: &Value) -> Result<String, GetError> {
+    // TODO: It's inefficient to initiazlize the environment like this every time.
+    // This should only be done once at startup. Same goes for page_to_html_form() below.
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);
@@ -787,6 +799,8 @@ pub fn page_to_html_table(page: &Value) -> Result<String, GetError> {
 }
 
 pub fn page_to_html_form(page: &Value) -> Result<String, GetError> {
+    // TODO: It's inefficient to initiazlize the environment like this every time.
+    // This should only be done once at startup. Same goes for page_to_html_table() above.
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);

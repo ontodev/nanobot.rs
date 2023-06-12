@@ -104,14 +104,16 @@ async fn table(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let mut table = path.clone();
-    let mut format = "html";
+    let (table, format);
     if path.ends_with(".pretty.json") {
         table = path.replace(".pretty.json", "");
         format = "pretty.json";
     } else if path.ends_with(".json") {
         table = path.replace(".json", "");
         format = "json";
+    } else {
+        table = path.clone();
+        format = "html";
     }
     let config = match state.config.valve.as_ref() {
         Some(c) => c,
@@ -164,10 +166,11 @@ async fn table(
         _ => (),
     };
 
+    // Handle a POST request to validate or submit a new row for insertion into the table:
     let mut form_html = None;
     let columns = get_columns(&table, config)?;
     if request_type == RequestType::POST {
-        // Override view, which isn't passed in POST:
+        // Override view, which isn't passed in POST. This value will then be picked up below.
         view = String::from("form");
         let mut new_row = SerdeMap::new();
         for column in &columns {
@@ -191,9 +194,14 @@ async fn table(
             Ok(v) => v,
             Err(e) => return Err(e.into()),
         };
+
         if action == "validate" {
+            // If this is a validate action, fill in form_html which will then be handled below.
             form_html = Some(get_row_as_form(config, &table, &validated_row)?);
         } else if action == "submit" {
+            // If this is a submit action, insert the row to the database and send back a page
+            // containing a javascript redirect as a response which points back to the last
+            // page of the table:
             let offset = {
                 let row_number =
                     match insert_new_row(&config.config, pool, &table, &validated_row).await {
@@ -219,6 +227,7 @@ async fn table(
     }
 
     if view == "form" {
+        // In this case the request is to view the "insert new row" form:
         if table == "message" {
             return Err((
                 StatusCode::BAD_REQUEST,
@@ -232,6 +241,9 @@ async fn table(
             for column in &columns {
                 if column != "row_number" {
                     let value = query_params.get(column).unwrap_or(&String::from("")).to_string();
+                    // Since this is supposed to be a new row, the initial value of this cell should
+                    // match the nulltype (if it exists) of its associated datatype in order to be
+                    // valid. Otherwise we mark it as invalid.
                     let valid = matches_nulltype(&table, &column, &value, config)?;
                     new_row.insert(
                         column.to_string(),
@@ -246,6 +258,7 @@ async fn table(
             form_html = Some(get_row_as_form(config, &table, &new_row)?);
         }
 
+        // Used to display a drop-down or menu of some kind containing all the available tables:
         let table_map = {
             let mut table_map = SerdeMap::new();
             for table in get_tables(config)? {
@@ -254,6 +267,8 @@ async fn table(
             json!(table_map)
         };
 
+        // Fill in the page JSON containing all of the configuration parameters that we will be
+        // passing (through page_to_html()) to the minijinja template:
         let page = json!({
             "page": {
                 "project_name": "Nanobot",
@@ -271,6 +286,8 @@ async fn table(
         };
         Ok(Html(page_html).into_response())
     } else {
+        // In this case the request is to view the database contents represented by the request URL,
+        // row by row.
         let url = {
             let url = query_params
                 .iter()
@@ -392,6 +409,45 @@ fn render_row_from_database(
         None => return Err(format!("No 'view' in {:?}", query_params).into()),
         Some(v) => v.to_string(),
     };
+
+    // Handle requests related to typeahead, used for autocomplete in data forms:
+    // TODO: There is an almost identical block of code in the table() route. We should refactor
+    // so that it is in its own function.
+    match query_params.get("format") {
+        Some(format) if format == "json" => match query_params.get("column") {
+            None => {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Html(
+                        "For format=json, column is also required \
+                     (e.g., /table/row/1?format=json&column=foo)"
+                            .to_string(),
+                    ),
+                )
+                    .into_response()
+                    .into())
+            }
+            Some(column_name) => match block_on(get_matching_values(
+                &config.config,
+                &config.datatype_conditions,
+                &config.structure_conditions,
+                pool,
+                &table,
+                column_name,
+                query_params.get("text").and_then(|t| Some(t.as_str())),
+            )) {
+                Ok(r) => return Ok(Json(r).into_response()),
+                Err(e) => {
+                    return Err((StatusCode::BAD_REQUEST, Html(e.to_string()))
+                        .into_response()
+                        .into())
+                }
+            },
+        },
+        _ => (),
+    };
+
+    // Handle POST request to validate or update the row in the table:
     let mut messages = HashMap::new();
     let mut form_html = None;
     if request_type == RequestType::POST {
@@ -456,6 +512,7 @@ fn render_row_from_database(
         }
     }
 
+    // Handle a request to display a form for editing and validiating the given row:
     if view == "form" {
         if let None = form_html {
             if table == "message" {
@@ -483,6 +540,7 @@ fn render_row_from_database(
         }
     };
 
+    // Used to display a drop-down or menu containing all of the tables:
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(config)? {
@@ -491,12 +549,15 @@ fn render_row_from_database(
         json!(table_map)
     };
 
+    // Fill in the page JSON which contains all of the parameters that we will be passing to our
+    // minijinja template (through page_to_html_form()):
     let page = json!({
         "page": {
             "project_name": "Nanobot",
             "tables": table_map,
         },
         "title": "table",
+        "table_name": table,
         "subtitle": format!(r#"<a href="/{}/row/{}">Return to row</a>"#, table, row_number),
         "messages": messages,
         "row_form": form_html,
