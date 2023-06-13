@@ -1,5 +1,6 @@
 [nanobot]
 config_version = 0
+port = 3000
 
 [logging]
 level = "WARN"

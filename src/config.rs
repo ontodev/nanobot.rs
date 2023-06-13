@@ -14,7 +14,8 @@ use toml;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub config_version: i32,
+    pub config_version: u16,
+    pub port: u16,
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
@@ -46,7 +47,8 @@ pub struct TomlConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NanobotConfig {
-    pub config_version: i32,
+    pub config_version: u16,
+    pub port: Option<u16>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -80,6 +82,12 @@ impl Config {
 
         let config = Config {
             config_version: user.nanobot.config_version,
+            port: {
+                match user.nanobot.port {
+                    Some(x) => x,
+                    None => default.nanobot.port.unwrap(),
+                }
+            },
             logging_level: {
                 match user.logging.level {
                     Some(x) => x,
@@ -191,6 +199,7 @@ pub fn to_toml(config: &Config) -> TomlConfig {
     TomlConfig {
         nanobot: NanobotConfig {
             config_version: config.config_version.clone(),
+            port: Some(config.port.clone()),
         },
         logging: LoggingConfig {
             level: Some(config.logging_level.clone()),
