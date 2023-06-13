@@ -41,8 +41,8 @@ pub struct ValveConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TomlConfig {
     pub nanobot: NanobotConfig,
-    pub logging: LoggingConfig,
-    pub database: DatabaseConfig,
+    pub logging: Option<LoggingConfig>,
+    pub database: Option<DatabaseConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -63,17 +63,14 @@ pub struct DatabaseConfig {
 
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
+pub const DEFAULT_TOML: &str = "[nanobot]
+config_version = 0";
+
 impl Config {
     pub async fn new() -> Result<Config, String> {
-        let default_config_file = include_str!("resources/default_config.toml");
-        let default: TomlConfig = match toml::from_str(default_config_file) {
-            Ok(d) => d,
-            Err(e) => return Err(e.to_string()),
-        };
-
         let user_config_file = match fs::read_to_string("nanobot.toml") {
             Ok(x) => x,
-            Err(_) => default_config_file.into(),
+            Err(_) => DEFAULT_TOML.into(),
         };
         let user: TomlConfig = match toml::from_str(user_config_file.as_str()) {
             Ok(d) => d,
@@ -85,19 +82,25 @@ impl Config {
             port: {
                 match user.nanobot.port {
                     Some(x) => x,
-                    None => default.nanobot.port.unwrap(),
+                    None => 3000,
                 }
             },
             logging_level: {
-                match user.logging.level {
-                    Some(x) => x,
-                    None => default.logging.level.unwrap(),
+                match user.logging {
+                    Some(x) => match x.level {
+                        Some(y) => y,
+                        None => LoggingLevel::WARN,
+                    },
+                    None => LoggingLevel::WARN,
                 }
             },
             connection: {
-                match user.database.connection {
-                    Some(x) => x,
-                    None => default.database.connection.as_ref().unwrap().to_string(),
+                match user.database {
+                    Some(x) => match x.connection {
+                        Some(y) => y,
+                        None => ".nanobot.db".into(),
+                    },
+                    None => ".nanobot.db".into(),
                 }
             },
             pool: None,
@@ -201,11 +204,11 @@ pub fn to_toml(config: &Config) -> TomlConfig {
             config_version: config.config_version.clone(),
             port: Some(config.port.clone()),
         },
-        logging: LoggingConfig {
+        logging: Some(LoggingConfig {
             level: Some(config.logging_level.clone()),
-        },
-        database: DatabaseConfig {
+        }),
+        database: Some(DatabaseConfig {
             connection: Some(config.connection.clone()),
-        },
+        }),
     }
 }

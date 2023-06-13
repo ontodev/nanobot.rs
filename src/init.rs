@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, DEFAULT_TOML};
 use ontodev_valve::{valve, ValveCommand};
 use std::error;
 use std::fs;
@@ -115,15 +115,8 @@ fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
 }
 
 pub async fn init(config: &Config) -> Result<String, String> {
+    // Fail if the database already exists.
     let database = config.connection.to_owned();
-    // Fail if nanobot.toml or .nanobot.db exist
-    let path = Path::new("nanobot.toml");
-    if path.exists() {
-        return Err(format!(
-            "Cannot init: '{}' file already exists.",
-            path.display()
-        ));
-    }
     let path = Path::new(&database);
     if path.exists() {
         return Err(format!(
@@ -132,11 +125,15 @@ pub async fn init(config: &Config) -> Result<String, String> {
         ));
     }
 
-    // Create default config nanobot.toml
+    // Create nanobot.toml if it does not exist.
     let path = Path::new("nanobot.toml");
-    let toml = include_str!("resources/default_config.toml");
-    fs::write(path, toml).expect("Unable to write file");
-    tracing::info!("Created config file '{}'", path.display());
+    if !path.exists() {
+        // Create default config nanobot.toml
+        let path = Path::new("nanobot.toml");
+        let toml = DEFAULT_TOML;
+        fs::write(path, toml).expect("Unable to write file");
+        tracing::info!("Created config file '{}'", path.display());
+    }
 
     // Create the basic VALVE schema tables, if they don't exist
     let path = Path::new("src/schema");
