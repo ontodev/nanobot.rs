@@ -58,19 +58,28 @@ impl Config {
             name: String::from(match default_values["name"].as_str() {
                 Some(s) => s,
                 None => {
-                    return Err(format!("Could not convert '{}' to str", default_values["name"]))
+                    return Err(format!(
+                        "Could not convert '{}' to str",
+                        default_values["name"]
+                    ))
                 }
             }),
             version: String::from(match default_values["version"].as_str() {
                 Some(s) => s,
                 None => {
-                    return Err(format!("Could not convert '{}' to str", default_values["version"]))
+                    return Err(format!(
+                        "Could not convert '{}' to str",
+                        default_values["version"]
+                    ))
                 }
             }),
             edition: String::from(match default_values["edition"].as_str() {
                 Some(s) => s,
                 None => {
-                    return Err(format!("Could not convert '{}' to str", default_values["edition"]))
+                    return Err(format!(
+                        "Could not convert '{}' to str",
+                        default_values["edition"]
+                    ))
                 }
             }),
             //not set in default_config.toml
@@ -125,11 +134,14 @@ impl Config {
             };
         }
 
-        let pool =
-            match AnyPoolOptions::new().max_connections(5).connect_with(connection_options).await {
-                Ok(o) => o,
-                Err(e) => return Err(e.to_string()),
-            };
+        let pool = match AnyPoolOptions::new()
+            .max_connections(5)
+            .connect_with(connection_options)
+            .await
+        {
+            Ok(o) => o,
+            Err(e) => return Err(e.to_string()),
+        };
         if pool.any_kind() == AnyKind::Sqlite {
             if let Err(e) = sqlx_query("PRAGMA foreign_keys = ON").execute(&pool).await {
                 return Err(e.to_string());
@@ -142,7 +154,15 @@ impl Config {
     pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
         // TODO: Make the path configurable:
         let path = "src/schema/table.tsv";
-        match valve(path, &self.connection, &ValveCommand::Config, false, "table").await {
+        match valve(
+            path,
+            &self.connection,
+            &ValveCommand::Config,
+            false,
+            "table",
+        )
+        .await
+        {
             Err(e) => {
                 tracing::warn!("VALVE: {:?}", e);
                 return Err(format!("Could not load from '{}'", path));

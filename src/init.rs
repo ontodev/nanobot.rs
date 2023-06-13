@@ -63,7 +63,10 @@ fn add_to_gitignore(input: &str) -> Result<String, String> {
                 }
                 Ok(String::from("NotFound-Modified"))
             } else {
-                let mut file = match OpenOptions::new().write(true).append(true).open(".gitignore")
+                let mut file = match OpenOptions::new()
+                    .write(true)
+                    .append(true)
+                    .open(".gitignore")
                 {
                     Ok(f) => f,
                     Err(e) => return Err(e.to_string()),
@@ -116,11 +119,17 @@ pub async fn init(config: &Config) -> Result<String, String> {
     // Fail if nanobot.toml or .nanobot.db exist
     let path = Path::new("nanobot.toml");
     if path.exists() {
-        return Err(format!("Cannot init: '{}' file already exists.", path.display()));
+        return Err(format!(
+            "Cannot init: '{}' file already exists.",
+            path.display()
+        ));
     }
     let path = Path::new(&database);
     if path.exists() {
-        return Err(format!("Cannot init: '{}' database already exists", path.display()));
+        return Err(format!(
+            "Cannot init: '{}' database already exists",
+            path.display()
+        ));
     }
 
     // Create default config nanobot.toml

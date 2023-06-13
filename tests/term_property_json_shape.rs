@@ -10,8 +10,11 @@ use std::collections::HashSet;
 async fn test_get_prefix_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool =
-        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
 
     let mut curies = HashSet::new();
     curies.insert(String::from("obo:ZFA_0000354"));
@@ -25,8 +28,11 @@ async fn test_get_prefix_map() {
 async fn test_get_label_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool =
-        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
 
     let table = "statement";
 
@@ -41,8 +47,11 @@ async fn test_get_label_map() {
 async fn test_get_property_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool =
-        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
 
     let subject = "obo:ZFA_0000354";
     let table = "statement";
@@ -216,8 +225,11 @@ async fn test_get_property_map() {
 async fn test_get_predicate_map_hiccup() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool =
-        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
 
     let subject = "obo:ZFA_0000354";
     let table = "statement";
@@ -580,8 +592,11 @@ async fn test_get_predicate_map_hiccup() {
 async fn test_get_predicate_map_html() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool =
-        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
 
     let subject = "obo:ZFA_0000354";
     let table = "statement";
@@ -703,8 +718,11 @@ async fn test_get_predicate_map_html() {
 async fn test_get_subject_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool =
-        SqlitePoolOptions::new().max_connections(5).connect(&connection_string).await.unwrap();
+    let pool: SqlitePool = SqlitePoolOptions::new()
+        .max_connections(5)
+        .connect(&connection_string)
+        .await
+        .unwrap();
 
     let subject = "obo:ZFA_0000354";
     let table = "statement";

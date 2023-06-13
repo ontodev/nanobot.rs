@@ -74,16 +74,26 @@ pub async fn get_rows(
     format: &str,
 ) -> Result<String, GetError> {
     // Get all the tables
-    let table_map =
-        match config.valve.as_ref().and_then(|v| v.config.get("table")).and_then(|t| t.as_object())
-        {
-            Some(table_map) => table_map,
-            None => return Err(GetError::new(format!("No object named 'table' in valve config"))),
-        };
+    let table_map = match config
+        .valve
+        .as_ref()
+        .and_then(|v| v.config.get("table"))
+        .and_then(|t| t.as_object())
+    {
+        Some(table_map) => table_map,
+        None => {
+            return Err(GetError::new(format!(
+                "No object named 'table' in valve config"
+            )))
+        }
+    };
 
     let unquoted_table = unquote(&base_select.table).unwrap_or(base_select.table.to_string());
     if !table_map.contains_key(&unquoted_table) {
-        return Err(GetError::new(format!("Invalid table '{}'", &base_select.table)));
+        return Err(GetError::new(format!(
+            "Invalid table '{}'",
+            &base_select.table
+        )));
     }
 
     // Get the columns for the selected table
@@ -240,7 +250,10 @@ async fn get_page(
     } else {
         db_object = format!("{}_view", unquoted_table);
     }
-    let mut view_select = Select { table: db_object, ..select.clone() };
+    let mut view_select = Select {
+        table: db_object,
+        ..select.clone()
+    };
     let curr_cols = view_select.select.to_vec();
     // Explicitly include the row_number / message_id column:
     if unquoted_table == "message" {
@@ -557,7 +570,10 @@ async fn get_page(
             match message_counts.get("message_row").and_then(|m| m.as_u64()) {
                 Some(m) => m as usize,
                 None => {
-                    return Err(GetError::new(format!("No 'nessage_row' in {:?}", message_counts)))
+                    return Err(GetError::new(format!(
+                        "No 'nessage_row' in {:?}",
+                        message_counts
+                    )))
                 }
             }
         } else {
@@ -582,7 +598,12 @@ async fn get_page(
 
     let mut this_table = match table_map.get(&unquoted_table).and_then(|t| t.as_object()) {
         Some(t) => t.clone(),
-        None => return Err(GetError::new(format!("No '{}' in {:?}", unquoted_table, table_map))),
+        None => {
+            return Err(GetError::new(format!(
+                "No '{}' in {:?}",
+                unquoted_table, table_map
+            )))
+        }
     };
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
     this_table.insert("href".to_string(), json!(format!("/{}", unquoted_table)));
@@ -632,7 +653,10 @@ async fn get_page(
             };
             this_table.insert("first".to_string(), json!(href));
             if offset > select.limit.unwrap_or(0) {
-                let href = match select_offset.offset(offset - select.limit.unwrap_or(0)).to_url() {
+                let href = match select_offset
+                    .offset(offset - select.limit.unwrap_or(0))
+                    .to_url()
+                {
                     Ok(url) => url,
                     Err(e) => return Err(GetError::new(e.to_string())),
                 };
@@ -720,7 +744,10 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError
                 value = match cell.as_str() {
                     Some(s) => s.to_string(),
                     None => {
-                        return Err(GetError::new(format!("Could not convert '{}' to str", cell)))
+                        return Err(GetError::new(format!(
+                            "Could not convert '{}' to str",
+                            cell
+                        )))
                     }
                 };
             } else if cell.is_null() {

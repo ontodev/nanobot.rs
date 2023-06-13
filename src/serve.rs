@@ -60,7 +60,10 @@ pub async fn app(config: &Config) -> Result<String, String> {
     // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     tracing::info!("listening on {}", addr);
-    if let Err(e) = axum::Server::bind(&addr).serve(app.into_make_service()).await {
+    if let Err(e) = axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+    {
         return Err(e.to_string());
     }
 
@@ -85,7 +88,14 @@ async fn post_table(
         query_params,
         form_params
     );
-    table(&path, &state, &query_params, &form_params, RequestType::POST).await
+    table(
+        &path,
+        &state,
+        &query_params,
+        &form_params,
+        RequestType::POST,
+    )
+    .await
 }
 
 async fn get_table(
@@ -94,7 +104,14 @@ async fn get_table(
     Query(query_params): Query<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("request table GET {:?} {:?}", path, query_params);
-    table(&path, &state, &query_params, &RequestParams::new(), RequestType::GET).await
+    table(
+        &path,
+        &state,
+        &query_params,
+        &RequestParams::new(),
+        RequestType::GET,
+    )
+    .await
 }
 
 async fn table(
@@ -179,7 +196,10 @@ async fn table(
                     Some(v) => v.to_string(),
                     None => {
                         let other_column = format!("{}_other", column);
-                        form_params.get(&other_column).unwrap_or(&String::from("")).to_string()
+                        form_params
+                            .get(&other_column)
+                            .unwrap_or(&String::from(""))
+                            .to_string()
                     }
                 };
                 new_row.insert(column.to_string(), value.into());
@@ -240,7 +260,10 @@ async fn table(
             let mut new_row = SerdeMap::new();
             for column in &columns {
                 if column != "row_number" {
-                    let value = query_params.get(column).unwrap_or(&String::from("")).to_string();
+                    let value = query_params
+                        .get(column)
+                        .unwrap_or(&String::from(""))
+                        .to_string();
                     // Since this is supposed to be a new row, the initial value of this cell should
                     // match the nulltype (if it exists) of its associated datatype in order to be
                     // valid. Otherwise we mark it as invalid.
@@ -333,7 +356,13 @@ async fn post_row(
         query_params,
         form_params
     );
-    row(Path((table, row_number)), &state, &query_params, &form_params, RequestType::POST)
+    row(
+        Path((table, row_number)),
+        &state,
+        &query_params,
+        &form_params,
+        RequestType::POST,
+    )
 }
 
 async fn get_row(
@@ -342,7 +371,13 @@ async fn get_row(
     Query(params): Query<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("request row GET {:?} {:?} {:?}", table, row_number, params);
-    row(Path((table, row_number)), &state, &params, &RequestParams::new(), RequestType::GET)
+    row(
+        Path((table, row_number)),
+        &state,
+        &params,
+        &RequestParams::new(),
+        RequestType::GET,
+    )
 }
 
 fn row(
@@ -365,7 +400,9 @@ fn row(
         Err(e) => return Err((StatusCode::BAD_REQUEST, Html(e)).into_response().into()),
         Ok(flag) if flag => {
             let error = format!("'row' path is not valid for ontology table '{}'", table);
-            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+            return Err((StatusCode::BAD_REQUEST, Html(error))
+                .into_response()
+                .into());
         }
         _ => (),
     };
@@ -373,12 +410,24 @@ fn row(
     let row_number = match row_number.parse::<u32>() {
         Ok(r) => r,
         Err(e) => {
-            let error = format!("Unable to parse row_number '{}' due to error: {}", row_number, e);
-            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+            let error = format!(
+                "Unable to parse row_number '{}' due to error: {}",
+                row_number, e
+            );
+            return Err((StatusCode::BAD_REQUEST, Html(error))
+                .into_response()
+                .into());
         }
     };
 
-    render_row_from_database(&table, row_number, state, query_params, form_params, request_type)
+    render_row_from_database(
+        &table,
+        row_number,
+        state,
+        query_params,
+        form_params,
+        request_type,
+    )
 }
 
 fn render_row_from_database(
@@ -459,7 +508,10 @@ fn render_row_from_database(
                     Some(v) => v.to_string(),
                     None => {
                         let other_column = format!("{}_other", column);
-                        form_params.get(&other_column).unwrap_or(&String::from("")).to_string()
+                        form_params
+                            .get(&other_column)
+                            .unwrap_or(&String::from(""))
+                            .to_string()
                     }
                 };
                 new_row.insert(column.to_string(), value.into());
@@ -490,9 +542,13 @@ fn render_row_from_database(
                 Ok(v) => v,
                 Err(e) => return Err(e.into()),
             };
-            if let Err(e) =
-                block_on(update_row(&config.config, pool, table, &validated_row, row_number))
-            {
+            if let Err(e) = block_on(update_row(
+                &config.config,
+                pool,
+                table,
+                &validated_row,
+                row_number,
+            )) {
                 return Err(e.to_string().into());
             }
 
@@ -506,8 +562,10 @@ fn render_row_from_database(
                     }
                 };
             } else {
-                messages
-                    .insert("success".to_string(), vec!["Row successfully updated!".to_string()]);
+                messages.insert(
+                    "success".to_string(),
+                    vec!["Row successfully updated!".to_string()],
+                );
             }
         }
     }
@@ -524,7 +582,11 @@ fn render_row_from_database(
                     .into());
             }
             let mut select = Select::new(format!("{}_view", table));
-            select.filter(vec![Filter::new("row_number", "eq", json!(format!("{}", row_number)))?]);
+            select.filter(vec![Filter::new(
+                "row_number",
+                "eq",
+                json!(format!("{}", row_number)),
+            )?]);
             let mut rows = select.fetch_rows_as_json(pool, &HashMap::new())?;
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
@@ -536,7 +598,9 @@ fn render_row_from_database(
         Some(f) => f,
         None => {
             let error = "Something went wrong - unable to render form".to_string();
-            return Err((StatusCode::BAD_REQUEST, Html(error)).into_response().into());
+            return Err((StatusCode::BAD_REQUEST, Html(error))
+                .into_response()
+                .into());
         }
     };
 
@@ -682,7 +746,10 @@ fn get_columns(table: &str, config: &ValveConfig) -> Result<Vec<String>, String>
         .and_then(|c| Some(c.map(|(k, _)| k.clone())))
         .and_then(|c| Some(c.collect::<Vec<_>>()))
     {
-        None => Err(format!("Unable to retrieve columns of '{}' from valve configuration.", table)),
+        None => Err(format!(
+            "Unable to retrieve columns of '{}' from valve configuration.",
+            table
+        )),
         Some(v) => Ok(v),
     }
 }
@@ -720,7 +787,12 @@ fn get_html_type_and_values(
         .and_then(|d| d.as_object())
     {
         Some(o) => o,
-        None => return Err(format!("Unable to retrieve datatype config for '{}'", datatype)),
+        None => {
+            return Err(format!(
+                "Unable to retrieve datatype config for '{}'",
+                datatype
+            ))
+        }
     };
 
     let mut new_values = vec![];
@@ -1079,11 +1151,17 @@ fn get_hiccup_form_row(
         Some(t) => t,
     };
     if vec!["select", "radio", "checkbox"].contains(&html_type) && *allowed_values == None {
-        return Err(format!("A list of allowed values is required for HTML type '{}'", html_type));
+        return Err(format!(
+            "A list of allowed values is required for HTML type '{}'",
+            html_type
+        ));
     }
 
     // Create the header level for this form row:
-    let mut header_col = vec![json!("div"), json!({"class": "col-md-3", "id": form_row_id})];
+    let mut header_col = vec![
+        json!("div"),
+        json!({"class": "col-md-3", "id": form_row_id}),
+    ];
     if allow_delete {
         header_col.push(json!([
             json!("a"),
@@ -1207,7 +1285,10 @@ fn get_hiccup_form_row(
         input_attrs.insert("type".to_string(), json!(html_type));
         if html_type == "search" {
             classes.append(&mut vec!["search", "typeahead"]);
-            input_attrs.insert("id".to_string(), json!(format!("{}-typeahead-form", header)));
+            input_attrs.insert(
+                "id".to_string(),
+                json!(format!("{}-typeahead-form", header)),
+            );
         }
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         match value {
@@ -1307,11 +1388,18 @@ fn get_hiccup_form_row(
                     _ => "invalid-feedback",
                 }
             };
-            e.push(json!([json!("div"), json!({ "class": validation_cls }), json!(message),]));
+            e.push(json!([
+                json!("div"),
+                json!({ "class": validation_cls }),
+                json!(message),
+            ]));
         }
         value_col.push(json!(e));
     } else {
-        return Err(format!("'{}' form field is not supported for column '{}'", html_type, header));
+        return Err(format!(
+            "'{}' form field is not supported for column '{}'",
+            html_type, header
+        ));
     }
 
     match message {
@@ -1331,5 +1419,10 @@ fn get_hiccup_form_row(
         _ => (),
     };
 
-    Ok(vec![json!("div"), json!({"class": "row py-1"}), json!(header_col), json!(value_col)])
+    Ok(vec![
+        json!("div"),
+        json!({"class": "row py-1"}),
+        json!(header_col),
+        json!(value_col),
+    ])
 }

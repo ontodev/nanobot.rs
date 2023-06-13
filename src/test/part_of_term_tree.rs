@@ -668,8 +668,12 @@ pub fn get_part_of_information(
 
         if part_of_restriction {
             //encode information in class_2_parts
-            let part_of_filler =
-                class_value.get("owl:someValuesFrom").unwrap().as_array().unwrap()[0].clone();
+            let part_of_filler = class_value
+                .get("owl:someValuesFrom")
+                .unwrap()
+                .as_array()
+                .unwrap()[0]
+                .clone();
 
             let part_of_filler = part_of_filler.get("object").unwrap();
             let part_of_filler_string = String::from(part_of_filler.as_str().unwrap());
@@ -1327,8 +1331,10 @@ pub async fn get_preferred_roots(
     pool: &SqlitePool,
 ) -> Result<HashSet<String>, sqlx::Error> {
     let mut preferred_roots = HashSet::new();
-    let query =
-        format!("SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'", table = table,);
+    let query = format!(
+        "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
+        table = table,
+    );
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let object: &str = row.get("object");

@@ -82,7 +82,13 @@ async fn main() {
                 _ => "text",
             };
             let result = match get::get_table(
-                config.start_pool().await.unwrap().load_valve_config().await.unwrap(),
+                config
+                    .start_pool()
+                    .await
+                    .unwrap()
+                    .load_valve_config()
+                    .await
+                    .unwrap(),
                 table,
                 shape,
                 format,
@@ -94,9 +100,15 @@ async fn main() {
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => {
-            serve::app(config.start_pool().await.unwrap().load_valve_config().await.unwrap())
-        }
+        Some(("serve", _sub_matches)) => serve::app(
+            config
+                .start_pool()
+                .await
+                .unwrap()
+                .load_valve_config()
+                .await
+                .unwrap(),
+        ),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
