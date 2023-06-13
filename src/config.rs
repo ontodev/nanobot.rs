@@ -9,7 +9,7 @@ use sqlx::{
     any::{AnyConnectOptions, AnyKind, AnyPool, AnyPoolOptions},
     query as sqlx_query,
 };
-use std::{collections::HashMap, fmt, fs, str::FromStr};
+use std::{collections::HashMap, fmt, fs, path::Path, str::FromStr};
 use toml;
 
 #[derive(Clone, Debug)]
@@ -20,6 +20,7 @@ pub struct Config {
     pub connection: String,
     pub pool: Option<AnyPool>,
     pub valve: Option<ValveConfig>,
+    pub template_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -43,6 +44,7 @@ pub struct TomlConfig {
     pub nanobot: NanobotConfig,
     pub logging: Option<LoggingConfig>,
     pub database: Option<DatabaseConfig>,
+    pub templates: Option<TemplatesConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -59,6 +61,11 @@ pub struct LoggingConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DatabaseConfig {
     pub connection: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TemplatesConfig {
+    pub path: Option<String>,
 }
 
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
@@ -105,6 +112,22 @@ impl Config {
             },
             pool: None,
             valve: None,
+            template_path: {
+                match user.templates {
+                    Some(x) => match x.path {
+                        Some(p) => {
+                            if Path::new(&p).is_dir() {
+                                Some(p)
+                            } else {
+                                eprintln!("WARNING: Configuration specifies a template directory '{}' but it does not exist. Using default templates.", p);
+                                None
+                            }
+                        }
+                        None => None,
+                    },
+                    None => None,
+                }
+            },
         };
 
         Ok(config)
@@ -209,6 +232,9 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         }),
         database: Some(DatabaseConfig {
             connection: Some(config.connection.clone()),
+        }),
+        templates: Some(TemplatesConfig {
+            path: config.template_path.clone(),
         }),
     }
 }
