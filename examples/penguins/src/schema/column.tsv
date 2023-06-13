@@ -1,41 +1,35 @@
-table	column	nulltype	datatype	structure	description
-table	table		label	unique	name of this table
-table	path		line		path to the TSV file for this table, relative to the table.tsv file
-table	type	empty	table_type		type of this table, used for tables with special meanings
-table	description	empty	text		a description of this table
-column	table		label	from(table.table)	the table that this column belongs to
-column	column		label		the name of this column
-column	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
-column	datatype		word	from(datatype.datatype)	the datatype for this column
-column	structure	empty	label		schema information for this column
-column	description	empty	text		a description of this column
-datatype	datatype		label	primary	the name of this datatype
-datatype	parent	empty	label	tree(datatype)	the parent datatype
-datatype	condition	empty	line		the method for testing the datatype
-datatype	description	empty	text		a description of this datatype
-datatype	SQL type	empty	sql_type		the SQL type for representing this data
-datatype	HTML type	empty	html_type		the HTML type for viewing and editing this data
-message	table		label		Table for this message
-message	row		natural number		Row number for this message
-message	column		label		Column for this message
-message	level		word		Severity of this message: error, warn, info, debug
-message	rule		label		Name of the rule that generated this message
-message	value		text		Value of this cell as text
-message	message		line		Content of the message
-penguin	studyName		word		Description
-penguin	Sample Number		natural number	primary	Description
-penguin	Species		label		Description
-penguin	Region		label		Description
-penguin	Island		label		Description
-penguin	Stage		label		Description
-penguin	Individual ID		word	unique	Description
-penguin	Clutch Completion		word		Description
-penguin	Date Egg		date		Description
-penguin	Culmen Length (mm)		positive decimal		Description
-penguin	Culmen Depth (mm)		positive decimal		Description
-penguin	Flipper Length (mm)		natural number		Description
-penguin	Body Mass (g)		natural number		Description
-penguin	Sex		word		Description
-penguin	Delta 15 N (o/oo)		positive decimal		Description
-penguin	Delta 13 C (o/oo)		negative decimal		Description
-penguin	Comments	empty	line		Description
+table	column	label	nulltype	datatype	structure	description
+table	table	table		label	unique	name of this table
+table	path	path		line		path to the TSV file for this table, relative to the table.tsv file
+table	type	type	empty	table_type		type of this table, used for tables with special meanings
+table	description	description	empty	text		a description of this table
+column	table	table		label	from(table.table)	the table that this column belongs to
+column	column	column		label		the name of this column
+column	label	label		label		the label of this column
+column	nulltype	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
+column	datatype	datatype		word	from(datatype.datatype)	the datatype for this column
+column	structure	structure	empty	label		schema information for this column
+column	description	description	empty	text		a description of this column
+datatype	datatype	datatype		label	primary	the name of this datatype
+datatype	parent	parent	empty	label	tree(datatype)	the parent datatype
+datatype	condition	condition	empty	line		the method for testing the datatype
+datatype	description	description	empty	text		a description of this datatype
+datatype	SQL type	SQL type	empty	sql_type		the SQL type for representing this data
+datatype	HTML type	HTML type	empty	html_type		the HTML type for viewing and editing this data
+penguin	study_name	studyName		word		the name of the study
+penguin	sample_number	Sample Number		natural_number	primary	the sample identifier
+penguin	species	Species		label		the species of the measured individual
+penguin	region	Region		label		the region where the measurement took place
+penguin	island	Island		label		the island where the measurement took place
+penguin	stage	Stage		label		the growth stage of the individual
+penguin	individual_id	Individual ID		word	unique	the ID of the measured individual
+penguin	clutch_completion	Clutch Completion		word		whether the measured individual's clutch of eggs was complete
+penguin	date_egg	Date Egg		date		the date that an egg in the clutch was observed
+penguin	culmen_length	Culmen Length (mm)		positive_decimal		the length of the culmen of the individual, in millimetres
+penguin	culmen_depth	Culmen Depth (mm)		positive_decimal		the depth of the culmen of the individual, in millimetres
+penguin	flipper_length	Flipper Length (mm)		natural_number		the length of the individual's flipper, in millimetres
+penguin	body_mass	Body Mass (g)		natural_number		the body mass of the individual, in grams
+penguin	sex	Sex		word		the sex of the individual
+penguin	delta_15_n	Delta 15 N (o/oo)		positive_decimal		the Delta 15 N measurement
+penguin	delta_13_c	Delta 13 C (o/oo)		negative_decimal		the Delta 13 C measurement
+penguin	comments	Comments	empty	line		comments on the measurement or the individual

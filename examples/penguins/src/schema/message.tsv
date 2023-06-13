@@ -1,8 +1,8 @@
-table	row	column	level	rule	value	message
-table	1	table	error	test	table	Test error message
-table	1	table	warn	test	table	Test warning message
-table	1	table	info	test	table	Test info message
-table	1	path	warn	test	src/schema/table.tsv	Test warning message
-table	1	path	info	test	src/schema/table.tsv	Test info message
-table	2	table	warn	test	column	Test warning message
-table	3	table	info	test	column	Test info message
+row_number	table	row	column	level	rule	value	message
+1	table	1	table	error	test	table	Test error message
+2	table	1	table	warn	test	table	Test warning message
+3	table	1	table	info	test	table	Test info message
+4	table	1	path	warn	test	src/schema/table.tsv	Test warning message
+5	table	1	path	info	test	src/schema/table.tsv	Test info message
+6	table	2	table	warn	test	column	Test warning message
+7	table	3	table	info	test	column	Test info message
