@@ -62,8 +62,10 @@ pub async fn get_count_from_pool(pool: &AnyPool, select: &Select) -> Result<usiz
     let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
     let conflict_count = {
         if unquoted_table != "message" {
-            let conflict_select =
-                Select { table: format!("\"{}_conflict\"", unquoted_table), ..select.clone() };
+            let conflict_select = Select {
+                table: format!("\"{}_conflict\"", unquoted_table),
+                ..select.clone()
+            };
             let sql = match conflict_select.to_sql_count(&db_type) {
                 Ok(sql) => sql,
                 Err(e) => return Err(sqlx::Error::Configuration(e.into())),

@@ -351,7 +351,10 @@ pub fn get_ldtab_field(value: &Value, field: &str) -> Result<Value, TreeViewErro
             }
         },
         _ => {
-            return Err(TreeViewError::LDTab(format!("Not an LDTab object: {}", value.to_string())))
+            return Err(TreeViewError::LDTab(format!(
+                "Not an LDTab object: {}",
+                value.to_string()
+            )))
         }
     }
 }
@@ -369,7 +372,10 @@ pub fn get_ldtab_array_at(value: &Value, index: usize) -> Result<Value, TreeView
     match value {
         Value::Array(array) => Ok(array[index].clone()),
         _ => {
-            return Err(TreeViewError::LDTab(format!("Not an LDTab array: {}", value.to_string())))
+            return Err(TreeViewError::LDTab(format!(
+                "Not an LDTab array: {}",
+                value.to_string()
+            )))
         }
     }
 }
@@ -402,7 +408,10 @@ pub fn get_ldtab_value_as_string(value: &Value) -> Result<String, TreeViewError>
     match value.as_str() {
         Some(string) => Ok(String::from(string)),
         None => {
-            return Err(TreeViewError::LDTab(format!("Not an LDTab string: {}", value.to_string())))
+            return Err(TreeViewError::LDTab(format!(
+                "Not an LDTab string: {}",
+                value.to_string()
+            )))
         }
     }
 }
@@ -1787,8 +1796,10 @@ pub async fn get_preferred_roots(
     pool: &SqlitePool,
 ) -> Result<HashSet<String>, TreeViewError> {
     let mut preferred_roots = HashSet::new();
-    let query =
-        format!("SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'", table = table,);
+    let query = format!(
+        "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
+        table = table,
+    );
     let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let object: &str = row.get("object");
@@ -2566,7 +2577,10 @@ pub async fn get_hiccup_top_property_hierarchy(
         _ => json!("ERROR"),
     };
     if top_hierarchy_tree == json!("FAILED") {
-        return Err(TreeViewError::Unknown(format!("Expected property type but got {:?}", case)));
+        return Err(TreeViewError::Unknown(format!(
+            "Expected property type but got {:?}",
+            case
+        )));
     };
 
     let sorted = sort_rich_tree_by_label(&top_hierarchy_tree)?;
