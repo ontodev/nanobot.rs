@@ -1,4 +1,11 @@
-[tool]
-name = "nanobot"
-version = "0.1.0"
-edition = "2021"
+[nanobot]
+config_version = 0
+
+[logging]
+level = "WARN"
+
+[database]
+connection = ".nanobot.db"
+
+[templates]
+# path = "src/resources/"

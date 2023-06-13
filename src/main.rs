@@ -10,14 +10,16 @@ async fn main() {
     // initialize configuration
     let mut config: config::Config = config::Config::new().await.unwrap();
 
+    let level = match config.logging_level {
+        config::LoggingLevel::DEBUG => tracing::Level::DEBUG,
+        config::LoggingLevel::INFO => tracing::Level::INFO,
+        config::LoggingLevel::WARN => tracing::Level::WARN,
+        config::LoggingLevel::ERROR => tracing::Level::ERROR,
+    };
+
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
-        .with_max_level(tracing::Level::WARN)
-        // .with_max_level(tracing::Level::INFO)
-        // .with_max_level(tracing::Level::DEBUG)
-        // completes the builder.
+        .with_max_level(level)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
@@ -67,7 +69,7 @@ async fn main() {
             }
             _ => init::init(&config).await,
         },
-        Some(("config", _sub_matches)) => config::config("nanobot.toml"),
+        Some(("config", _sub_matches)) => Ok(config.to_string()),
         Some(("get", sub_matches)) => {
             let table = match sub_matches.get_one::<String>("TABLE") {
                 Some(x) => x,
@@ -81,34 +83,14 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result = match get::get_table(
-                config
-                    .start_pool()
-                    .await
-                    .unwrap()
-                    .load_valve_config()
-                    .await
-                    .unwrap(),
-                table,
-                shape,
-                format,
-            )
-            .await
-            {
-                Ok(x) => x,
-                Err(x) => format!("ERROR: {:?}", x),
-            };
+            let result =
+                match get::get_table(config.init().await.unwrap(), table, shape, format).await {
+                    Ok(x) => x,
+                    Err(x) => format!("ERROR: {:?}", x),
+                };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(
-            config
-                .start_pool()
-                .await
-                .unwrap()
-                .load_valve_config()
-                .await
-                .unwrap(),
-        ),
+        Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
         _ => unreachable!("Exhausted list of subcommands and subcommand_required prevents `None`"),
     };
 
