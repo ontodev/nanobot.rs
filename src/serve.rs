@@ -217,7 +217,13 @@ async fn table(
 
         if action == "validate" {
             // If this is a validate action, fill in form_html which will then be handled below.
-            form_html = Some(get_row_as_form(config, &table, &validated_row)?);
+            match get_row_as_form(config, &table, &validated_row) {
+                Ok(f) => form_html = Some(f),
+                Err(e) => {
+                    tracing::warn!("Rendering error {}", e);
+                    form_html = None
+                }
+            };
         } else if action == "submit" {
             // If this is a submit action, insert the row to the database and send back a page
             // containing a javascript redirect as a response which points back to the last
@@ -246,7 +252,8 @@ async fn table(
         }
     }
 
-    if view == "form" {
+    // TODO: Improve handling of custom views.
+    if view != "" {
         // In this case the request is to view the "insert new row" form:
         if table == "message" {
             return Err((
@@ -278,7 +285,13 @@ async fn table(
                     );
                 }
             }
-            form_html = Some(get_row_as_form(config, &table, &new_row)?);
+            match get_row_as_form(config, &table, &new_row) {
+                Ok(f) => form_html = Some(f),
+                Err(e) => {
+                    tracing::warn!("Rendering error {}", e);
+                    form_html = None
+                }
+            };
         }
 
         // Used to display a drop-down or menu of some kind containing all the available tables:
@@ -303,7 +316,7 @@ async fn table(
             "messages": [],
             "row_form": form_html,
         });
-        let page_html = match get::page_to_html_form(&page) {
+        let page_html = match get::page_to_html(&state.config, &view, &page) {
             Ok(p) => p,
             Err(e) => return Err(e.to_string().into()),
         };
@@ -535,7 +548,13 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            form_html = Some(get_row_as_form(config, table, &validated_row)?);
+            match get_row_as_form(config, table, &validated_row) {
+                Ok(f) => form_html = Some(f),
+                Err(e) => {
+                    tracing::warn!("Rendering error {}", e);
+                    form_html = None
+                }
+            };
         } else if action == "submit" {
             let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
             {
@@ -571,7 +590,7 @@ fn render_row_from_database(
     }
 
     // Handle a request to display a form for editing and validiating the given row:
-    if view == "form" {
+    if view != "" {
         if let None = form_html {
             if table == "message" {
                 return Err((
@@ -590,7 +609,13 @@ fn render_row_from_database(
             let mut rows = select.fetch_rows_as_json(pool, &HashMap::new())?;
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
-            form_html = Some(get_row_as_form(config, table, &metafied_row)?);
+            match get_row_as_form(config, table, &metafied_row) {
+                Ok(f) => form_html = Some(f),
+                Err(e) => {
+                    tracing::warn!("Rendering error {}", e);
+                    form_html = None
+                }
+            };
         }
     }
 
@@ -614,7 +639,7 @@ fn render_row_from_database(
     };
 
     // Fill in the page JSON which contains all of the parameters that we will be passing to our
-    // minijinja template (through page_to_html_form()):
+    // minijinja template (through page_to_html()):
     let page = json!({
         "page": {
             "project_name": "Nanobot",
@@ -626,7 +651,7 @@ fn render_row_from_database(
         "messages": messages,
         "row_form": form_html,
     });
-    let page_html = match get::page_to_html_form(&page) {
+    let page_html = match get::page_to_html(&state.config, &view, &page) {
         Ok(p) => p,
         Err(e) => return Err(e.to_string().into()),
     };

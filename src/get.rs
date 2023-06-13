@@ -8,7 +8,7 @@ use crate::sql::{
     LIMIT_DEFAULT, LIMIT_MAX,
 };
 use enquote::unquote;
-use minijinja::Environment;
+use minijinja::{Environment, Source};
 use ontodev_sqlrest::Select;
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Map, Value};
@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::io::Write;
+use std::path::Path;
 use tabwriter::TabWriter;
 use urlencoding::decode;
 
@@ -176,7 +177,7 @@ pub async fn get_rows(
                     Ok(pretty_json) => Ok(pretty_json),
                     Err(e) => return Err(GetError::new(e.to_string())),
                 },
-                "html" => page_to_html_table(&page),
+                "html" => page_to_html(&config, "table", &page),
                 &_ => Err(GetError::new(format!(
                     "Shape '{}' does not support format '{}'",
                     shape, format
@@ -802,43 +803,40 @@ fn name_to_id(name: String) -> String {
     re.replace_all(&name, "-").to_string()
 }
 
-pub fn page_to_html_table(page: &Value) -> Result<String, GetError> {
-    // TODO: It's inefficient to initiazlize the environment like this every time.
-    // This should only be done once at startup. Same goes for page_to_html_form() below.
+// TODO: Don't rebuild the Minijinja environment on every call!
+pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<String, GetError> {
+    tracing::info!("page_to_html {:?} {}", config.template_path, template);
+    let page_html = include_str!("resources/page.html");
+    let table_html = include_str!("resources/table.html");
+    let form_html = include_str!("resources/form.html");
+
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
     env.add_filter("id", name_to_id);
-    if let Err(e) = env.add_template("page.html", include_str!("resources/page.html")) {
-        return Err(GetError::new(e.to_string()));
-    }
-    if let Err(e) = env.add_template("table.html", include_str!("resources/table.html")) {
-        return Err(GetError::new(e.to_string()));
+
+    if let Some(t) = &config.template_path {
+        tracing::info!("Adding template source {}", t);
+        env.set_source(Source::from_path(t));
+        let path = Path::new(t).join("page.html");
+        if !path.is_file() {
+            env.add_template("page.html", page_html).unwrap();
+        }
+        let path = Path::new(t).join("table.html");
+        if !path.is_file() {
+            env.add_template("table.html", table_html).unwrap();
+        }
+        let path = Path::new(t).join("form.html");
+        if !path.is_file() {
+            env.add_template("form.html", form_html).unwrap();
+        }
+    } else {
+        tracing::info!("Adding default templates");
+        env.add_template("page.html", page_html).unwrap();
+        env.add_template("table.html", table_html).unwrap();
+        env.add_template("form.html", form_html).unwrap();
     }
 
-    let template = match env.get_template("table.html") {
-        Ok(t) => t,
-        Err(e) => return Err(GetError::new(e.to_string())),
-    };
-    match template.render(page) {
-        Ok(p) => Ok(p),
-        Err(e) => return Err(GetError::new(e.to_string())),
-    }
-}
-
-pub fn page_to_html_form(page: &Value) -> Result<String, GetError> {
-    // TODO: It's inefficient to initiazlize the environment like this every time.
-    // This should only be done once at startup. Same goes for page_to_html_table() above.
-    let mut env = Environment::new();
-    env.add_filter("level_to_bootstrap", level_to_bootstrap);
-    env.add_filter("id", name_to_id);
-    if let Err(e) = env.add_template("page.html", include_str!("resources/page.html")) {
-        return Err(GetError::new(e.to_string()));
-    }
-    if let Err(e) = env.add_template("form.html", include_str!("resources/form.html")) {
-        return Err(GetError::new(e.to_string()));
-    }
-
-    let template = match env.get_template("form.html") {
+    let template = match env.get_template(format!("{}.html", template).as_str()) {
         Ok(t) => t,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
