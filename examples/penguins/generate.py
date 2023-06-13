@@ -7,23 +7,23 @@ random.seed(0)
 
 
 columns = [
-    "studyName",
-    "Sample Number",
-    "Species",
-    "Region",
-    "Island",
-    "Stage",
-    "Individual ID",
-    "Clutch Completion",
-    "Date Egg",
-    "Culmen Length (mm)",
-    "Culmen Depth (mm)",
-    "Flipper Length (mm)",
-    "Body Mass (g)",
-    "Sex",
-    "Delta 15 N (o/oo)",
-    "Delta 13 C (o/oo)",
-    "Comments",
+    "study_name",
+    "sample_number",
+    "species",
+    "region",
+    "island",
+    "stage",
+    "individual_id",
+    "clutch_completion",
+    "date_egg",
+    "culmen_length",
+    "culmen_depth",
+    "flipper_length",
+    "body_mass",
+    "sex",
+    "delta_15_n",
+    "delta_13_c",
+    "comments",
 ]
 
 levels = ["error", "warn", "info"]
@@ -60,31 +60,31 @@ def main():
         w.writeheader()
         for i in range(1, count + 1):
             row = {
-                "studyName": "FAKE123",
-                "Sample Number": i,
-                "Species": random.choice(species),
-                "Region": random.choice(regions),
-                "Island": random.choice(islands),
-                "Stage": random.choice(stages),
-                "Individual ID": f"N{math.floor(i / 2) + 1}A{i % 2 + 1}",
-                "Clutch Completion": random.choices(
+                "study_name": "FAKE123",
+                "sample_number": i,
+                "species": random.choice(species),
+                "region": random.choice(regions),
+                "island": random.choice(islands),
+                "stage": random.choice(stages),
+                "individual_id": f"N{math.floor(i / 2) + 1}A{i % 2 + 1}",
+                "clutch_completion": random.choices(
                     clutch_completions,
                     weights=clutch_completion_weights
                 )[0],
-                "Date Egg": randdate(),
-                "Culmen Length (mm)": random.randint(300, 500) / 10,
-                "Culmen Depth (mm)": random.randint(150, 230) / 10,
-                "Flipper Length (mm)": random.randint(160, 230),
-                "Body Mass (g)": random.randint(1000, 5000),
-                "Sex": random.choices(sexes, weights=sex_weights)[0],
-                "Delta 15 N (o/oo)":
+                "date_egg": randdate(),
+                "culmen_length": random.randint(300, 500) / 10,
+                "culmen_depth": random.randint(150, 230) / 10,
+                "flipper_length": random.randint(160, 230),
+                "body_mass": random.randint(1000, 5000),
+                "sex": random.choices(sexes, weights=sex_weights)[0],
+                "delta_15_n":
                 f"{random.randint(700000, 1000000) / 100000:05}",
-                "Delta 13 C (o/oo)":
+                "delta_13_c":
                 f"{random.randint(-2700000, -2300000) / 100000:05}",
-                "Comments": None,
+                "comments": None,
             }
             if i in error_set:
-                row["Sample Number"] = f"{i} foo"
+                row["sample_number"] = f"{i} foo"
             w.writerow(row)
 
     fieldnames = ["table", "row", "column", "level", "rule", "value",

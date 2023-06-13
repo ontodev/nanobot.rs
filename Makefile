@@ -53,3 +53,13 @@ dev-test:
 dev-serve:
 	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
 
+.PHONY: penguins
+penguins: target/release/nanobot examples/penguins/
+	rm -rf build/penguins/
+	mkdir -p build/penguins/
+	cp -r examples/penguins/* build/penguins/
+	mkdir -p build/penguins/src/data/
+	cd build/penguins \
+	&& python3 generate.py \
+	&& ../../$< init \
+	&& ../../$< serve
