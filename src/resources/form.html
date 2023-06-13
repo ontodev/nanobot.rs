@@ -56,7 +56,19 @@
 {% endif %}
 
 <div class="row" style="padding-bottom:5px; padding-top:20px;">
-  {{ row_form|safe }}
+  <form method="post">
+    {% for column, form_row in form_map|items %}
+    {{ form_row|safe }}
+    {% endfor %}
+    <div class="row pt-4">
+      <div class="col-auto">
+        <button class="btn btn-large btn-outline-primary" type="submit" name="action" value="validate">Validate</button>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-large btn-outline-{{ 'success' if validated else 'danger' }}" type="submit" name="action"
+          value="submit">Submit</button>
+      </div>
+  </form>
 </div>
 
 {% endblock %}

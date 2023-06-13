@@ -184,7 +184,7 @@ async fn table(
     };
 
     // Handle a POST request to validate or submit a new row for insertion into the table:
-    let mut form_html = None;
+    let mut form_map = None;
     let columns = get_columns(&table, config)?;
     if request_type == RequestType::POST {
         // Override view, which isn't passed in POST. This value will then be picked up below.
@@ -216,12 +216,12 @@ async fn table(
         };
 
         if action == "validate" {
-            // If this is a validate action, fill in form_html which will then be handled below.
-            match get_row_as_form(config, &table, &validated_row) {
-                Ok(f) => form_html = Some(f),
+            // If this is a validate action, fill in form_map which will then be handled below.
+            match get_row_as_form_map(config, &table, &validated_row) {
+                Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::warn!("Rendering error {}", e);
-                    form_html = None
+                    form_map = None
                 }
             };
         } else if action == "submit" {
@@ -263,7 +263,7 @@ async fn table(
                 .into_response()
                 .into());
         }
-        if let None = form_html {
+        if let None = form_map {
             let mut new_row = SerdeMap::new();
             for column in &columns {
                 if column != "row_number" {
@@ -285,11 +285,11 @@ async fn table(
                     );
                 }
             }
-            match get_row_as_form(config, &table, &new_row) {
-                Ok(f) => form_html = Some(f),
+            match get_row_as_form_map(config, &table, &new_row) {
+                Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::warn!("Rendering error {}", e);
-                    form_html = None
+                    form_map = None
                 }
             };
         }
@@ -314,7 +314,7 @@ async fn table(
             "table_name": table,
             "subtitle": format!(r#"<a href="/{}">Return to table</a>"#, table),
             "messages": [],
-            "row_form": form_html,
+            "form_map": form_map,
         });
         let page_html = match get::page_to_html(&state.config, &view, &page) {
             Ok(p) => p,
@@ -511,7 +511,7 @@ fn render_row_from_database(
 
     // Handle POST request to validate or update the row in the table:
     let mut messages = HashMap::new();
-    let mut form_html = None;
+    let mut form_map = None;
     if request_type == RequestType::POST {
         let mut new_row = SerdeMap::new();
         // Use the list of columns for the table from the db to look up their values in the form:
@@ -548,11 +548,11 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            match get_row_as_form(config, table, &validated_row) {
-                Ok(f) => form_html = Some(f),
+            match get_row_as_form_map(config, table, &validated_row) {
+                Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::warn!("Rendering error {}", e);
-                    form_html = None
+                    form_map = None
                 }
             };
         } else if action == "submit" {
@@ -591,7 +591,7 @@ fn render_row_from_database(
 
     // Handle a request to display a form for editing and validiating the given row:
     if view != "" {
-        if let None = form_html {
+        if let None = form_map {
             if table == "message" {
                 return Err((
                     StatusCode::BAD_REQUEST,
@@ -609,17 +609,17 @@ fn render_row_from_database(
             let mut rows = select.fetch_rows_as_json(pool, &HashMap::new())?;
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
-            match get_row_as_form(config, table, &metafied_row) {
-                Ok(f) => form_html = Some(f),
+            match get_row_as_form_map(config, table, &metafied_row) {
+                Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::warn!("Rendering error {}", e);
-                    form_html = None
+                    form_map = None
                 }
             };
         }
     }
 
-    let form_html = match form_html {
+    let form_map = match form_map {
         Some(f) => f,
         None => {
             let error = "Something went wrong - unable to render form".to_string();
@@ -649,7 +649,7 @@ fn render_row_from_database(
         "table_name": table,
         "subtitle": format!(r#"<a href="/{}/row/{}">Return to row</a>"#, table, row_number),
         "messages": messages,
-        "row_form": form_html,
+        "form_map": form_map,
     });
     let page_html = match get::page_to_html(&state.config, &view, &page) {
         Ok(p) => p,
@@ -1002,12 +1002,12 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
     Ok(metafied_row)
 }
 
-fn get_row_as_form(
+fn get_row_as_form_map(
     config: &ValveConfig,
     table_name: &str,
     row_data: &SerdeMap,
-) -> Result<String, String> {
-    let mut html = vec![json!("form"), json!({"method": "post"})];
+) -> Result<SerdeMap, String> {
+    let mut result = SerdeMap::new();
     let mut row_valid = None;
     let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
@@ -1098,56 +1098,23 @@ fn get_row_as_form(
             &Some(value),
             form_row_id,
         )?;
-        html.push(json!(hiccup_form_row));
+        let html = hiccup::render(&json!(hiccup_form_row))?;
+        result.insert(cell_header.into(), json!(html));
         form_row_id += 1;
     }
 
-    let submit_cls = match row_valid {
-        Some(flag) => {
-            if flag {
-                "success"
-            } else {
-                "danger"
-            }
-        }
-        None => "secondary", // Row has not yet been validated - display gray button.
-    };
+    // let submit_cls = match row_valid {
+    //     Some(flag) => {
+    //         if flag {
+    //             "success"
+    //         } else {
+    //             "danger"
+    //         }
+    //     }
+    //     None => "secondary", // Row has not yet been validated - display gray button.
+    // };
 
-    html.push(json!([
-        "div",
-        {"class": "row", "style": "padding-top: 10px;"},
-        [
-            "div",
-            {"class": "col-auto"},
-            [
-                "button",
-                {
-                    "type": "submit",
-                    "name": "action",
-                    "value": "validate",
-                    "class": "btn btn-large btn-outline-primary",
-                },
-                "Validate",
-            ],
-        ],
-        [
-            "div",
-            {"class": "col-auto"},
-            [
-                "button",
-                {
-                    "type": "submit",
-                    "name": "action",
-                    "value": "submit",
-                    "class": format!("btn btn-large btn-outline-{}", submit_cls),
-                },
-                "Submit",
-            ],
-        ],
-    ]));
-
-    let page_hiccup = hiccup::render(&json!(html))?;
-    Ok(page_hiccup)
+    Ok(result)
 }
 
 fn get_hiccup_form_row(
