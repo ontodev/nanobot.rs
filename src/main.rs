@@ -128,9 +128,15 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
 
     let client = TestClient::new(app);
 
-    let request_method = vars.get("REQUEST_METHOD").unwrap();
-    let path_info = vars.get("PATH_INFO").unwrap();
-    let query_string = vars.get("QUERY_STRING").unwrap();
+    let request_method = vars
+        .get("REQUEST_METHOD")
+        .ok_or("No 'REQUEST_METHOD' in CGI vars".to_string())?;
+    let path_info = vars
+        .get("PATH_INFO")
+        .ok_or("No 'PATH_INFO' in CGI vars".to_string())?;
+    let query_string = vars
+        .get("QUERY_STRING")
+        .ok_or("No 'QUERY_STRING' in CGI vars".to_string())?;
     let mut url = format!("/{}", path_info);
     if !query_string.is_empty() {
         url.push_str(&format!("?{}", query_string));
@@ -138,7 +144,20 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     tracing::info!("In CGI mode, processing URL: {}", url);
 
     match request_method.to_lowercase().as_str() {
-        "post" => todo!(),
+        "post" => {
+            // TODO: Read the form parameters from STDIN and parse them into a vector like this
+            // one below (which contains hard-coded dummy values).
+            let example_form = [
+                ("action", "validate"),
+                ("prefix", "FOOS"),
+                ("base", "my_basses"),
+                ("ontology IRI", "my stuffs"),
+                ("version IRI", "my versions"),
+            ];
+            let res = client.post(&url).form(&example_form).send().await;
+            let html = res.text().await;
+            Ok(html)
+        }
         "get" => {
             let res = client.get(&url).send().await;
             let html = res.text().await;
@@ -163,11 +182,10 @@ fn cgi_vars() -> Option<HashMap<String, String>> {
                 "QUERY_STRING" => vars.insert(var.to_string(), String::new()),
                 _ => {
                     // This should never happen since all possible cases should be handled above:
-                    tracing::error!(
+                    unreachable!(
                         "CGI mode enabled but environment variable: {} is undefined. Exiting.",
                         var
                     );
-                    std::process::exit(1);
                 }
             },
         };
