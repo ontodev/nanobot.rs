@@ -30,8 +30,8 @@ async fn main() {
 
     let matches = command!() // requires `cargo` feature
         .propagate_version(true)
-        .subcommand_required(true)
-        .arg_required_else_help(true)
+        .subcommand_required(false)
+        .arg_required_else_help(false)
         .subcommand(
             Command::new("init").about("Initialises things").arg(
                 arg!(
@@ -101,9 +101,10 @@ async fn main() {
                     Ok(result)
                 }
                 Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
-                _ => unreachable!(
-                    "Exhausted list of subcommands and subcommand_required prevents `None`"
-                ),
+                _ => Err(String::from(
+                    "Unrecognised or missing subcommand, but CGI environment vars are \
+                             undefined",
+                )),
             },
         };
 
@@ -141,13 +142,19 @@ fn cgi_vars() -> Option<HashMap<String, String>> {
     for var in vec!["REQUEST_METHOD", "PATH_INFO", "QUERY_STRING"] {
         match env::var_os(var).and_then(|p| Some(p.into_string())) {
             Some(Ok(s)) => vars.insert(var.to_string(), s),
-            _ => {
-                tracing::error!(
-                    "CGI mode enabled but environment variable: {} is undefined. Exiting.",
-                    var
-                );
-                std::process::exit(1);
-            }
+            _ => match var {
+                "REQUEST_METHOD" => vars.insert(var.to_string(), "GET".to_string()),
+                "PATH_INFO" => vars.insert(var.to_string(), "/table".to_string()),
+                "QUERY_STRING" => vars.insert(var.to_string(), String::new()),
+                _ => {
+                    // This should never happen since all possible cases should be handled above:
+                    tracing::error!(
+                        "CGI mode enabled but environment variable: {} is undefined. Exiting.",
+                        var
+                    );
+                    std::process::exit(1);
+                }
+            },
         };
     }
 
