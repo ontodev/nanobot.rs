@@ -127,10 +127,25 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     let app = build_app(shared_state);
 
     let client = TestClient::new(app);
-    // TODO: Replace this dummy request with a request that is build from `vars`:
-    let res = client.get("/table").send().await;
 
-    Ok(String::from("CGI request handled successfully!"))
+    let request_method = vars.get("REQUEST_METHOD").unwrap();
+    let path_info = vars.get("PATH_INFO").unwrap();
+    let query_string = vars.get("QUERY_STRING").unwrap();
+    let mut url = format!("/{}", path_info);
+    if !query_string.is_empty() {
+        url.push_str(&format!("?{}", query_string));
+    }
+    tracing::info!("In CGI mode, processing URL: {}", url);
+
+    match request_method.to_lowercase().as_str() {
+        "post" => todo!(),
+        "get" => {
+            let res = client.get(&url).send().await;
+            let html = res.text().await;
+            Ok(html)
+        }
+        _ => Err(format!("Unrecognized request method: {}", request_method)),
+    }
 }
 
 fn cgi_vars() -> Option<HashMap<String, String>> {
