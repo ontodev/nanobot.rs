@@ -31,6 +31,12 @@ pub enum LoggingLevel {
     ERROR,
 }
 
+impl Default for LoggingLevel {
+    fn default() -> LoggingLevel {
+        LoggingLevel::WARN
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ValveConfig {
     pub config: SerdeMap,
@@ -39,7 +45,7 @@ pub struct ValveConfig {
     pub structure_conditions: HashMap<String, ParsedStructure>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TomlConfig {
     pub nanobot: NanobotConfig,
     pub logging: Option<LoggingConfig>,
@@ -53,7 +59,16 @@ pub struct NanobotConfig {
     pub port: Option<u16>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+impl Default for NanobotConfig {
+    fn default() -> NanobotConfig {
+        NanobotConfig {
+            config_version: 1,
+            port: Some(3000),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LoggingConfig {
     pub level: Option<LoggingLevel>,
 }
@@ -63,7 +78,15 @@ pub struct DatabaseConfig {
     pub connection: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+impl Default for DatabaseConfig {
+    fn default() -> DatabaseConfig {
+        DatabaseConfig {
+            connection: Some(".nanobot.db".into()),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TemplatesConfig {
     pub path: Option<String>,
 }
@@ -71,7 +94,7 @@ pub struct TemplatesConfig {
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub const DEFAULT_TOML: &str = "[nanobot]
-config_version = 0";
+config_version = 1";
 
 impl Config {
     pub async fn new() -> Result<Config, String> {
@@ -86,45 +109,29 @@ impl Config {
 
         let config = Config {
             config_version: user.nanobot.config_version,
-            port: {
-                match user.nanobot.port {
-                    Some(x) => x,
-                    None => 3000,
-                }
-            },
-            logging_level: {
-                match user.logging {
-                    Some(x) => match x.level {
-                        Some(y) => y,
-                        None => LoggingLevel::WARN,
-                    },
-                    None => LoggingLevel::WARN,
-                }
-            },
-            connection: {
-                match user.database {
-                    Some(x) => match x.connection {
-                        Some(y) => y,
-                        None => ".nanobot.db".into(),
-                    },
-                    None => ".nanobot.db".into(),
-                }
-            },
+            port: user.nanobot.port.unwrap_or(3000),
+            logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
+            connection: user
+                .database
+                .unwrap_or_default()
+                .connection
+                .unwrap_or(".nanobot,db".into()),
             pool: None,
             valve: None,
             template_path: {
-                match user.templates {
-                    Some(x) => match x.path {
-                        Some(p) => {
-                            if Path::new(&p).is_dir() {
-                                Some(p)
-                            } else {
-                                eprintln!("WARNING: Configuration specifies a template directory '{}' but it does not exist. Using default templates.", p);
-                                None
-                            }
+                match user.templates.unwrap_or_default().path {
+                    Some(p) => {
+                        if Path::new(&p).is_dir() {
+                            Some(p)
+                        } else {
+                            eprintln!(
+                                "WARNING: Configuration specifies a template directory \
+                                '{}' but it does not exist. Using default templates.",
+                                p
+                            );
+                            None
                         }
-                        None => None,
-                    },
+                    }
                     None => None,
                 }
             },
