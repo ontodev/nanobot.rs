@@ -58,7 +58,7 @@ pub async fn app(config: &Config) -> Result<String, String> {
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
     tracing::info!("listening on {}", addr);
     if let Err(e) = axum::Server::bind(&addr)
         .serve(app.into_make_service())
