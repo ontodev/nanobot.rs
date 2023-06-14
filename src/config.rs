@@ -9,16 +9,18 @@ use sqlx::{
     any::{AnyConnectOptions, AnyKind, AnyPool, AnyPoolOptions},
     query as sqlx_query,
 };
-use std::{collections::HashMap, fmt, fs, str::FromStr};
+use std::{collections::HashMap, fmt, fs, path::Path, str::FromStr};
 use toml;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub config_version: i32,
+    pub config_version: u16,
+    pub port: u16,
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
     pub valve: Option<ValveConfig>,
+    pub template_path: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -40,13 +42,15 @@ pub struct ValveConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TomlConfig {
     pub nanobot: NanobotConfig,
-    pub logging: LoggingConfig,
-    pub database: DatabaseConfig,
+    pub logging: Option<LoggingConfig>,
+    pub database: Option<DatabaseConfig>,
+    pub templates: Option<TemplatesConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NanobotConfig {
-    pub config_version: i32,
+    pub config_version: u16,
+    pub port: Option<u16>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -59,19 +63,21 @@ pub struct DatabaseConfig {
     pub connection: Option<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TemplatesConfig {
+    pub path: Option<String>,
+}
+
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
+
+pub const DEFAULT_TOML: &str = "[nanobot]
+config_version = 0";
 
 impl Config {
     pub async fn new() -> Result<Config, String> {
-        let default_config_file = include_str!("resources/default_config.toml");
-        let default: TomlConfig = match toml::from_str(default_config_file) {
-            Ok(d) => d,
-            Err(e) => return Err(e.to_string()),
-        };
-
         let user_config_file = match fs::read_to_string("nanobot.toml") {
             Ok(x) => x,
-            Err(_) => default_config_file.into(),
+            Err(_) => DEFAULT_TOML.into(),
         };
         let user: TomlConfig = match toml::from_str(user_config_file.as_str()) {
             Ok(d) => d,
@@ -80,20 +86,48 @@ impl Config {
 
         let config = Config {
             config_version: user.nanobot.config_version,
-            logging_level: {
-                match user.logging.level {
+            port: {
+                match user.nanobot.port {
                     Some(x) => x,
-                    None => default.logging.level.unwrap(),
+                    None => 3000,
+                }
+            },
+            logging_level: {
+                match user.logging {
+                    Some(x) => match x.level {
+                        Some(y) => y,
+                        None => LoggingLevel::WARN,
+                    },
+                    None => LoggingLevel::WARN,
                 }
             },
             connection: {
-                match user.database.connection {
-                    Some(x) => x,
-                    None => default.database.connection.as_ref().unwrap().to_string(),
+                match user.database {
+                    Some(x) => match x.connection {
+                        Some(y) => y,
+                        None => ".nanobot.db".into(),
+                    },
+                    None => ".nanobot.db".into(),
                 }
             },
             pool: None,
             valve: None,
+            template_path: {
+                match user.templates {
+                    Some(x) => match x.path {
+                        Some(p) => {
+                            if Path::new(&p).is_dir() {
+                                Some(p)
+                            } else {
+                                eprintln!("WARNING: Configuration specifies a template directory '{}' but it does not exist. Using default templates.", p);
+                                None
+                            }
+                        }
+                        None => None,
+                    },
+                    None => None,
+                }
+            },
         };
 
         Ok(config)
@@ -191,12 +225,16 @@ pub fn to_toml(config: &Config) -> TomlConfig {
     TomlConfig {
         nanobot: NanobotConfig {
             config_version: config.config_version.clone(),
+            port: Some(config.port.clone()),
         },
-        logging: LoggingConfig {
+        logging: Some(LoggingConfig {
             level: Some(config.logging_level.clone()),
-        },
-        database: DatabaseConfig {
+        }),
+        database: Some(DatabaseConfig {
             connection: Some(config.connection.clone()),
-        },
+        }),
+        templates: Some(TemplatesConfig {
+            path: config.template_path.clone(),
+        }),
     }
 }

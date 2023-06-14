@@ -54,7 +54,7 @@
     {# message_rows #}
     {% if table.counts.message_row == 1 %}
     1
-    <a href="{{ table.href }}?message=any">row</a>
+    <a href="{{ table.href }}?message=not_is.null">row</a>
     has
     {% elif table.counts.message_row > 1 %}
     {{ table.counts.message_row }}

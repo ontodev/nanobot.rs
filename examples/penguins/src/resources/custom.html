@@ -1,6 +1,8 @@
 {% extends "page.html" %}
 {% block content %}
 
+<h2>Custom Page: Field Order Reversed</h2>
+
 {% if messages %}
 {% if "success" in messages %}
 {% for msg in messages["success"] %}
@@ -57,7 +59,7 @@
 
 <div class="row" style="padding-bottom:5px; padding-top:20px;">
   <form method="post">
-    {% for column, form_row in form_map|items %}
+    {% for column, form_row in form_map|items|reverse %}
     {{ form_row|safe }}
     {% endfor %}
     <div class="row pt-4">
@@ -70,5 +72,6 @@
       </div>
   </form>
 </div>
+
 
 {% endblock %}
