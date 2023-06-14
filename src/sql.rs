@@ -5,7 +5,7 @@ use sqlx::any::{AnyKind, AnyPool};
 use sqlx::Row;
 use std::collections::HashMap;
 
-pub const LIMIT_MAX: usize = 100;
+pub const LIMIT_MAX: usize = 10000;
 pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
 
 pub async fn get_table_from_pool(

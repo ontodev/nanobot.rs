@@ -615,8 +615,8 @@ async fn get_page(
     let mut formats = Map::new();
 
     let mut select_format = Select::clone(select);
-    select_format.table(format!("\"{}.json\"", unquoted_table));
 
+    select_format.table(format!("\"{}.tsv\"", unquoted_table));
     let href = match select_format.to_url() {
         Ok(url) => url,
         Err(e) => return Err(GetError::new(e.to_string())),
@@ -625,7 +625,52 @@ async fn get_page(
         Ok(href) => href,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
-    formats.insert("JSON".to_string(), json!(href));
+    formats.insert("TSV".to_string(), json!(href));
+
+    select_format.table(format!("\"{}.json\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => {
+            if href.contains("?") {
+                format!("{}&shape=value_rows", href)
+            } else {
+                format!("{}?shape=value_rows", href)
+            }
+        }
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("JSON (raw)".to_string(), json!(href));
+
+    select_format.table(format!("\"{}.pretty.json\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => {
+            if href.contains("?") {
+                format!("{}&shape=value_rows", href)
+            } else {
+                format!("{}?shape=value_rows", href)
+            }
+        }
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("JSON (raw, pretty)".to_string(), json!(href));
+
+    select_format.table(format!("\"{}.json\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("JSON (page)".to_string(), json!(href));
 
     select_format.table(format!("\"{}.pretty.json\"", unquoted_table));
     let href = match select_format.to_url() {
@@ -636,8 +681,8 @@ async fn get_page(
         Ok(href) => href,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
+    formats.insert("JSON (page, pretty)".to_string(), json!(href));
 
-    formats.insert("JSON (Pretty)".to_string(), json!(href));
     this_table.insert("formats".to_string(), json!(formats));
 
     // Pagination

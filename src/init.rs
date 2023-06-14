@@ -185,13 +185,20 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // load tables into database
-    let path = "src/schema/table.tsv";
-    match valve(path, &database, &ValveCommand::Load, false, "table").await {
-        Err(_x) => return Err(format!("Could not load from '{}'", path)),
+    match valve(
+        &config.valve_path,
+        &database,
+        &ValveCommand::Load,
+        false,
+        "table",
+    )
+    .await
+    {
+        Err(_x) => return Err(format!("Could not load from '{}'", &config.valve_path)),
         Ok(_x) => {}
     }
 
-    tracing::info!("Loaded '{}' using '{}'", database, path);
+    tracing::info!("Loaded '{}' using '{}'", database, &config.valve_path);
 
     Ok(String::from("Initialized a Nanobot project"))
 }
