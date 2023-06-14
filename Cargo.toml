@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async-std = { version = "1", features = [ "attributes" ] }
 axum = "0.6.1"
+axum-test-helper = "0.3.0"
 clap = { version = "4.0.27", features = ["cargo", "derive"] }
 enquote = "1.1.0"
 futures = "0.3"

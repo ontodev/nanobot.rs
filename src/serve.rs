@@ -30,7 +30,7 @@ enum RequestType {
 }
 
 #[derive(Debug)]
-struct AppState {
+pub struct AppState {
     pub config: Config,
 }
 
@@ -41,6 +41,16 @@ pub type RequestParams = HashMap<String, String>;
 // overriden by specifying the preserve-order feature in Cargo.toml, which we have indeed specified.
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
+pub fn build_app(shared_state: Arc<AppState>) -> Router {
+    // build our application with a route
+    Router::new()
+        // `GET /` goes to `root`
+        .route("/", get(root))
+        .route("/:table", get(get_table).post(post_table))
+        .route("/:table/row/:row_number", get(get_row).post(post_row))
+        .with_state(shared_state)
+}
+
 #[tokio::main]
 pub async fn app(config: &Config) -> Result<String, String> {
     let shared_state = Arc::new(AppState {
@@ -48,13 +58,7 @@ pub async fn app(config: &Config) -> Result<String, String> {
         config: config.clone(),
     });
 
-    // build our application with a route
-    let app = Router::new()
-        // `GET /` goes to `root`
-        .route("/", get(root))
-        .route("/:table", get(get_table).post(post_table))
-        .route("/:table/row/:row_number", get(get_row).post(post_row))
-        .with_state(shared_state);
+    let app = build_app(shared_state);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -71,12 +75,12 @@ pub async fn app(config: &Config) -> Result<String, String> {
     Ok(hello)
 }
 
-async fn root() -> impl IntoResponse {
+pub async fn root() -> impl IntoResponse {
     tracing::info!("request root");
     Redirect::permanent("/table")
 }
 
-async fn post_table(
+pub async fn post_table(
     Path(path): Path<String>,
     state: State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
@@ -98,7 +102,7 @@ async fn post_table(
     .await
 }
 
-async fn get_table(
+pub async fn get_table(
     Path(path): Path<String>,
     State(state): State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
@@ -343,7 +347,7 @@ async fn table(
     }
 }
 
-async fn post_row(
+pub async fn post_row(
     Path((table, row_number)): Path<(String, String)>,
     State(state): State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
@@ -365,7 +369,7 @@ async fn post_row(
     )
 }
 
-async fn get_row(
+pub async fn get_row(
     Path((table, row_number)): Path<(String, String)>,
     State(state): State<Arc<AppState>>,
     Query(params): Query<RequestParams>,
