@@ -145,16 +145,20 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
 
     match request_method.to_lowercase().as_str() {
         "post" => {
-            // TODO: Read the form parameters from STDIN and parse them into a vector like this
-            // one below (which contains hard-coded dummy values).
-            let example_form = [
-                ("action", "validate"),
-                ("prefix", "FOOS"),
-                ("base", "my_basses"),
-                ("ontology IRI", "my stuffs"),
-                ("version IRI", "my versions"),
-            ];
-            let res = client.post(&url).form(&example_form).send().await;
+            // TODO: This is still a little bit hacky. Maybe use a library function provided
+            // by Axum (if one exists) instead of url::Url as we do below. It would also be good
+            // if we didn't have to prepend "http://example.com".
+            // Also: There may be a better way to read from STDIN using the clap library (which
+            // we are already using) instead of what we are doing below.
+            let mut query_str = String::new();
+            std::io::stdin().read_line(&mut query_str);
+            let query_str = format!("http://example.com?{}", query_str);
+            let example_url = url::Url::try_from(query_str.as_str()).unwrap();
+            let mut form = vec![];
+            for (key, val) in example_url.query_pairs() {
+                form.push((key.to_string(), val.to_string()));
+            }
+            let res = client.post(&url).form(&form).send().await;
             let html = res.text().await;
             Ok(html)
         }
