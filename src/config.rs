@@ -119,7 +119,11 @@ impl Config {
                             if Path::new(&p).is_dir() {
                                 Some(p)
                             } else {
-                                eprintln!("WARNING: Configuration specifies a template directory '{}' but it does not exist. Using default templates.", p);
+                                eprintln!(
+                                    "WARNING: Configuration specifies a template directory \
+                                           '{}' but it does not exist. Using default templates.",
+                                    p
+                                );
                                 None
                             }
                         }

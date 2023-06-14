@@ -75,12 +75,12 @@ pub async fn app(config: &Config) -> Result<String, String> {
     Ok(hello)
 }
 
-pub async fn root() -> impl IntoResponse {
+async fn root() -> impl IntoResponse {
     tracing::info!("request root");
     Redirect::permanent("/table")
 }
 
-pub async fn post_table(
+async fn post_table(
     Path(path): Path<String>,
     state: State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
@@ -102,7 +102,7 @@ pub async fn post_table(
     .await
 }
 
-pub async fn get_table(
+async fn get_table(
     Path(path): Path<String>,
     State(state): State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
@@ -360,7 +360,7 @@ async fn table(
     }
 }
 
-pub async fn post_row(
+async fn post_row(
     Path((table, row_number)): Path<(String, String)>,
     State(state): State<Arc<AppState>>,
     Query(query_params): Query<RequestParams>,
@@ -382,7 +382,7 @@ pub async fn post_row(
     )
 }
 
-pub async fn get_row(
+async fn get_row(
     Path((table, row_number)): Path<(String, String)>,
     State(state): State<Arc<AppState>>,
     Query(params): Query<RequestParams>,
