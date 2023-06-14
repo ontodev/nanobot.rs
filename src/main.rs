@@ -150,10 +150,11 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
             // if we didn't have to prepend "http://example.com".
             // Also: There may be a better way to read from STDIN using the clap library (which
             // we are already using) instead of what we are doing below.
-            let mut query_str = String::new();
-            std::io::stdin()
-                .read_line(&mut query_str)
-                .map_err(|e| e.to_string())?;
+            let query_str = std::io::stdin()
+                .lines()
+                .map(|l| l.unwrap())
+                .collect::<Vec<_>>()
+                .join("\n");
             let query_str = format!("http://example.com?{}", query_str);
             let example_url = url::Url::try_from(query_str.as_str()).unwrap();
             let mut form = vec![];
@@ -161,12 +162,18 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
                 form.push((key.to_string(), val.to_string()));
             }
             let res = client.post(&url).form(&form).send().await;
-            let html = format!("Content-Type: text/html\nStatus: 200\n\n{}", res.text().await);
+            let html = format!(
+                "Content-Type: text/html\nStatus: 200\n\n{}",
+                res.text().await
+            );
             Ok(html)
         }
         "get" => {
             let res = client.get(&url).send().await;
-            let html = format!("Content-Type: text/html\nStatus: 200\n\n{}", res.text().await);
+            let html = format!(
+                "Content-Type: text/html\nStatus: 200\n\n{}",
+                res.text().await
+            );
             Ok(html)
         }
         _ => Err(format!(
