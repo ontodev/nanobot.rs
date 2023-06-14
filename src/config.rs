@@ -19,6 +19,7 @@ pub struct Config {
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
+    pub valve_path: String,
     pub valve: Option<ValveConfig>,
     pub template_path: Option<String>,
 }
@@ -50,6 +51,7 @@ pub struct TomlConfig {
     pub nanobot: NanobotConfig,
     pub logging: Option<LoggingConfig>,
     pub database: Option<DatabaseConfig>,
+    pub valve: Option<ValveTomlConfig>,
     pub templates: Option<TemplatesConfig>,
 }
 
@@ -86,6 +88,19 @@ impl Default for DatabaseConfig {
     }
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ValveTomlConfig {
+    pub path: Option<String>,
+}
+
+impl Default for ValveTomlConfig {
+    fn default() -> ValveTomlConfig {
+        ValveTomlConfig {
+            path: Some("src/schema/table.tsv".into()),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TemplatesConfig {
     pub path: Option<String>,
@@ -117,6 +132,11 @@ impl Config {
                 .connection
                 .unwrap_or(".nanobot,db".into()),
             pool: None,
+            valve_path: user
+                .valve
+                .unwrap_or_default()
+                .path
+                .unwrap_or("src/schema/table.tsv".into()),
             valve: None,
             template_path: {
                 match user.templates.unwrap_or_default().path {
@@ -184,9 +204,8 @@ impl Config {
 
     pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
         // TODO: Make the path configurable:
-        let path = "src/schema/table.tsv";
         match valve(
-            path,
+            &self.valve_path,
             &self.connection,
             &ValveCommand::Config,
             false,
@@ -196,7 +215,7 @@ impl Config {
         {
             Err(e) => {
                 tracing::warn!("VALVE: {:?}", e);
-                return Err(format!("Could not load from '{}'", path));
+                return Err(format!("Could not load from '{}'", &self.valve_path));
             }
             Ok(v) => {
                 let v: SerdeMap = serde_json::from_str(&v).unwrap();
@@ -239,6 +258,9 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         }),
         database: Some(DatabaseConfig {
             connection: Some(config.connection.clone()),
+        }),
+        valve: Some(ValveTomlConfig {
+            path: Some(config.valve_path.clone()),
         }),
         templates: Some(TemplatesConfig {
             path: config.template_path.clone(),
