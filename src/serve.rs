@@ -121,16 +121,34 @@ async fn table(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let (table, format);
+    let (table, format, shape);
+    let mut sqlrest_params = query_params.clone();
+    sqlrest_params.remove("shape".into());
+    sqlrest_params.remove("view".into());
+    sqlrest_params.remove("format".into());
+
     if path.ends_with(".pretty.json") {
         table = path.replace(".pretty.json", "");
         format = "pretty.json";
+        shape = match query_params.get("shape") {
+            Some(s) => s.as_str(),
+            None => "page",
+        };
     } else if path.ends_with(".json") {
         table = path.replace(".json", "");
         format = "json";
+        shape = match query_params.get("shape") {
+            Some(s) => s.as_str(),
+            None => "page",
+        };
+    } else if path.ends_with(".tsv") {
+        table = path.replace(".tsv", "");
+        format = "text";
+        shape = "value_rows";
     } else {
         table = path.clone();
         format = "html";
+        shape = "page";
     }
     let config = match state.config.valve.as_ref() {
         Some(c) => c,
@@ -325,9 +343,8 @@ async fn table(
         // In this case the request is to view the database contents represented by the request URL,
         // row by row.
         let url = {
-            let url = query_params
+            let url = sqlrest_params
                 .iter()
-                .filter(|(k, _)| **k != "view".to_string())
                 .map(|(k, v)| format!("{}={}", k, v))
                 .collect::<Vec<_>>();
             if !url.is_empty() {
@@ -339,8 +356,9 @@ async fn table(
         tracing::info!("URL: {}", url);
         let select = parse(&url)?;
         tracing::info!("select {:?}", select);
-        match get::get_rows(&state.config, &select, "page", &format).await {
+        match get::get_rows(&state.config, &select, &shape, &format).await {
             Ok(x) => match format {
+                "text" => Ok(([("content-type", "text/plain")], x).into_response()),
                 "html" => Ok(Html(x).into_response()),
                 "json" => {
                     Ok(([("content-type", "application/json; charset=utf-8")], x).into_response())
