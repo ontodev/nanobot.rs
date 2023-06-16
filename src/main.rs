@@ -143,6 +143,22 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     }
     tracing::info!("In CGI mode, processing URL: {}", url);
 
+    fn generate_html(headers: &Vec<(String, String)>, html_body: &String) -> String {
+        let mut html = String::from("");
+        for (hname, hval) in headers {
+            // TODO: This is a temporary dev hack. Remove it later after fixing droid
+            // so that it recognises this case-insensitively:
+            let hname = if hname.as_str() == "content-type" {
+                "Content-Type".to_string()
+            } else {
+                hname.to_string()
+            };
+            html.push_str(&format!("{}: {}\n", hname, hval));
+        }
+        html.push_str(&format!("\n{}", html_body));
+        html
+    }
+
     match request_method.to_lowercase().as_str() {
         "post" => {
             // TODO: This is still a little bit hacky. Maybe use a library function provided
@@ -163,44 +179,24 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
             }
             let res = client.post(&url).form(&form).send().await;
             let html = {
-                let mut html = String::from("");
-                for (hname, hval) in res.headers() {
-                    // TODO: This is a temporary dev hack. Remove it later after fixing droid
-                    // so that it recognises this case-insensitively:
-                    let hname = if hname.as_str() == "content-type" {
-                        "Content-Type".to_string()
-                    } else {
-                        hname.to_string()
-                    };
-                    html.push_str(&format!("{}: {}\n", hname, hval.to_str().unwrap()));
-                }
-                html.push_str(&format!(
-                    "\n{}",
-                    res.text().await
-                ));
-                html
+                let headers = res
+                    .headers()
+                    .iter()
+                    .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
+                    .collect::<Vec<_>>();
+                generate_html(&headers, &res.text().await)
             };
             Ok(html)
         }
         "get" => {
             let res = client.get(&url).send().await;
             let html = {
-                let mut html = String::from("");
-                for (hname, hval) in res.headers() {
-                    // TODO: This is a temporary dev hack. Remove it later after fixing droid
-                    // so that it recognises this case-insensitively:
-                    let hname = if hname.as_str() == "content-type" {
-                        "Content-Type".to_string()
-                    } else {
-                        hname.to_string()
-                    };
-                    html.push_str(&format!("{}: {}\n", hname, hval.to_str().unwrap()));
-                }
-                html.push_str(&format!(
-                    "\n{}",
-                    res.text().await
-                ));
-                html
+                let headers = res
+                    .headers()
+                    .iter()
+                    .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
+                    .collect::<Vec<_>>();
+                generate_html(&headers, &res.text().await)
             };
             Ok(html)
         }
