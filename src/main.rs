@@ -137,7 +137,7 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     let query_string = vars
         .get("QUERY_STRING")
         .ok_or("No 'QUERY_STRING' in CGI vars".to_string())?;
-    let mut url = format!("/{}", path_info);
+    let mut url = format!("{}", path_info);
     if !query_string.is_empty() {
         url.push_str(&format!("?{}", query_string));
     }
@@ -162,18 +162,46 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
                 form.push((key.to_string(), val.to_string()));
             }
             let res = client.post(&url).form(&form).send().await;
-            let html = format!(
-                "Content-Type: text/html\nStatus: 200\n\n{}",
-                res.text().await
-            );
+            let html = {
+                let mut html = String::from("");
+                for (hname, hval) in res.headers() {
+                    // TODO: This is a temporary dev hack. Remove it later after fixing droid
+                    // so that it recognises this case-insensitively:
+                    let hname = if hname.as_str() == "content-type" {
+                        "Content-Type".to_string()
+                    } else {
+                        hname.to_string()
+                    };
+                    html.push_str(&format!("{}: {}\n", hname, hval.to_str().unwrap()));
+                }
+                html.push_str(&format!(
+                    "\n{}",
+                    res.text().await
+                ));
+                html
+            };
             Ok(html)
         }
         "get" => {
             let res = client.get(&url).send().await;
-            let html = format!(
-                "Content-Type: text/html\nStatus: 200\n\n{}",
-                res.text().await
-            );
+            let html = {
+                let mut html = String::from("");
+                for (hname, hval) in res.headers() {
+                    // TODO: This is a temporary dev hack. Remove it later after fixing droid
+                    // so that it recognises this case-insensitively:
+                    let hname = if hname.as_str() == "content-type" {
+                        "Content-Type".to_string()
+                    } else {
+                        hname.to_string()
+                    };
+                    html.push_str(&format!("{}: {}\n", hname, hval.to_str().unwrap()));
+                }
+                html.push_str(&format!(
+                    "\n{}",
+                    res.text().await
+                ));
+                html
+            };
             Ok(html)
         }
         _ => Err(format!(
