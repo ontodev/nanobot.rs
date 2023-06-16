@@ -168,24 +168,15 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &Config) -> Result<S
                 form.push((key.to_string(), val.to_string()));
             }
             let res = client.post(&url).form(&form).send().await;
-            let html = format!(
-                "Content-Type: text/html\nStatus: 200\n\n{}",
-                res.text().await
-            );
+            let html = res.text().await;
             Ok(html)
         }
         "get" => {
             let res = client.get(&url).send().await;
-            let html = format!(
-                "Content-Type: text/html\nStatus: 200\n\n{}",
-                res.text().await
-            );
+            let html = res.text().await;
             Ok(html)
         }
-        _ => Err(format!(
-            "Content-Type: text/html\nStatus: 400\nUnrecognized request method: {}",
-            request_method
-        )),
+        _ => Err(format!("Unrecognized request method: {}", request_method)),
     }
 }
 
