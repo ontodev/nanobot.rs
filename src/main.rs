@@ -1,8 +1,6 @@
 use crate::{config::Config, serve::build_app};
 use axum_test_helper::TestClient;
-use cgi;
 use clap::{arg, command, value_parser, Command};
-use futures::executor::block_on;
 use std::sync::Arc;
 use std::{collections::HashMap, env};
 
@@ -68,13 +66,7 @@ async fn main() {
 
     let exit_result =
         match cgi_vars() {
-            Some(vars) => {
-                block_on(config.init()).unwrap();
-                return cgi::handle(|_request: cgi::Request| -> cgi::Response {
-                    let html = block_on(handle_cgi(&vars, &config)).unwrap();
-                    cgi::html_response(200, html)
-                });
-            }
+            Some(vars) => handle_cgi(&vars, &mut config),
             None => match matches.subcommand() {
                 Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
                     Some(x) => {
@@ -111,7 +103,7 @@ async fn main() {
                 Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
                 _ => Err(String::from(
                     "Unrecognised or missing subcommand, but CGI environment vars are \
-                     undefined",
+                             undefined",
                 )),
             },
         };
@@ -127,11 +119,13 @@ async fn main() {
     }
 }
 
-async fn handle_cgi(vars: &HashMap<String, String>, config: &Config) -> Result<String, String> {
+#[tokio::main]
+async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Result<String, String> {
     let shared_state = Arc::new(serve::AppState {
-        config: config.clone(),
+        config: config.init().await.unwrap().clone(),
     });
     let app = build_app(shared_state);
+
     let client = TestClient::new(app);
 
     let request_method = vars
@@ -143,7 +137,7 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &Config) -> Result<S
     let query_string = vars
         .get("QUERY_STRING")
         .ok_or("No 'QUERY_STRING' in CGI vars".to_string())?;
-    let mut url = path_info.to_string();
+    let mut url = format!("/{}", path_info);
     if !query_string.is_empty() {
         url.push_str(&format!("?{}", query_string));
     }
