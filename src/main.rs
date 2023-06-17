@@ -3,6 +3,7 @@ use axum_test_helper::TestClient;
 use clap::{arg, command, value_parser, Command};
 use std::sync::Arc;
 use std::{collections::HashMap, env};
+use url::Url;
 
 pub mod config;
 pub mod get;
@@ -125,7 +126,6 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
         config: config.init().await.unwrap().clone(),
     });
     let app = build_app(shared_state);
-
     let client = TestClient::new(app);
 
     let request_method = vars
@@ -148,10 +148,10 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
         for (hname, hval) in headers {
             // TODO: This is a temporary dev hack. Remove it later after fixing droid
             // so that it recognises this case-insensitively:
-            let hname = if hname.as_str() == "content-type" {
-                "Content-Type".to_string()
+            let hname = if hname.as_str().to_lowercase() == "content-type" {
+                "Content-Type"
             } else {
-                hname.to_string()
+                hname
             };
             html.push_str(&format!("{}: {}\n", hname, hval));
         }
@@ -161,18 +161,15 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
 
     match request_method.to_lowercase().as_str() {
         "post" => {
-            // TODO: This is still a little bit hacky. Maybe use a library function provided
-            // by Axum (if one exists) instead of url::Url as we do below. It would also be good
-            // if we didn't have to prepend "http://example.com".
-            // Also: There may be a better way to read from STDIN using the clap library (which
-            // we are already using) instead of what we are doing below.
             let query_str = std::io::stdin()
                 .lines()
                 .map(|l| l.unwrap())
                 .collect::<Vec<_>>()
                 .join("\n");
             let query_str = format!("http://example.com?{}", query_str);
-            let example_url = url::Url::try_from(query_str.as_str()).unwrap();
+            // TODO: Check to see if this is provided by Axum so that we can remove the extra
+            // library dependency (on Url).
+            let example_url = Url::try_from(query_str.as_str()).map_err(|e| e.to_string())?;
             let mut form = vec![];
             for (key, val) in example_url.query_pairs() {
                 form.push((key.to_string(), val.to_string()));
