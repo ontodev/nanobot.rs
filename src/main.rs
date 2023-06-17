@@ -122,6 +122,8 @@ async fn main() {
 
 #[tokio::main]
 async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Result<String, String> {
+    tracing::debug!("Processing CGI request with vars: {:?}", vars);
+
     let shared_state = Arc::new(serve::AppState {
         config: config.init().await.unwrap().clone(),
     });
@@ -174,6 +176,7 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
             for (key, val) in example_url.query_pairs() {
                 form.push((key.to_string(), val.to_string()));
             }
+            tracing::debug!("In CGI mode, processing form for POST: {:?}", form);
             let res = client.post(&url).form(&form).send().await;
             let html = {
                 let headers = res
