@@ -26,6 +26,7 @@ async fn main() {
     // initialize tracing
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(level)
+        .with_writer(io::stderr)
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
