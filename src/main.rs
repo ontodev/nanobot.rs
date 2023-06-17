@@ -2,7 +2,7 @@ use crate::{config::Config, serve::build_app};
 use axum_test_helper::TestClient;
 use clap::{arg, command, value_parser, Command};
 use std::sync::Arc;
-use std::{collections::HashMap, env};
+use std::{collections::HashMap, env, io};
 use url::Url;
 
 pub mod config;
