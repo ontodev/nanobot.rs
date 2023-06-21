@@ -140,7 +140,10 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     let query_string = vars
         .get("QUERY_STRING")
         .ok_or("No 'QUERY_STRING' in CGI vars".to_string())?;
-    let mut url = format!("{}", path_info);
+    let mut url = path_info.clone();
+    if !url.starts_with("/") {
+        url = format!("/{}", path_info);
+    }
     if !query_string.is_empty() {
         url.push_str(&format!("?{}", query_string));
     }
