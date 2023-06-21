@@ -1,5 +1,5 @@
 use crate::{config::Config, serve::build_app};
-use axum_test_helper::TestClient;
+use axum_test_helper::{TestClient, TestResponse};
 use clap::{arg, command, value_parser, Command};
 use std::sync::Arc;
 use std::{collections::HashMap, env, io};
@@ -149,18 +149,16 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     }
     tracing::info!("In CGI mode, processing URL: {}", url);
 
-    fn generate_html(headers: &Vec<(String, String)>, html_body: &String) -> String {
-        let mut html = String::from("");
-        for (hname, hval) in headers {
-            // TODO: This is a temporary dev hack. Remove it later after fixing droid
-            // so that it recognises this case-insensitively:
-            let hname = if hname.as_str().to_lowercase() == "content-type" {
-                "Content-Type"
-            } else {
-                hname
-            };
-            html.push_str(&format!("{}: {}\n", hname, hval));
+    async fn generate_html(res: TestResponse) -> String {
+        let mut html = format!("status: {}\n", res.status());
+        for (hname, hval) in res.headers().iter() {
+            html.push_str(&format!(
+                "{}: {}\n",
+                hname,
+                hval.to_str().unwrap_or_default()
+            ));
         }
+        let html_body = &res.text().await;
         html.push_str(&format!("\n{}", html_body));
         html
     }
@@ -182,27 +180,11 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
             }
             tracing::debug!("In CGI mode, processing form for POST: {:?}", form);
             let res = client.post(&url).form(&form).send().await;
-            let html = {
-                let headers = res
-                    .headers()
-                    .iter()
-                    .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
-                    .collect::<Vec<_>>();
-                generate_html(&headers, &res.text().await)
-            };
-            Ok(html)
+            Ok(generate_html(res).await)
         }
         "get" => {
             let res = client.get(&url).send().await;
-            let html = {
-                let headers = res
-                    .headers()
-                    .iter()
-                    .map(|(k, v)| (k.as_str().to_string(), v.to_str().unwrap().to_string()))
-                    .collect::<Vec<_>>();
-                generate_html(&headers, &res.text().await)
-            };
-            Ok(html)
+            Ok(generate_html(res).await)
         }
         _ => Err(format!(
             "Content-Type: text/html\nStatus: 400\nUnrecognized request method: {}",
