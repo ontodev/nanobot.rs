@@ -87,7 +87,7 @@
     {% endif %}
     {% if table.counts.update %}
     <strong>{{ table.counts.update}}</strong>
-    <i class="bi bi-check-square-fill text-success"></i>
+    <i class="bi bi-clock-history text-secondary"></i>
     {% endif %}
     {% endif %}
   </div>
@@ -187,7 +187,7 @@
           {% elif cell.message_level == "info" %}
           <i class="bi bi-info-circle-fill text-info"></i>
           {% elif cell.message_level == "update" %}
-          <i class="bi bi-check-square-fill text-success"></i>
+          <i class="bi bi-clock-history text-secondary"></i>
           {% else %}
           <i class="bi bi-question-circle-fill"></i>
           {% endif %}
@@ -203,7 +203,7 @@
               {% elif message.level == "info" %}
               <i class="bi bi-info-circle-fill text-info"></i>
               {% elif message.level == "update" %}
-              <i class="bi bi-check-square-fill text-success"></i>
+              <i class="bi bi-clock-history text-secondary"></i>
               {% else %}
               <i class="bi bi-question-circle-fill"></i>
               {% endif %}

@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 async-std = { version = "1", features = [ "attributes" ] }
 axum = "0.6.1"
+axum-test-helper = { version = "0.3.0", default-features = false, features = ["withouttrace"] }
 clap = { version = "4.0.27", features = ["cargo", "derive"] }
 enquote = "1.1.0"
 futures = "0.3"
@@ -25,6 +26,7 @@ toml = { version = "0.5.9" }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 urlencoding = "2.1.2"
+url = "2.4.0"
 wiring_rs = { git = "https://github.com/ontodev/wiring.rs" } 
 async-recursion = "1.0.2"
 reqwest = { version = "0.11.14", features = ["blocking"] }
