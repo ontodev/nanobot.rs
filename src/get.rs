@@ -358,7 +358,7 @@ async fn get_page(
                     let default_structure = json!("");
                     let structure = column.get("structure").unwrap_or(&default_structure);
                     if structure == "from(table.table)" {
-                        let href = format!("/table?table=eq.{}", {
+                        let href = format!("table?table=eq.{}", {
                             match v.as_str() {
                                 Some(s) => s.to_string(),
                                 None => {
@@ -372,17 +372,15 @@ async fn get_page(
                         cell.insert("href".to_string(), Value::String(href));
                     } else if k == "table" && unquoted_table == "table" {
                         // In the 'table' table, link to the other tables
-                        let href = format!("/{}", {
-                            match v.as_str() {
-                                Some(s) => s.to_string(),
-                                None => {
-                                    return Err(GetError::new(format!(
-                                        "Could not convert '{}' to str",
-                                        v
-                                    )))
-                                }
+                        let href = match v.as_str() {
+                            Some(s) => s.to_string(),
+                            None => {
+                                return Err(GetError::new(format!(
+                                    "Could not convert '{}' to str",
+                                    v
+                                )))
                             }
-                        });
+                        };
                         cell.insert("href".to_string(), Value::String(href));
                     }
                 }
@@ -607,7 +605,7 @@ async fn get_page(
         }
     };
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
-    this_table.insert("href".to_string(), json!(format!("/{}", unquoted_table)));
+    this_table.insert("href".to_string(), json!(unquoted_table.clone()));
     this_table.insert("start".to_string(), json!(select.offset.unwrap_or(0) + 1));
     this_table.insert("end".to_string(), json!(end));
     this_table.insert("counts".to_string(), json!(counts));
@@ -749,7 +747,7 @@ async fn get_page(
 
     let mut tables = Map::new();
     for key in table_map.keys() {
-        tables.insert(key.clone(), Value::String(format!("/{}", key)));
+        tables.insert(key.clone(), Value::String(key.clone()));
     }
 
     let elapsed = start.elapsed().as_millis() as usize;
