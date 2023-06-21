@@ -44,7 +44,6 @@ pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 pub fn build_app(shared_state: Arc<AppState>) -> Router {
     // build our application with a route
     Router::new()
-        // `GET /` goes to `root`
         .route("/", get(root))
         .route("/:table", get(get_table).post(post_table))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
@@ -77,7 +76,7 @@ pub async fn app(config: &Config) -> Result<String, String> {
 
 async fn root() -> impl IntoResponse {
     tracing::info!("request root");
-    Redirect::permanent("/table")
+    Redirect::permanent("table")
 }
 
 async fn post_table(
@@ -320,7 +319,7 @@ async fn table(
         let table_map = {
             let mut table_map = SerdeMap::new();
             for table in get_tables(config)? {
-                table_map.insert(table.to_string(), json!(format!("/{}", table)));
+                table_map.insert(table.to_string(), json!(table.clone()));
             }
             json!(table_map)
         };
@@ -489,9 +488,9 @@ fn render_row_from_database(
                 .into());
         }
     };
-    let mut view = match query_params.get("view") {
-        None => return Err(format!("No 'view' in {:?}", query_params).into()),
+    let view = match query_params.get("view") {
         Some(v) => v.to_string(),
+        None => "form".to_string(),
     };
 
     // Handle requests related to typeahead, used for autocomplete in data forms:
@@ -553,8 +552,6 @@ fn render_row_from_database(
             }
         }
 
-        // Manually override view, which is not included in request.args in CGI app
-        view = String::from("form");
         let action = match form_params.get("action") {
             None => return Err(format!("No 'action' in {:?}", form_params).into()),
             Some(v) => v,
@@ -655,7 +652,7 @@ fn render_row_from_database(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(config)? {
-            table_map.insert(table.to_string(), json!(format!("/{}", table)));
+            table_map.insert(table.to_string(), json!(format!("../../{}", table)));
         }
         json!(table_map)
     };
