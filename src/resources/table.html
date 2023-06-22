@@ -23,7 +23,7 @@
             <label class="col-form-label">Skip rows</label>
           </div>
           <div class="col-auto">
-            <input type="number" class="form-control" name="offset" value="{{ page.select_params.offset }}">
+            <input type="number" class="form-control" name="offset" value="{{ page.select_params.offset or 0 }}">
           </div>
         </div>
       </div>
@@ -46,7 +46,7 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h1 class="modal-title fs-5" id="{{ name|id }}ModalLabel">{{ value.label }}</h1>
+        <h1 class="modal-title fs-5" id="{{ name|id }}ModalLabel">{{ value.label or name }}</h1>
         <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
@@ -138,7 +138,9 @@
   </div>
 
   {% for key, value in page.select_params|items %}
+  {% if key not in ["offset"] %}
   <input type="hidden" name="{{ key }}" value="{{ value }}" />
+  {% endif %}
   {% endfor %}
 </form>
 {% endfor %}
@@ -241,6 +243,8 @@
       {% endif %}
     </span>
 
+    <a class="btn btn-outline-secondary" href="{{ table.href }}">Reset</a>
+
     <span>
       <a class="btn btn-outline-secondary dropdown-toggle" href="" data-bs-toggle="dropdown" aria-expanded="false">
         Format
@@ -251,8 +255,6 @@
         {% endfor %}
       </ul>
     </span>
-
-    <a class="btn btn-outline-secondary" href="{{ table.href }}">Reset</a>
 
     {% if table.table != "message" %}
     <a class="btn btn-outline-success" href="/{{ table.table }}?view=form">Add row</a>
