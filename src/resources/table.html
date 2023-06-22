@@ -2,6 +2,44 @@
 {% block content %}
 <h2>{{ table.table }}</h2>
 
+<form class="modal fade" id="updateLoc" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Show Results</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row py-2">
+          <div class="col-md-4">
+            <label class="col-form-label">Results per page</label>
+          </div>
+          <div class="col-auto">
+            <input type="number" name="limit" class="form-control" value="{{ page.select_params.limit }}">
+          </div>
+        </div>
+        <div class="row py-2">
+          <div class="col-md-4">
+            <label class="col-form-label">Skip rows</label>
+          </div>
+          <div class="col-auto">
+            <input type="number" class="form-control" name="offset" value="{{ page.select_params.offset }}">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="{{ table.first }}" class="btn btn-secondary">Reset</a>
+        <input type="submit" class="btn btn-primary" value="Update" />
+      </div>
+    </div>
+  </div>
+  {% for key, value in page.select_params|items %}
+  {% if key not in ["limit", "offset"] %}
+  <input type="hidden" name="{{ key }}" value="{{ value }}" />
+  {% endif %}
+  {% endfor %}
+</form>
+
 {% for name, value in column|items -%}
 <form class="modal fade" id="{{ name|id }}Modal" tabindex="-1" aria-labelledby="{{ name|id }}ModalLabel"
   aria-hidden="true">
@@ -122,9 +160,9 @@
           </a>
         </li>
         <li class="page-item">
-          <a class="page-link" href="#">
+          <button class="page-link" data-bs-toggle="modal" data-bs-target="#updateLoc">
             {{ table.start }}-{{ table.end }}
-          </a>
+          </button>
         </li>
         <li class="page-item">
           <a class="page-link {{ 'disabled' if not table.next }}" href="{{ table.next }}" aria-label="Next">
