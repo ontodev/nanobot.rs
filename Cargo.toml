@@ -39,11 +39,11 @@ rev = "fb8bfe02fc36389c89d335d81488d7d1da719c1f"
 
 [dependencies.ontodev_valve]
 git = "https://github.com/ontodev/valve.rs"
-rev = "91c8907743f126c3fa560b40a78dd0f0d6cb0fef"
+rev = "a8273a5210fda3ed9e09273182323e451a4725d8"
 
 [dependencies.ontodev_sqlrest]
 git = "https://github.com/ontodev/sqlrest.rs"
-rev = "750c459c47b702761e05f88c58315dc0660daad1"
+rev = "9a332687e0af916475d0d7357043c019628cff63"
 
 [build-dependencies]
 cc = "1.0"

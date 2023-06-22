@@ -9,10 +9,10 @@ use crate::sql::{
 };
 use enquote::unquote;
 use minijinja::{Environment, Source};
-use ontodev_sqlrest::Select;
+use ontodev_sqlrest::{Direction, OrderByColumn, Select};
+use ontodev_valve::get_sql_type_from_global_config;
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Map, Value};
-use sqlx::any::AnyPool;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -167,7 +167,7 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page = match get_page(&pool, &select, &table_map, &column_rows).await {
+            let page = match get_page(&config, &select, &table_map, &column_rows).await {
                 Ok(page) => page,
                 Err(e) => return Err(GetError::new(e.to_string())),
             };
@@ -189,11 +189,12 @@ pub async fn get_rows(
 }
 
 async fn get_page(
-    pool: &AnyPool,
+    config: &Config,
     select: &Select,
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
+    let pool = &config.pool.as_ref().unwrap();
     let filter_messages = {
         let m = select
             .select
@@ -221,20 +222,108 @@ async fn get_page(
                 r.insert(k.to_string(), v.clone());
             }
         }
-        let mut filters: Vec<Value> = vec![];
+
+        let sql_type = get_sql_type_from_global_config(
+            &config.valve.as_ref().unwrap().config,
+            &unquote(&select.table).unwrap(),
+            &key,
+            &config.pool.as_ref().unwrap(),
+        )
+        .unwrap_or_default();
+        r.insert("sql_type".into(), json!(sql_type));
+        let numeric_types = ["integer", "numeric", "real", "decimal"];
+        r.insert(
+            "numeric".into(),
+            json!(numeric_types.contains(&sql_type.to_lowercase().as_str())),
+        );
+        let mut filter_others = vec![];
         for filter in &select.filter {
-            if filter.lhs == key {
-                filters.push(json!([
-                    filter.lhs.clone(),
-                    filter.operator.clone(),
-                    filter.rhs.clone(),
-                ]));
+            if filter.lhs.replace("\"", "") == key {
+                r.insert(
+                    "filtered_operator".into(),
+                    json!(filter.operator.to_string()),
+                );
+                r.insert(
+                    "filtered_constraint".into(),
+                    match filter.rhs.clone() {
+                        serde_json::Value::String(s) => json!(s
+                            .clone()
+                            .replace("\"", "")
+                            .replace("\u{0027}", "")
+                            .replace("%", "*")),
+                        _ => json!(filter.rhs),
+                    },
+                );
+            } else {
+                filter_others.push(filter.clone());
             }
         }
-        if filters.len() > 0 {
-            r.insert("filters".to_string(), Value::Array(filters));
+        for order_by in &select.order_by {
+            if order_by.column.replace("\"", "") == key {
+                r.insert("sorted".to_string(), json!(order_by.direction.to_url()));
+                break;
+            }
         }
-        // TODO: order
+
+        let mut sorted = select.clone();
+        let empty: Vec<String> = Vec::new();
+        sorted.select(empty);
+
+        sorted.order_by(vec![&key]);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("sort_ascending".into(), json!(href));
+
+        sorted.explicit_order_by(vec![&OrderByColumn::new(&key, &Direction::Descending)]);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("sort_descending".into(), json!(href));
+
+        let empty: Vec<String> = Vec::new();
+        sorted.order_by(empty);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("sort_none".into(), json!(href));
+
+        let mut sorted = select.clone();
+        let empty: Vec<String> = Vec::new();
+        sorted.select(empty);
+
+        if r.contains_key(&"sorted".to_string()) {
+            let empty: Vec<String> = Vec::new();
+            sorted.order_by(empty);
+        }
+        sorted.filter(filter_others);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("reset".into(), json!(href));
+
+        // TODO: Hide
+
         column_map.insert(key, Value::Object(r));
     }
 
@@ -613,6 +702,8 @@ async fn get_page(
     let mut formats = Map::new();
 
     let mut select_format = Select::clone(select);
+    let empty: Vec<String> = Vec::new();
+    select_format.select(empty);
 
     select_format.table(format!("\"{}.tsv\"", unquoted_table));
     let href = match select_format.to_url() {
@@ -685,6 +776,8 @@ async fn get_page(
 
     // Pagination
     let mut select_offset = Select::clone(select);
+    let empty: Vec<String> = Vec::new();
+    select_offset.select(empty);
     match select.offset {
         Some(offset) if offset > 0 => {
             let href = match select_offset.offset(0).to_url() {
@@ -750,13 +843,19 @@ async fn get_page(
         tables.insert(key.clone(), Value::String(key.clone()));
     }
 
+    let mut select2 = select.clone();
+    let empty: Vec<String> = Vec::new();
+    select2.select(empty);
+
     let elapsed = start.elapsed().as_millis() as usize;
     let result: Value = json!({
         "page": {
             "project_name": "Nanobot",
             "tables": tables,
             "title": unquoted_table,
+            "url": select2.to_url().unwrap_or_default(),
             "select": select,
+            "select_params": select2.to_params().unwrap_or_default(),
             "elapsed": elapsed,
         },
         "table": this_table,
