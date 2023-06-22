@@ -137,7 +137,6 @@ pub async fn init(config: &Config) -> Result<String, String> {
 
     // Create the basic VALVE schema tables, if they don't exist
     let path = Path::new(&config.valve_path).parent().unwrap();
-    tracing::warn!("dir {:?}", path);
     if !path.exists() {
         match fs::create_dir_all(&path) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -147,7 +146,6 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     let path = Path::new(&config.valve_path);
-    tracing::warn!("table {:?}", path);
     if !path.exists() {
         match create_table_tsv(&path) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -160,7 +158,6 @@ pub async fn init(config: &Config) -> Result<String, String> {
         .parent()
         .unwrap()
         .join("column.tsv");
-    tracing::warn!("column {:?}", path);
     if !path.exists() {
         match create_column_tsv(&path.as_path()) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -173,7 +170,6 @@ pub async fn init(config: &Config) -> Result<String, String> {
         .parent()
         .unwrap()
         .join("datatype.tsv");
-    tracing::warn!("datatype {:?}", path);
     if !path.exists() {
         match create_datatype_tsv(&path.as_path()) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
