@@ -96,21 +96,21 @@ fn add_to_gitignore(input: &str) -> Result<String, String> {
     }
 }
 
-fn create_table_tsv() -> Result<(), Box<dyn error::Error>> {
+fn create_table_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
     let data = include_str!("resources/table.tsv");
-    fs::write("src/schema/table.tsv", data).expect("Unable to write file");
+    fs::write(&path, data).expect("Unable to write file");
     Ok(())
 }
 
-fn create_column_tsv() -> Result<(), Box<dyn error::Error>> {
+fn create_column_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
     let data = include_str!("resources/column.tsv");
-    fs::write("src/schema/column.tsv", data).expect("Unable to write file");
+    fs::write(&path, data).expect("Unable to write file");
     Ok(())
 }
 
-fn create_datatype_tsv() -> Result<(), Box<dyn error::Error>> {
+fn create_datatype_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
     let data = include_str!("resources/datatype.tsv");
-    fs::write("src/schema/datatype.tsv", data).expect("Unable to write file");
+    fs::write(&path, data).expect("Unable to write file");
     Ok(())
 }
 
@@ -136,36 +136,42 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // Create the basic VALVE schema tables, if they don't exist
-    let path = Path::new("src/schema");
+    let path = Path::new(&config.valve_path).parent().unwrap();
     if !path.exists() {
-        match fs::create_dir_all(path) {
+        match fs::create_dir_all(&path) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
             Ok(_x) => {}
         };
         tracing::info!("Created '{}' directory", path.display());
     }
 
-    let path = Path::new("src/schema/table.tsv");
+    let path = Path::new(&config.valve_path);
     if !path.exists() {
-        match create_table_tsv() {
+        match create_table_tsv(&path) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
             Ok(_x) => {}
         };
         tracing::info!("Created '{}' file", path.display());
     }
 
-    let path = Path::new("src/schema/column.tsv");
+    let path = Path::new(&config.valve_path)
+        .parent()
+        .unwrap()
+        .join("column.tsv");
     if !path.exists() {
-        match create_column_tsv() {
+        match create_column_tsv(&path.as_path()) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
             Ok(_x) => {}
         };
         tracing::info!("Created '{}' file", path.display());
     }
 
-    let path = Path::new("src/schema/datatype.tsv");
+    let path = Path::new(&config.valve_path)
+        .parent()
+        .unwrap()
+        .join("datatype.tsv");
     if !path.exists() {
-        match create_datatype_tsv() {
+        match create_datatype_tsv(&path.as_path()) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
             Ok(_x) => {}
         };
