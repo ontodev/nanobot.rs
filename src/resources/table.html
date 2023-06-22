@@ -47,19 +47,23 @@
           <div class="col-md-6">
             <select class="form-select" name="nb.operator">
               <option value="eq" {% if value.filtered_operator=='eq' %}selected="true" {% endif %}>equals</option>
-              <option value="gt" {% if value.filtered_operator=='gt' %}selected="true" {% endif %}>greater than
-              </option>
-              <option value="gte" {% if value.filtered_operator=='gte' %}selected="true" {% endif %}>greater than or
-                equals</option>
-              <option value="lt" {% if value.filtered_operator=='lt' %}selected="true" {% endif %}>less than</option>
-              <option value="lte" {% if value.filtered_operator=='lte' %}selected="true" {% endif %}>less than or
-                equals</option>
               <option value="not_eq" {% if value.filtered_operator=='not_eq' %}selected="true" {% endif %}>not equals
               </option>
+              {% if value.numeric %}
+              <option value="gt" {% if value.filtered_operator=='gt' %}selected="true" {% endif %}>greater than
+              </option>
+              <option value="gte" {% if value.filtered_operator=='gte' or not value.filtered_operator %}selected="true"
+                {% endif %}>greater than or
+                equal to</option>
+              <option value="lt" {% if value.filtered_operator=='lt' %}selected="true" {% endif %}>less than</option>
+              <option value="lte" {% if value.filtered_operator=='lte' %}selected="true" {% endif %}>less than or
+                equal to</option>
+              {% else %}
               <option value="like" {% if value.filtered_operator=='like' %}selected="true" {% endif %}>like</option>
               <option value="ilike" {% if value.filtered_operator=='ilike' or not value.filtered_operator
                 %}selected="true" {% endif %}>like (case
                 insensitive)</option>
+              {% endif %}
               <option value="is" {% if value.filtered_operator=='is' %}selected="true" {% endif %}>is</option>
               <option value="not_is" {% if value.filtered_operator=='not_is' %}selected="true" {% endif %}>is not
               </option>
@@ -72,12 +76,14 @@
             <input class="form-control" name="nb.constraint" type="text" value="{{ value.filtered_constraint }}">
           </div>
         </div>
+        {% if not value.numeric %}
         <div class="row">
           <p class="mt-2 mb-0">
             For <code>like</code> and <code>ilike</code> operators, use <code>*</code> to match any character (instead
             of <code>%</code>).
           </p>
         </div>
+        {% endif %}
 
         <div id="details-{{name}}" class="collapse">
           <hr />
