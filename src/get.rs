@@ -9,7 +9,7 @@ use crate::sql::{
 };
 use enquote::unquote;
 use minijinja::{Environment, Source};
-use ontodev_sqlrest::Select;
+use ontodev_sqlrest::{Direction, OrderByColumn, Select};
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Map, Value};
 use sqlx::any::AnyPool;
@@ -221,20 +221,89 @@ async fn get_page(
                 r.insert(k.to_string(), v.clone());
             }
         }
-        let mut filters: Vec<Value> = vec![];
+
+        let mut filter_others = vec![];
         for filter in &select.filter {
-            if filter.lhs == key {
-                filters.push(json!([
-                    filter.lhs.clone(),
-                    filter.operator.clone(),
-                    filter.rhs.clone(),
-                ]));
+            if filter.lhs.replace("\"", "") == key {
+                r.insert(
+                    "filtered_operator".into(),
+                    json!(filter.operator.to_string()),
+                );
+                r.insert(
+                    "filtered_constraint".into(),
+                    json!(filter
+                        .rhs
+                        .as_str()
+                        .unwrap_or_default()
+                        .replace("\"", "")
+                        .replace("\u{0027}", "")
+                        .replace("%", "*")),
+                );
+            } else {
+                filter_others.push(filter.clone());
             }
         }
-        if filters.len() > 0 {
-            r.insert("filters".to_string(), Value::Array(filters));
+        for order_by in &select.order_by {
+            tracing::info!("order_by {:?} {}", order_by, key);
+            if order_by.column.replace("\"", "") == key {
+                r.insert("sorted".to_string(), json!(order_by.direction.to_url()));
+                break;
+            }
         }
-        // TODO: order
+
+        let mut sorted = select.clone();
+        sorted.order_by(vec![&key]);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("sort_ascending".into(), json!(href));
+
+        sorted.explicit_order_by(vec![&OrderByColumn::new(&key, &Direction::Descending)]);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("sort_descending".into(), json!(href));
+
+        let empty: Vec<String> = Vec::new();
+        sorted.order_by(empty);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("sort_none".into(), json!(href));
+
+        let mut sorted = select.clone();
+        if r.contains_key(&"sorted".to_string()) {
+            let empty: Vec<String> = Vec::new();
+            sorted.order_by(empty);
+        }
+        sorted.filter(filter_others);
+        let href = match sorted.to_url() {
+            Ok(url) => url,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        let href = match decode(&href) {
+            Ok(href) => href,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
+        r.insert("reset".into(), json!(href));
+
+        // TODO: Hide
+
         column_map.insert(key, Value::Object(r));
     }
 
@@ -756,7 +825,9 @@ async fn get_page(
             "project_name": "Nanobot",
             "tables": tables,
             "title": unquoted_table,
+            "url": select.to_url().unwrap_or_default(),
             "select": select,
+            "select_params": select.to_params().unwrap_or_default(),
             "elapsed": elapsed,
         },
         "table": this_table,

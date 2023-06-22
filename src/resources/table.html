@@ -3,105 +3,104 @@
 <h2>{{ table.table }}</h2>
 
 {% for name, value in column|items -%}
-<div class="modal fade" id="{{ name|id }}Modal" tabindex="-1" aria-labelledby="{{ name|id }}ModalLabel"
+<form class="modal fade" id="{{ name|id }}Modal" tabindex="-1" aria-labelledby="{{ name|id }}ModalLabel"
   aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h1 class="modal-title fs-5" id="{{ name|id }}ModalLabel">{{ name }}</h1>
+        <h1 class="modal-title fs-5" id="{{ name|id }}ModalLabel">{{ value.label }}</h1>
         <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         {% if value.description %}
-        <p>{{ value.description }}</p>
+        <div class="row">
+          <p>{{ value.description }}</p>
+        </div>
+
         {% endif %}
-        <p>TODO: sort and filter</p>
-        {% if value.filters %}
-        <ul>
-          {% for filter in value.filters %}
-          <li>{{ filter[0] }} {{ filter[1] }} {{ filter[2] }}</li>
-          {% endfor %}
-        </ul>
-        {% endif %}
-        <pre><code>{{ value|tojson(true) }}</code></pre>
+        <div class="row">
+          <div class="btn-group">
+            <a class="btn {{ 'btn-primary' if value.sorted == 'asc' else 'btn-outline-primary' }}"
+              href="{{ value.sort_ascending }}">A-Z</a>
+            <a class="btn {{ 'btn-primary' if value.sorted == 'desc' else 'btn-outline-primary' }}"
+              href="{{ value.sort_descending }}">Z-A</a>
+            <a class="btn {{ 'btn-outline-primary' if value.sorted else 'btn-primary' }}"
+              href="{{ value.sort_none }}">None</a>
+          </div>
+        </div>
+
+        {# TODO: Add support for hiding columns.
+        <hr />
+        <div class="row">
+          <a href="{{ value.hide }}"><i class="bi-eye-slash"></i> Hide column</a>
+        </div>
+        #}
+
+        <hr />
+        <div class="row">
+          <div class="col-auto pb-2">Filter by condition</div>
+        </div>
+
+        <div class="row">
+          <input type="hidden" name="nb.action" value="filter">
+          <input type="hidden" name="nb.column" value="{{ name }}">
+          <div class="col-md-6">
+            <select class="form-select" name="nb.operator">
+              <option value="eq" {% if value.filtered_operator=='eq' %}selected="true" {% endif %}>equals</option>
+              <option value="gt" {% if value.filtered_operator=='gt' %}selected="true" {% endif %}>greater than
+              </option>
+              <option value="gte" {% if value.filtered_operator=='gte' %}selected="true" {% endif %}>greater than or
+                equals</option>
+              <option value="lt" {% if value.filtered_operator=='lt' %}selected="true" {% endif %}>less than</option>
+              <option value="lte" {% if value.filtered_operator=='lte' %}selected="true" {% endif %}>less than or
+                equals</option>
+              <option value="not_eq" {% if value.filtered_operator=='not_eq' %}selected="true" {% endif %}>not equals
+              </option>
+              <option value="like" {% if value.filtered_operator=='like' %}selected="true" {% endif %}>like</option>
+              <option value="ilike" {% if value.filtered_operator=='ilike' or not value.filtered_operator
+                %}selected="true" {% endif %}>like (case
+                insensitive)</option>
+              <option value="is" {% if value.filtered_operator=='is' %}selected="true" {% endif %}>is</option>
+              <option value="not_is" {% if value.filtered_operator=='not_is' %}selected="true" {% endif %}>is not
+              </option>
+              <option value="in" {% if value.filtered_operator=='in' %}selected="true" {% endif %}>in</option>
+              <option value="not_in" {% if value.filtered_operator=='not_in' %}selected="true" {% endif %}>not in
+              </option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <input class="form-control" name="nb.constraint" type="text" value="{{ value.filtered_constraint }}">
+          </div>
+        </div>
+        <div class="row">
+          <p class="mt-2 mb-0">
+            For <code>like</code> and <code>ilike</code> operators, use <code>*</code> to match any character (instead
+            of <code>%</code>).
+          </p>
+        </div>
+
+        <div id="details-{{name}}" class="collapse">
+          <hr />
+          <pre><code>{{name}} -- {{ value|tojson(true) }}</code></pre>
+        </div>
       </div>
+
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary">Update</button>
+        <a data-bs-toggle="collapse" href="#details-{{name}}" role="button" aria-expanded="false">Debug</a>
+        <a href="{{ value.reset }}" class="btn btn-secondary">Reset</a>
+        <input type="submit" class="btn btn-primary" value="Update" />
       </div>
     </div>
   </div>
-</div>
+
+  {% for key, value in page.select_params|items %}
+  <input type="hidden" name="{{ key }}" value="{{ value }}" />
+  {% endfor %}
+</form>
 {% endfor %}
 
 <div class="row">
   <div class="col">
-    {# range #}
-    {{ table.start }}-{{ table.end }} of
-    {% if table.counts.count == 1 %}
-    1 row
-    {% else %}
-    {{ table.counts.count }} rows
-    {% endif %}
-    {% if table.counts.total > table.counts.count %}
-    filtered from {{ table.counts.total }}.
-    {% else %}
-    .
-    {% endif %}
-    <a href="{{ table.href }}">Reset</a>
-  </div>
-
-  <div class="col text-center">
-    {# message_rows #}
-    {% if table.counts.message_row == 1 %}
-    1
-    <a href="{{ table.href }}?message=not_is.null">row</a>
-    has
-    {% elif table.counts.message_row > 1 %}
-    {{ table.counts.message_row }}
-    <a href="{{ table.href }}?message=any">rows</a>
-    have
-    {% endif %}
-
-    {# message counts #}
-    {% if table.counts.message == 1 %}
-    1
-    <a href="/message?table=eq.{{ table.table }}">message</a>:
-    {% elif table.counts.message > 1 %}
-    {{ table.counts.message }}
-    <a href="/message?table=eq.{{ table.table }}">messages</a>:
-    {% endif %}
-
-    {# message types #}
-    {% if table.counts.message %}
-    {% if table.counts.error %}
-    <strong>{{ table.counts.error }}</strong>
-    <i class="bi bi-exclamation-octagon-fill text-danger"></i>
-    {% endif %}
-    {% if table.counts.warn %}
-    <strong>{{ table.counts.warn }}</strong>
-    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-    {% endif %}
-    {% if table.counts.info %}
-    <strong>{{ table.counts.info}}</strong>
-    <i class="bi bi-info-circle-fill text-info"></i>
-    {% endif %}
-    {% if table.counts.update %}
-    <strong>{{ table.counts.update}}</strong>
-    <i class="bi bi-clock-history text-secondary"></i>
-    {% endif %}
-    {% endif %}
-  </div>
-  <div class="col col-auto text-end">
-    <span class="align-top me-2">
-      <a class="dropdown-toggle" href="" data-bs-toggle="dropdown" aria-expanded="false">
-        Format
-      </a>
-      <ul class="dropdown-menu">
-        {% for name, href in table.formats|items %}
-        <li><a class="dropdown-item" href="{{ href }}">{{ name }}</a></li>
-        {% endfor %}
-      </ul>
-    </span>
     <nav style="display: inline-block" aria-label="Page navigation">
       <ul class="pagination justify-content-end">
         <li class="page-item">
@@ -135,90 +134,172 @@
         </li>
       </ul>
     </nav>
+
+    {# range #}
+    <span class="mx-2">
+      Showing
+      {{ table.start }}-{{ table.end }} of
+      {% if table.counts.count == 1 %}
+      1 row
+      {% else %}
+      {{ table.counts.count }}
+      {% endif %}
+      {% if table.counts.total > table.counts.count %}
+      rows filtered from {{ table.counts.total }}.
+      {% else %}
+      rows.
+      {% endif %}
+    </span>
+
+    {# message_rows #}
+    <span>
+      {% if table.counts.message_row == 1 %}
+      1
+      <a href="{{ table.href }}?message=not_is.null">row</a>
+      has
+      {% elif table.counts.message_row > 1 %}
+      {{ table.counts.message_row }}
+      <a href="{{ table.href }}?message=not_is.null">rows</a>
+      have
+      {% endif %}
+    </span>
+
+    {# message counts #}
+    <span>
+      {% if table.counts.message == 1 %}
+      1
+      <a href="/message?table=eq.{{ table.table }}">message</a>:
+      {% elif table.counts.message > 1 %}
+      {{ table.counts.message }}
+      <a href="/message?table=eq.{{ table.table }}">messages</a>:
+      {% endif %}
+    </span>
+
+    {# message types #}
+    <span class="me-2">
+      {% if table.counts.message %}
+      {% if table.counts.error %}
+      <strong>{{ table.counts.error }}</strong>
+      <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+      {% endif %}
+      {% if table.counts.warn %}
+      <strong>{{ table.counts.warn }}</strong>
+      <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+      {% endif %}
+      {% if table.counts.info %}
+      <strong>{{ table.counts.info}}</strong>
+      <i class="bi bi-info-circle-fill text-info"></i>
+      {% endif %}
+      {% if table.counts.update %}
+      <strong>{{ table.counts.update}}</strong>
+      <i class="bi bi-check-square-fill text-success"></i>
+      {% endif %}
+      {% endif %}
+    </span>
+
+    <span>
+      <a class="btn btn-outline-secondary dropdown-toggle" href="" data-bs-toggle="dropdown" aria-expanded="false">
+        Format
+      </a>
+      <ul class="dropdown-menu">
+        {% for name, href in table.formats|items %}
+        <li><a class="dropdown-item" href="{{ href }}">{{ name }}</a></li>
+        {% endfor %}
+      </ul>
+    </span>
+
+    <a class="btn btn-outline-secondary" href="{{ table.href }}">Reset</a>
+
+    {% if table.table != "message" %}
+    <a class="btn btn-outline-success" href="/{{ table.table }}?view=form">Add row</a>
+    {% endif %}
+
   </div>
 </div>
 
-{% if table.table != "message" %}
-<div class="row">
-  <a class="btn btn-large btn-outline-primary" href="/{{ table.table }}?view=form">Add a new row</a>
-</div>
-{% endif %}
-
-<table class="table">
-  <tr>
-    <th />
-    {% for name, value in column|items -%}
-    <th>
-      <a class="" data-bs-toggle="modal" href="#{{ name|id }}Modal" role="button">{{ name }}</a>
-      {% if value.filters %}
-      <i class="bi bi-filter-circle-fill float-end"></i>
-      {% endif %}
-    </th>
-    {% endfor %}
-  </tr>
-  {% for r in row -%}
-  <tr>
-    {% for column, cell in r|items -%}
-    {% if table.table == "message" and column == "message_id" %}
-    <td />
-    {% elif column == "row_number" %}
-    <td>
-      <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view=form"><i class="bi-pencil"
-          style="color: #adb5bd;"></i></a>
-    </td>
-    {% else %}
-    <td class="{{ cell.classes|join(" , ") }}">
-      {% if cell.nulltype %}
-      {% elif cell.href %}
-      <a href="{{ cell.href }}">{{ cell.value }}</a>
-      {% else %}
-      {{ cell.value }}
-      {% endif %}
-      {% if cell.messages %}
-      <div class="dropdown float-end">
-        <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
-          {% if cell.messages|length > 1 %}
-          <strong>{{ cell.messages|length }}</strong>
-          {% endif %}
-          {% if cell.message_level == "error" %}
-          <i class="bi bi-exclamation-octagon-fill text-danger"></i>
-          {% elif cell.message_level == "warn" %}
-          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-          {% elif cell.message_level == "info" %}
-          <i class="bi bi-info-circle-fill text-info"></i>
-          {% elif cell.message_level == "update" %}
-          <i class="bi bi-clock-history text-secondary"></i>
-          {% else %}
-          <i class="bi bi-question-circle-fill"></i>
-          {% endif %}
+<table class="table table-sm">
+  <thead>
+    <tr>
+      <th />
+      {% for name, value in column|items -%}
+      <th>
+        <a class="" data-bs-toggle="modal" href="#{{ name|id }}Modal" role="button">
+          {{ value.label or name }}
         </a>
-        <ul class="dropdown-menu">
-          {% for message in cell.messages %}
-          <li>
-            <a class="dropdown-item" href="#">
-              {% if message.level == "error" %}
-              <i class="bi bi-exclamation-octagon-fill text-danger"></i>
-              {% elif message.level == "warn" %}
-              <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-              {% elif message.level == "info" %}
-              <i class="bi bi-info-circle-fill text-info"></i>
-              {% elif message.level == "update" %}
-              <i class="bi bi-clock-history text-secondary"></i>
-              {% else %}
-              <i class="bi bi-question-circle-fill"></i>
-              {% endif %}
-              {{ message.message }}
-            </a>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-    </td>
-    {% endif %}
-    </td>
-    {% endif %}
+        {% if value.filtered_operator %}
+        <i class="bi bi-filter-circle-fill"></i>
+        {% elif value.sorted == "asc" %}
+        <i class="bi bi-sort-up"></i>
+        {% elif value.sorted == "desc" %}
+        <i class="bi bi-sort-down"></i>
+        {% endif %}
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in row -%}
+    <tr>
+      {% for column, cell in r|items -%}
+      {% if column == "row_number" %}
+      <td>
+        <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view=form"><i class="bi-pencil"
+            style="color: #adb5bd;"></i></a>
+      </td>
+      {% else %}
+      <td class="{{ cell.classes|join(" , ") }}">
+        {% if cell.nulltype %}
+        {% elif cell.href %}
+        <a href="{{ cell.href }}">{{ cell.value }}</a>
+        {% else %}
+        {{ cell.value }}
+        {% endif %}
+        {% if cell.messages %}
+        <div class="dropdown float-end">
+          <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
+            {% if cell.messages|length > 1 %}
+            <strong>{{ cell.messages|length }}</strong>
+            {% endif %}
+            {% if cell.message_level == "error" %}
+            <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+            {% elif cell.message_level == "warn" %}
+            <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+            {% elif cell.message_level == "info" %}
+            <i class="bi bi-info-circle-fill text-info"></i>
+            {% elif cell.message_level == "update" %}
+            <i class="bi bi-check-square-fill text-success"></i>
+            {% else %}
+            <i class="bi bi-question-circle-fill"></i>
+            {% endif %}
+          </a>
+          <ul class="dropdown-menu">
+            {% for message in cell.messages %}
+            <li>
+              <a class="dropdown-item" href="#">
+                {% if message.level == "error" %}
+                <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+                {% elif message.level == "warn" %}
+                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                {% elif message.level == "info" %}
+                <i class="bi bi-info-circle-fill text-info"></i>
+                {% elif message.level == "update" %}
+                <i class="bi bi-check-square-fill text-success"></i>
+                {% else %}
+                <i class="bi bi-question-circle-fill"></i>
+                {% endif %}
+                {{ message.message }}
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </td>
+      {% endif %}
+      </td>
+      {% endif %}
+      {% endfor %}
+    </tr>
     {% endfor %}
-  </tr>
-  {% endfor %}
+  </tbody>
 </table>
 {% endblock %}
