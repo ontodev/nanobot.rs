@@ -214,10 +214,10 @@
     <span>
       {% if table.counts.message == 1 %}
       1
-      <a href="/message?table=eq.{{ table.table }}">message</a>:
+      <a href="message?table=eq.{{ table.table }}">message</a>:
       {% elif table.counts.message > 1 %}
       {{ table.counts.message }}
-      <a href="/message?table=eq.{{ table.table }}">messages</a>:
+      <a href="message?table=eq.{{ table.table }}">messages</a>:
       {% endif %}
     </span>
 
