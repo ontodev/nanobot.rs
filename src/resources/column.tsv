@@ -1,17 +1,17 @@
-table	column	nulltype	datatype	structure	description
-table	table		label	unique	name of this table
-table	path		line		path to the TSV file for this table, relative to the table.tsv file
-table	type	empty	table_type		type of this table, used for tables with special meanings
-table	description	empty	text		a description of this table
-column	table		label	from(table.table)	the table that this column belongs to
-column	column		label		the name of this column
-column	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
-column	datatype		word	from(datatype.datatype)	the datatype for this column
-column	structure	empty	label		schema information for this column
-column	description	empty	text		a description of this column
-datatype	datatype		word	primary	the name of this datatype
-datatype	parent	empty	word	tree(datatype)	the parent datatype
-datatype	condition	empty	line		the method for testing the datatype
-datatype	description	empty	text		a description of this datatype
-datatype	SQL type	empty	sql_type		the SQL type for representing this data
-datatype	HTML type	empty	html_type		the HTML type for viewing and editing this data
+table	column	label	nulltype	datatype	structure	description
+table	table			label	unique	name of this table
+table	path			line		path to the TSV file for this table, relative to the table.tsv file
+table	type		empty	table_type		type of this table, used for tables with special meanings
+table	description		empty	text		a description of this table
+column	table			label	from(table.table)	the table that this column belongs to
+column	column			label		the name of this column
+column	nulltype		empty	word	from(datatype.datatype)	the datatype for NULL values in this column
+column	datatype			word	from(datatype.datatype)	the datatype for this column
+column	structure		empty	label		schema information for this column
+column	description		empty	text		a description of this column
+datatype	datatype			word	primary	the name of this datatype
+datatype	parent		empty	word	tree(datatype)	the parent datatype
+datatype	condition		empty	line		the method for testing the datatype
+datatype	description		empty	text		a description of this datatype
+datatype	SQL type		empty	sql_type		the SQL type for representing this data
+datatype	HTML type		empty	html_type		the HTML type for viewing and editing this data
