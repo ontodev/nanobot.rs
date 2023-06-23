@@ -214,8 +214,10 @@ impl Config {
         .await
         {
             Err(e) => {
-                tracing::warn!("VALVE: {:?}", e);
-                return Err(format!("Could not load from '{}'", &self.valve_path));
+                return Err(format!(
+                    "Could not load from '{}' due to: {:?}",
+                    &self.valve_path, e
+                ))
             }
             Ok(v) => {
                 let v: SerdeMap = serde_json::from_str(&v).unwrap();

@@ -200,7 +200,12 @@ pub async fn init(config: &Config) -> Result<String, String> {
     )
     .await
     {
-        Err(_x) => return Err(format!("Could not load from '{}'", &config.valve_path)),
+        Err(e) => {
+            return Err(format!(
+                "Could not load from '{}' due to: {:?}",
+                &config.valve_path, e
+            ))
+        }
         Ok(_x) => {}
     }
 
