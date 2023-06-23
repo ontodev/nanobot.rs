@@ -975,8 +975,8 @@ fn validate_table_row(
                     &pool,
                     table_name,
                     &result_row,
-                    true,
                     Some(*row_number),
+                    None,
                 )) {
                     Ok(r) => r,
                     Err(e) => return Err(e.to_string()),
@@ -989,7 +989,7 @@ fn validate_table_row(
                 &pool,
                 table_name,
                 &result_row,
-                false,
+                None,
                 None,
             )) {
                 Ok(r) => r,
