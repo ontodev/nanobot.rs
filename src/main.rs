@@ -30,10 +30,20 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    if let Some(vars) = cgi_vars() {
+        return match handle_cgi(&vars, &mut config) {
+            Err(x) => {
+                tracing::error!("{}", x);
+                std::process::exit(1)
+            }
+            Ok(x) => println!("{}", x),
+        };
+    }
+
     let matches = command!() // requires `cargo` feature
         .propagate_version(true)
         .subcommand_required(false)
-        .arg_required_else_help(false)
+        .arg_required_else_help(true)
         .subcommand(
             Command::new("init").about("Initialises things").arg(
                 arg!(
@@ -66,49 +76,43 @@ async fn main() {
         .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
-    let exit_result =
-        match cgi_vars() {
-            Some(vars) => handle_cgi(&vars, &mut config),
-            None => match matches.subcommand() {
-                Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
-                    Some(x) => {
-                        //update config
-                        config.connection(x);
+    let exit_result = match matches.subcommand() {
+        Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
+            Some(x) => {
+                //update config
+                config.connection(x);
 
-                        init::init(&config).await
-                    }
-                    _ => init::init(&config).await,
-                },
-                Some(("config", _sub_matches)) => Ok(config.to_string()),
-                Some(("get", sub_matches)) => {
-                    let table = match sub_matches.get_one::<String>("TABLE") {
-                        Some(x) => x,
-                        _ => panic!("No table given"),
-                    };
-                    let shape = match sub_matches.get_one::<String>("shape") {
-                        Some(x) => x,
-                        _ => "value_rows",
-                    };
-                    let format = match sub_matches.get_one::<String>("format") {
-                        Some(x) => x,
-                        _ => "text",
-                    };
-                    let result =
-                        match get::get_table(config.init().await.unwrap(), table, shape, format)
-                            .await
-                        {
-                            Ok(x) => x,
-                            Err(x) => format!("ERROR: {:?}", x),
-                        };
-                    Ok(result)
-                }
-                Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
-                _ => Err(String::from(
-                    "Unrecognised or missing subcommand, but CGI environment vars are \
+                init::init(&config).await
+            }
+            _ => init::init(&config).await,
+        },
+        Some(("config", _sub_matches)) => Ok(config.to_string()),
+        Some(("get", sub_matches)) => {
+            let table = match sub_matches.get_one::<String>("TABLE") {
+                Some(x) => x,
+                _ => panic!("No table given"),
+            };
+            let shape = match sub_matches.get_one::<String>("shape") {
+                Some(x) => x,
+                _ => "value_rows",
+            };
+            let format = match sub_matches.get_one::<String>("format") {
+                Some(x) => x,
+                _ => "text",
+            };
+            let result =
+                match get::get_table(config.init().await.unwrap(), table, shape, format).await {
+                    Ok(x) => x,
+                    Err(x) => format!("ERROR: {:?}", x),
+                };
+            Ok(result)
+        }
+        Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
+        _ => Err(String::from(
+            "Unrecognised or missing subcommand, but CGI environment vars are \
                              undefined",
-                )),
-            },
-        };
+        )),
+    };
 
     //print exit message
     match exit_result {

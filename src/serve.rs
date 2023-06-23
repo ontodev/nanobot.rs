@@ -129,6 +129,11 @@ async fn table(
     sqlrest_params.remove("shape".into());
     sqlrest_params.remove("view".into());
     sqlrest_params.remove("format".into());
+    for key in sqlrest_params.clone().keys() {
+        if key.starts_with("nb.") {
+            sqlrest_params.remove(key);
+        }
+    }
 
     if path.ends_with(".pretty.json") {
         table = path.replace(".pretty.json", "");
@@ -169,6 +174,33 @@ async fn table(
         Some(view) => view.to_string(),
         None => "".to_string(),
     };
+
+    // Handle actions such as filtering.
+    if query_params.contains_key("nb.action") {
+        tracing::warn!("ACTION {:?}", query_params);
+        let action = query_params.get("nb.action").unwrap();
+        if action == "filter" {
+            let column = query_params.get("nb.column").unwrap();
+            let operator = query_params.get("nb.operator").unwrap();
+            let constraint = query_params.get("nb.constraint").unwrap();
+            tracing::warn!("FILTER {}, {}, {}", column, operator, constraint);
+            sqlrest_params.insert(column.into(), format!("{}.{}", operator, constraint));
+            tracing::warn!("SQLREST {:?}", sqlrest_params);
+
+            let url = {
+                let url = sqlrest_params
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>();
+                if !url.is_empty() {
+                    format!("{}?{}", table, url.join("&"))
+                } else {
+                    table.to_string()
+                }
+            };
+            return Ok(Redirect::permanent(&url).into_response());
+        }
+    }
 
     // Handle requests related to typeahead, used for autocomplete in data forms:
     match query_params.get("format") {
