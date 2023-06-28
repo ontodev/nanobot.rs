@@ -47,7 +47,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h1 class="modal-title fs-5" id="{{ name|id }}ModalLabel">{{ value.label or name }}</h1>
-        <button type="button" class="btn" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         {% if value.description %}
@@ -238,7 +238,7 @@
       {% endif %}
       {% if table.counts.update %}
       <strong>{{ table.counts.update}}</strong>
-      <i class="bi bi-check-square-fill text-success"></i>
+      <i class="bi bi-clock-history text-secondary"></i>
       {% endif %}
       {% endif %}
     </span>
@@ -313,7 +313,7 @@
             {% elif cell.message_level == "info" %}
             <i class="bi bi-info-circle-fill text-info"></i>
             {% elif cell.message_level == "update" %}
-            <i class="bi bi-check-square-fill text-success"></i>
+            <i class="bi bi-clock-history text-secondary"></i>
             {% else %}
             <i class="bi bi-question-circle-fill"></i>
             {% endif %}
