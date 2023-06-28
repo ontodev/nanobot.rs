@@ -1151,15 +1151,21 @@ fn stringify_messages(messages: &Vec<SerdeValue>) -> Result<String, String> {
     for m in messages {
         match m.as_object() {
             None => return Err(format!("{:?} is not an object.", m)),
-            Some(message) => match message.get("message") {
-                None => return Err(format!("No 'message' in {:?}", message)),
-                Some(message) => {
-                    match message.as_str() {
-                        Some(message) => msg_parts.push(message.to_string()),
-                        None => return Err(format!("{} is not a str", message)),
-                    };
+            Some(message) => {
+                let level = message.get("level").unwrap_or(&serde_json::Value::Null);
+                if level == "update" {
+                    continue;
                 }
-            },
+                match message.get("message") {
+                    None => return Err(format!("No 'message' in {:?}", message)),
+                    Some(message) => {
+                        match message.as_str() {
+                            Some(message) => msg_parts.push(message.to_string()),
+                            None => return Err(format!("{} is not a str", message)),
+                        };
+                    }
+                }
+            }
         };
     }
     Ok(msg_parts.join("<br>"))
@@ -1178,6 +1184,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
         }
         let mut metafied_cell = SerdeMap::new();
         metafied_cell.insert("value".to_string(), value.clone());
+        let mut valid = true;
         let metafied_messages = {
             let mut metafied_messages = vec![];
             for m in &mut messages {
@@ -1187,6 +1194,11 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
                             Some(m) => m,
                             None => return Err(format!("{} is not an object", m)),
                         };
+                        if let Some(level) = m.get("level") {
+                            if level != "update" {
+                                valid = false;
+                            }
+                        }
                         m.remove("column");
                         metafied_messages.push(m.clone());
                         // Overwrite the value in the metafied_cell:
@@ -1204,7 +1216,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
             metafied_messages
         };
         metafied_cell.insert("messages".to_string(), json!(metafied_messages));
-        metafied_cell.insert("valid".to_string(), json!(metafied_messages.is_empty()));
+        metafied_cell.insert("valid".to_string(), valid.into());
         metafied_row.insert(column.to_string(), json!(metafied_cell));
     }
     Ok(metafied_row)
