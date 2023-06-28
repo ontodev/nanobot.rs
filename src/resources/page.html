@@ -148,7 +148,7 @@
       On branch '{{ page.repo.local }}':
       {{ page.repo.ahead }} ahead,
       {{ page.repo.behind }} behind
-      '<a href="{{ page.repo.remote }}" target="_blank">{{ page.repo.upstream }}</a>'
+      '<a href="{{ page.repo.remote_url }}" target="_blank">{{ page.repo.upstream }}</a>'
       {% if page.repo.fetched %}
       (fetched <span class="since">{{ page.repo.fetched }}</span>)
       {% else %}
