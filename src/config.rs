@@ -1,3 +1,4 @@
+use indexmap::map::IndexMap;
 use ontodev_valve::{
     get_compiled_datatype_conditions, get_compiled_rule_conditions,
     get_parsed_structure_conditions, valve, valve_grammar::StartParser, ColumnRule,
@@ -22,6 +23,7 @@ pub struct Config {
     pub valve_path: String,
     pub valve: Option<ValveConfig>,
     pub template_path: Option<String>,
+    pub actions: IndexMap<String, ActionConfig>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -53,6 +55,7 @@ pub struct TomlConfig {
     pub database: Option<DatabaseConfig>,
     pub valve: Option<ValveTomlConfig>,
     pub templates: Option<TemplatesConfig>,
+    pub actions: Option<IndexMap<String, ActionConfig>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -106,6 +109,23 @@ pub struct TemplatesConfig {
     pub path: Option<String>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct ActionConfig {
+    pub label: String,
+    pub inputs: Option<Vec<InputConfig>>,
+    pub commands: Vec<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct InputConfig {
+    pub name: String,
+    pub label: String,
+    pub value: Option<String>,
+    pub default: Option<String>,
+    pub placeholder: Option<String>,
+    pub test: Option<String>,
+}
+
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub const DEFAULT_TOML: &str = "[nanobot]
@@ -155,6 +175,7 @@ impl Config {
                     None => None,
                 }
             },
+            actions: user.actions.unwrap_or_default(),
         };
 
         Ok(config)
@@ -267,5 +288,6 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         templates: Some(TemplatesConfig {
             path: config.template_path.clone(),
         }),
+        actions: Some(config.actions.clone()),
     }
 }
