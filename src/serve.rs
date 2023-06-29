@@ -1277,6 +1277,19 @@ fn get_row_as_form_map(
             },
             None => cell_header.to_string(),
         };
+        let label = match column_config.get("label") {
+            Some(l) => match l.as_str().and_then(|l| Some(l.to_string())) {
+                None => cell_header.to_string(),
+                Some(l) => {
+                    if l.trim().is_empty() {
+                        cell_header.to_string()
+                    } else {
+                        l
+                    }
+                }
+            },
+            None => cell_header.to_string(),
+        };
         let datatype = match column_config.get("datatype") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
                 None => return Err(format!("Could not convert '{}' to string", d)),
@@ -1318,7 +1331,7 @@ fn get_row_as_form_map(
             &None,
             &allowed_values,
             &Some(description),
-            &None,
+            &Some(label),
             &html_type,
             &Some(message),
             &Some(readonly),
