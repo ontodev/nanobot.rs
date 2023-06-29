@@ -218,15 +218,23 @@ fn action(
             tracing::debug!("COMMAND {:?}", run);
             let output = run.output().expect("Command failed!");
             tracing::debug!("OUTPUT {:?}", output);
+            let status = output
+                .status
+                .code()
+                .ok_or("Bad exit status")
+                .unwrap_or_default();
             let stdout = std::str::from_utf8(&output.stdout).unwrap_or_default();
             let stderr = std::str::from_utf8(&output.stderr).unwrap_or_default();
             let result = json!({
                 "command": parts.join(" "),
-                "status": output.status.code().ok_or("Bad exit status").unwrap_or_default(),
+                "status": status,
                 "stdout": ansi_to_html::convert_escaped(stdout).unwrap(),
                 "stderr": ansi_to_html::convert_escaped(stderr).unwrap(),
             });
             results.push(result);
+            if status != 0 {
+                break;
+            }
         }
     }
 
