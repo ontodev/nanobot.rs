@@ -970,6 +970,7 @@ fn update_table_row(
         &row_data,
         row_number,
         false,
+        false,
     ))
     .map_err(|e| e.to_string())
 }
