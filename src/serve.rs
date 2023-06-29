@@ -25,6 +25,7 @@ use ontodev_valve::{
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
 use std::{collections::HashMap, net::SocketAddr, process::Command, sync::Arc};
+use tower_http::services::ServeDir;
 
 #[derive(Debug, PartialEq, Eq)]
 enum RequestType {
@@ -45,12 +46,22 @@ pub type RequestParams = HashMap<String, String>;
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub fn build_app(shared_state: Arc<AppState>) -> Router {
+    let asset_path = shared_state.config.asset_path.clone();
     // build our application with a route
-    Router::new()
+    let router = Router::new()
         .route("/", get(root))
         .route("/:table", get(get_table).post(post_table))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
-        .with_state(shared_state)
+        .with_state(shared_state);
+    if let Some(asset_path) = asset_path {
+        let serve_dir = ServeDir::new(asset_path);
+        tracing::debug!("Serving static assets from {:?}", serve_dir);
+        Router::new()
+            .nest_service("/assets", serve_dir)
+            .merge(router)
+    } else {
+        router
+    }
 }
 
 #[tokio::main]
@@ -218,15 +229,23 @@ fn action(
             tracing::debug!("COMMAND {:?}", run);
             let output = run.output().expect("Command failed!");
             tracing::debug!("OUTPUT {:?}", output);
+            let status = output
+                .status
+                .code()
+                .ok_or("Bad exit status")
+                .unwrap_or_default();
             let stdout = std::str::from_utf8(&output.stdout).unwrap_or_default();
             let stderr = std::str::from_utf8(&output.stderr).unwrap_or_default();
             let result = json!({
                 "command": parts.join(" "),
-                "status": output.status.code().ok_or("Bad exit status").unwrap_or_default(),
+                "status": status,
                 "stdout": ansi_to_html::convert_escaped(stdout).unwrap(),
                 "stderr": ansi_to_html::convert_escaped(stderr).unwrap(),
             });
             results.push(result);
+            if status != 0 {
+                break;
+            }
         }
     }
 
@@ -1269,6 +1288,19 @@ fn get_row_as_form_map(
             },
             None => cell_header.to_string(),
         };
+        let label = match column_config.get("label") {
+            Some(l) => match l.as_str().and_then(|l| Some(l.to_string())) {
+                None => cell_header.to_string(),
+                Some(l) => {
+                    if l.trim().is_empty() {
+                        cell_header.to_string()
+                    } else {
+                        l
+                    }
+                }
+            },
+            None => cell_header.to_string(),
+        };
         let datatype = match column_config.get("datatype") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
                 None => return Err(format!("Could not convert '{}' to string", d)),
@@ -1310,7 +1342,7 @@ fn get_row_as_form_map(
             &None,
             &allowed_values,
             &Some(description),
-            &None,
+            &Some(label),
             &html_type,
             &Some(message),
             &Some(readonly),

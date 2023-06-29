@@ -289,8 +289,8 @@
       {% for column, cell in r|items -%}
       {% if column == "row_number" %}
       <td>
-        <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view=form"><i class="bi-pencil"
-            style="color: #adb5bd;"></i></a>
+        <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view={{ table.edit_view or 'form' }}"><i
+            class="bi-pencil" style="color: #adb5bd;"></i></a>
       </td>
       {% else %}
       <td class="{{ cell.classes|join(" , ") }}">

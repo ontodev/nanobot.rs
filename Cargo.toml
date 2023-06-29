@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 async-std = { version = "1", features = [ "attributes" ] }
-axum = "0.6.1"
+axum = "0.6.18"
 axum-test-helper = { version = "0.3.0", default-features = false, features = ["withouttrace"] }
 clap = { version = "4.0.27", features = ["cargo", "derive"] }
 enquote = "1.1.0"
@@ -36,6 +36,7 @@ indexmap = { version = "2.0.0", features = ["serde"] }
 git2 = "0.17.2"
 chrono = "0.4.26"
 ansi-to-html = "0.1.3"
+tower-http = { version = "0.4.1", features = ["fs", "trace"] }
 
 [dependencies.ontodev_hiccup]
 git = "https://github.com/ontodev/hiccup.rs"

@@ -101,6 +101,7 @@
       top: 2.375rem !important;
     }
   </style>
+  {% block head_end %}{% endblock %}
 </head>
 
 <body>
@@ -161,6 +162,7 @@
     {% endif %}
     {% block content %}{% endblock %}
   </div>
+  {% block script_start %}{% endblock %}
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
@@ -231,6 +233,7 @@
     }
     $('.typeahead').each(function () {configure_typeahead_form(this, "{{ table_name }}");});
   </script>
+  {% block body_end %}{% endblock %}
 </body>
 
 </html>
