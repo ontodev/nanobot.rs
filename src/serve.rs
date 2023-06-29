@@ -25,6 +25,7 @@ use ontodev_valve::{
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
 use std::{collections::HashMap, net::SocketAddr, process::Command, sync::Arc};
+use tower_http::services::ServeDir;
 
 #[derive(Debug, PartialEq, Eq)]
 enum RequestType {
@@ -45,12 +46,22 @@ pub type RequestParams = HashMap<String, String>;
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub fn build_app(shared_state: Arc<AppState>) -> Router {
+    let asset_path = shared_state.config.asset_path.clone();
     // build our application with a route
-    Router::new()
+    let router = Router::new()
         .route("/", get(root))
         .route("/:table", get(get_table).post(post_table))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
-        .with_state(shared_state)
+        .with_state(shared_state);
+    if let Some(asset_path) = asset_path {
+        let serve_dir = ServeDir::new(asset_path);
+        tracing::debug!("Serving static assets from {:?}", serve_dir);
+        Router::new()
+            .nest_service("/assets", serve_dir)
+            .merge(router)
+    } else {
+        router
+    }
 }
 
 #[tokio::main]

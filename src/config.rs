@@ -22,6 +22,7 @@ pub struct Config {
     pub pool: Option<AnyPool>,
     pub valve_path: String,
     pub valve: Option<ValveConfig>,
+    pub asset_path: Option<String>,
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
 }
@@ -54,6 +55,7 @@ pub struct TomlConfig {
     pub logging: Option<LoggingConfig>,
     pub database: Option<DatabaseConfig>,
     pub valve: Option<ValveTomlConfig>,
+    pub assets: Option<AssetsConfig>,
     pub templates: Option<TemplatesConfig>,
     pub actions: Option<IndexMap<String, ActionConfig>>,
 }
@@ -102,6 +104,11 @@ impl Default for ValveTomlConfig {
             path: Some("src/schema/table.tsv".into()),
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct AssetsConfig {
+    pub path: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -158,6 +165,23 @@ impl Config {
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
             valve: None,
+            asset_path: {
+                match user.assets.unwrap_or_default().path {
+                    Some(p) => {
+                        if Path::new(&p).is_dir() {
+                            Some(p)
+                        } else {
+                            eprintln!(
+                                "WARNING: Configuration specifies an assets directory \
+                                '{}' but it does not exist.",
+                                p
+                            );
+                            None
+                        }
+                    }
+                    None => None,
+                }
+            },
             template_path: {
                 match user.templates.unwrap_or_default().path {
                     Some(p) => {
@@ -284,6 +308,9 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         }),
         valve: Some(ValveTomlConfig {
             path: Some(config.valve_path.clone()),
+        }),
+        assets: Some(AssetsConfig {
+            path: config.asset_path.clone(),
         }),
         templates: Some(TemplatesConfig {
             path: config.template_path.clone(),
