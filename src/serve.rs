@@ -135,8 +135,6 @@ fn action(
     path: &String,
     state: &Arc<AppState>,
     query_params: &RequestParams,
-    _form_params: &RequestParams,
-    _request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
     let action_name = match query_params.get("user.action") {
         Some(a) => a,
@@ -294,7 +292,7 @@ async fn table(
 ) -> axum::response::Result<impl IntoResponse> {
     // TODO: Just hacking!
     if query_params.contains_key("user.action") {
-        let result = action(path, state, query_params, form_params, request_type)?;
+        let result = action(path, state, query_params)?;
         return Ok(result.into_response());
     }
 
@@ -612,13 +610,20 @@ async fn get_row(
     Query(params): Query<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("request row GET {:?} {:?} {:?}", table, row_number, params);
-    row(
+
+    if params.contains_key("user.action") {
+        let result = action(&table, &state, &params)?;
+        return Ok(result.into_response());
+    }
+
+    let row = row(
         Path((table, row_number)),
         &state,
         &params,
         &RequestParams::new(),
         RequestType::GET,
-    )
+    )?;
+    Ok(row.into_response())
 }
 
 fn row(
