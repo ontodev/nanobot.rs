@@ -941,6 +941,8 @@ fn insert_table_row(
         pool,
         &table_name,
         &row_data,
+        None,
+        false,
     ))
     .map_err(|e| e.to_string())
 }
@@ -967,6 +969,7 @@ fn update_table_row(
         &table_name,
         &row_data,
         row_number,
+        false,
     ))
     .map_err(|e| e.to_string())
 }
