@@ -843,6 +843,10 @@ fn render_row_from_database(
                 json!(format!("{}", row_number)),
             )?]);
             let mut rows = select.fetch_rows_as_json(pool, &HashMap::new())?;
+            if rows.len() == 0 {
+                let error = format!("No such row '{row_number}' for table '{table}'");
+                return Err((StatusCode::NOT_FOUND, Html(error)).into_response().into());
+            }
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
             match get_row_as_form_map(config, table, &metafied_row) {
@@ -885,6 +889,8 @@ fn render_row_from_database(
         },
         "title": "table",
         "table_name": table,
+        "row_number": row_number,
+        "offset": row_number - 1,
         "subtitle": format!(r#"<a href="/{}/row/{}">Return to row</a>"#, table, row_number),
         "messages": messages,
         "form_map": form_map,
