@@ -7,7 +7,9 @@ use crate::sql::{
     get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
     LIMIT_DEFAULT, LIMIT_MAX,
 };
+use chrono::prelude::{DateTime, Utc};
 use enquote::unquote;
+use git2::Repository;
 use minijinja::{Environment, Source};
 use ontodev_sqlrest::{Direction, OrderByColumn, Select};
 use ontodev_valve::get_sql_type_from_global_config;
@@ -16,10 +18,13 @@ use serde_json::{json, to_string_pretty, Map, Value};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
+use std::fs;
 use std::io::Write;
 use std::path::Path;
 use tabwriter::TabWriter;
 use urlencoding::decode;
+
+pub type SerdeMap = serde_json::Map<String, serde_json::Value>;
 
 #[derive(Debug)]
 pub struct GetError {
@@ -44,15 +49,33 @@ impl Error for GetError {
     }
 }
 
+impl From<String> for GetError {
+    fn from(error: String) -> GetError {
+        GetError::new(error)
+    }
+}
+
+impl From<std::io::Error> for GetError {
+    fn from(error: std::io::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
 impl From<sqlx::Error> for GetError {
     fn from(error: sqlx::Error) -> GetError {
         GetError::new(format!("{:?}", error))
     }
 }
 
-impl From<String> for GetError {
-    fn from(error: String) -> GetError {
-        GetError::new(error)
+impl From<git2::Error> for GetError {
+    fn from(error: git2::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
+impl From<std::time::SystemTimeError> for GetError {
+    fn from(error: std::time::SystemTimeError) -> GetError {
+        GetError::new(format!("{:?}", error))
     }
 }
 
@@ -857,12 +880,92 @@ async fn get_page(
             "select": select,
             "select_params": select2.to_params().unwrap_or_default(),
             "elapsed": elapsed,
+            "actions": get_action_map(&config).unwrap_or_default(),
+            "repo": get_repo_details().unwrap_or_default(),
         },
         "table": this_table,
         "column": column_map,
         "row": cell_rows,
     });
     tracing::debug!("Elapsed time for get_page(): {}", elapsed);
+    Ok(result)
+}
+
+pub fn get_action_map(config: &Config) -> Result<SerdeMap, GetError> {
+    let action_map: SerdeMap = config
+        .actions
+        .iter()
+        .map(|(k, v)| (k.into(), v.clone().label.into()))
+        .collect();
+    Ok(action_map)
+}
+
+pub fn get_repo_details() -> Result<SerdeMap, GetError> {
+    let mut result = SerdeMap::new();
+
+    let repo = Repository::open_from_env().expect("Couldn't open repository");
+    let head = match repo.head() {
+        Ok(head) => Some(head),
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let head = head
+        .as_ref()
+        .and_then(|h| h.shorthand())
+        .unwrap_or_default();
+    let local = repo.find_branch(&head, git2::BranchType::Local)?;
+    tracing::debug!("GIT got local: {head}, {:?}", local.name()?);
+    result.insert("head".into(), head.into());
+    result.insert("local".into(), local.name()?.into());
+
+    let upstream = local.upstream();
+    if let Ok(upstream) = upstream {
+        let (ahead, behind) = repo.graph_ahead_behind(
+            local.get().target().unwrap(),
+            upstream.get().target().unwrap(),
+        )?;
+        let remote = repo.find_remote("origin")?;
+        let remote_url = format!(
+            "{}/tree/{}",
+            remote
+                .url()
+                .ok_or("No URL?")
+                .unwrap_or_default()
+                .trim_end_matches(".git"),
+            upstream
+                .name()?
+                .unwrap_or_default()
+                .trim_start_matches("origin/")
+        );
+        tracing::debug!(
+            "GIT got remote: {ahead} ahead {behind} behind {:?}, {remote_url}",
+            upstream.name()?
+        );
+        result.insert("upstream".into(), upstream.name()?.into());
+        result.insert("remote_url".into(), remote_url.into());
+        result.insert("ahead".into(), ahead.into());
+        result.insert("behind".into(), behind.into());
+    } else {
+        tracing::debug!("GIT no upstream branch");
+    }
+
+    // https://github.com/ontodev/nanobot.rs/tree/refine-ui
+    let mut opts = git2::StatusOptions::new();
+    opts.include_ignored(false);
+    opts.include_untracked(false);
+    opts.exclude_submodules(true);
+    if let Ok(statuses) = repo.statuses(Some(&mut opts)) {
+        let uncommitted = statuses.len() > 0;
+        tracing::debug!("GIT got status: {uncommitted}");
+        result.insert("uncommitted".into(), uncommitted.into());
+    }
+    let path = repo.path().join("FETCH_HEAD");
+    tracing::debug!("GIT repo path: {path:?} {}", path.is_file());
+    if path.is_file() {
+        let dt: DateTime<Utc> = fs::metadata(path)?.modified()?.clone().into();
+        let fetched = format!("{}", dt.to_rfc3339());
+        result.insert("fetched".into(), fetched.into());
+    }
+
     Ok(result)
 }
 
@@ -951,6 +1054,7 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
     let page_html = include_str!("resources/page.html");
     let table_html = include_str!("resources/table.html");
     let form_html = include_str!("resources/form.html");
+    let action_html = include_str!("resources/action.html");
 
     let mut env = Environment::new();
     env.add_filter("level_to_bootstrap", level_to_bootstrap);
@@ -971,11 +1075,16 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
         if !path.is_file() {
             env.add_template("form.html", form_html).unwrap();
         }
+        let path = Path::new(t).join("action.html");
+        if !path.is_file() {
+            env.add_template("action.html", action_html).unwrap();
+        }
     } else {
         tracing::info!("Adding default templates");
         env.add_template("page.html", page_html).unwrap();
         env.add_template("table.html", table_html).unwrap();
         env.add_template("form.html", form_html).unwrap();
+        env.add_template("action.html", action_html).unwrap();
     }
 
     let template = match env.get_template(format!("{}.html", template).as_str()) {

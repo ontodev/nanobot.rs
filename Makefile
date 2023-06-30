@@ -25,6 +25,9 @@ format:
 build:
 	cargo build --release
 
+build/:
+	mkdir -p $@
+
 target/release/nanobot: src/
 	cargo build --release
 
@@ -63,3 +66,50 @@ penguins: target/release/nanobot examples/penguins/
 	&& python3 generate.py \
 	&& ../../$< init \
 	&& ../../$< serve
+
+build/synthea.zip: | build
+	curl -L -o build/synthea.zip "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip"
+
+build/synthea/: build/synthea.zip examples/synthea/
+	mkdir -p build/synthea/src/data
+	cp -r examples/synthea/* build/synthea/
+	unzip $< -d build/synthea/
+	sed 's/,/	/g' build/synthea/csv/patients.csv > build/synthea/src/data/patients.tsv
+	sed 's/,/	/g' build/synthea/csv/observations.csv > build/synthea/src/data/observations.tsv
+
+# && ~/valve.rs/target/release/ontodev_valve src/schema/table.tsv .nanobot.db
+.PHONY: synthea
+synthea: target/release/nanobot
+	rm -rf build/synthea/
+	make build/synthea/
+	cd build/synthea/ \
+	&& time ../../$< init \
+	&& ../../$< serve
+
+TODAY := $(shell date +%Y-%m-%d)
+ARCH := x86_64-unknown-linux-musl
+TARGET := build/nanobot-$(ARCH)
+
+target/$(ARCH)/release/nanobot: src
+	docker pull clux/muslrust:stable
+	docker run \
+		-v cargo-cache:/root/.cargo/registry \
+		-v $$PWD:/volume \
+		--rm -t clux/muslrust:stable \
+		cargo build --release
+
+.PHONY: musl
+musl: target/$(ARCH)/release/nanobot src/ | build/
+
+.PHONY: upload
+upload: target/$(ARCH)/release/nanobot | build/
+	cp $< $(TARGET)
+	gh release upload --clobber v$(TODAY) $(TARGET)
+
+.PHONY: release
+release: target/$(ARCH)/release/nanobot | build/
+	cp $< $(TARGET)
+	gh release create --draft --prerelease \
+		--title "$(TODAY) Alpha Release" \
+		--generate-notes \
+		v$(TODAY) $(TARGET)

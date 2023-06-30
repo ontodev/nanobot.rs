@@ -3,6 +3,7 @@ use crate::{
     get,
     sql::LIMIT_DEFAULT,
 };
+use ansi_to_html;
 use axum::{
     extract::{Form, Path, Query, State},
     http::StatusCode,
@@ -10,6 +11,7 @@ use axum::{
     routing::get,
     Router,
 };
+use chrono::prelude::Local;
 use enquote::unquote;
 use futures::executor::block_on;
 use html_escape::encode_text_to_string;
@@ -20,8 +22,10 @@ use ontodev_valve::{
     insert_new_row, update_row,
     validate::{get_matching_values, validate_row},
 };
+use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, process::Command, sync::Arc};
+use tower_http::services::ServeDir;
 
 #[derive(Debug, PartialEq, Eq)]
 enum RequestType {
@@ -42,12 +46,22 @@ pub type RequestParams = HashMap<String, String>;
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub fn build_app(shared_state: Arc<AppState>) -> Router {
+    let asset_path = shared_state.config.asset_path.clone();
     // build our application with a route
-    Router::new()
+    let router = Router::new()
         .route("/", get(root))
         .route("/:table", get(get_table).post(post_table))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
-        .with_state(shared_state)
+        .with_state(shared_state);
+    if let Some(asset_path) = asset_path {
+        let serve_dir = ServeDir::new(asset_path);
+        tracing::debug!("Serving static assets from {:?}", serve_dir);
+        Router::new()
+            .nest_service("/assets", serve_dir)
+            .merge(router)
+    } else {
+        router
+    }
 }
 
 #[tokio::main]
@@ -117,6 +131,161 @@ async fn get_table(
     .await
 }
 
+fn action(
+    path: &String,
+    state: &Arc<AppState>,
+    query_params: &RequestParams,
+) -> axum::response::Result<impl IntoResponse> {
+    let action_name = match query_params.get("user.action") {
+        Some(a) => a,
+        None => {
+            return Err((StatusCode::BAD_REQUEST, Html("No user action specified"))
+                .into_response()
+                .into())
+        }
+    };
+
+    let action = match &state.config.actions.get(action_name) {
+        Some(a) => a.clone(),
+        None => {
+            let message = format!("Undefined user action '{}'", action_name);
+            return Err((StatusCode::BAD_REQUEST, Html(message))
+                .into_response()
+                .into());
+        }
+    };
+
+    let mut values: HashMap<String, String> = HashMap::new();
+    if let Ok(output) = Command::new("gh")
+        .args(["api", "user", "--jq", ".login"])
+        .output()
+    {
+        let stdout = std::str::from_utf8(&output.stdout)
+            .unwrap_or_default()
+            .trim();
+        values.insert("username".into(), stdout.into());
+    }
+    values.insert("today".into(), Local::now().format("%Y-%m-%d").to_string());
+
+    let satisfied = match action.inputs {
+        Some(_) => {
+            let mut result = true;
+            for input in action.inputs.clone().unwrap_or_default() {
+                match query_params.get(&input.name) {
+                    Some(v) => {
+                        if !v.trim().is_empty() {
+                            values.insert(input.name, v.into());
+                            ()
+                        } else {
+                            result = false
+                        }
+                    }
+                    None => result = false,
+                }
+            }
+            result
+        }
+        None => true,
+    };
+
+    tracing::info!("VALUES {values:?}");
+
+    let re = Regex::new(r"\{(\w+)\}").unwrap();
+    let mut inputs = vec![];
+    let mut results = vec![];
+
+    if !satisfied {
+        for mut input in action.inputs.clone().unwrap_or_default() {
+            if let Some(v) = values.get(&input.name) {
+                if !v.trim().is_empty() {
+                    input.value = Some(v.to_string());
+                }
+            } else if let Some(default) = input.default.clone() {
+                tracing::debug!("INPUT DEFAULT {:?}", input.clone());
+                let subbed =
+                    re.replace_all(&default, |caps: &Captures| match values.get(&caps[1]) {
+                        Some(v) => v,
+                        None => "",
+                    });
+                input.value = Some(subbed.to_string());
+            };
+            inputs.push(input);
+        }
+    } else {
+        for command in action.commands.iter() {
+            tracing::debug!("RUNNING {:?}", command);
+            let mut run = Command::new(&command[0]);
+            let mut parts = vec![command[0].to_string()];
+            for arg in &command[1..] {
+                let subbed = re.replace_all(arg, |caps: &Captures| match values.get(&caps[1]) {
+                    Some(v) => v,
+                    None => "",
+                });
+                run.arg(subbed.to_string());
+                parts.push(subbed.to_string());
+            }
+            tracing::debug!("COMMAND {:?}", run);
+            let output = run.output().expect("Command failed!");
+            tracing::debug!("OUTPUT {:?}", output);
+            let status = output
+                .status
+                .code()
+                .ok_or("Bad exit status")
+                .unwrap_or_default();
+            let stdout = std::str::from_utf8(&output.stdout).unwrap_or_default();
+            let stderr = std::str::from_utf8(&output.stderr).unwrap_or_default();
+            let result = json!({
+                "command": parts.join(" "),
+                "status": status,
+                "stdout": ansi_to_html::convert_escaped(stdout).unwrap(),
+                "stderr": ansi_to_html::convert_escaped(stderr).unwrap(),
+            });
+            results.push(result);
+            if status != 0 {
+                break;
+            }
+        }
+    }
+
+    let root = if path.contains("/") { "../../" } else { "" };
+    tracing::debug!("ROOT! {root} {path}");
+    let table_map = {
+        let mut table_map = SerdeMap::new();
+        for table in get_tables(state.config.valve.as_ref().ok_or("No VALVE config")?)? {
+            table_map.insert(table.to_string(), json!(table.clone()));
+        }
+        json!(table_map)
+    };
+    let page = json!({
+        "page": {
+            "root": root,
+            "project_name": "Nanobot",
+            "tables": table_map,
+            "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "repo": get::get_repo_details().unwrap_or_default(),
+        },
+        "title": action.label,
+        "action_name": action_name,
+        "action": action,
+        "inputs": inputs,
+        "results": results,
+    });
+
+    if path.ends_with(".pretty.json") {
+        Ok(serde_json::to_string_pretty(&page)
+            .unwrap_or_default()
+            .into_response())
+    } else if path.ends_with(".json") {
+        Ok(Json(page).into_response())
+    } else {
+        let page_html = match get::page_to_html(&state.config, "action", &page) {
+            Ok(p) => p,
+            Err(e) => return Err(e.to_string().into()),
+        };
+        Ok(Html(page_html).into_response())
+    }
+}
+
 async fn table(
     path: &String,
     state: &Arc<AppState>,
@@ -124,11 +293,17 @@ async fn table(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
+    // TODO: Just hacking!
+    if query_params.contains_key("user.action") {
+        let result = action(path, state, query_params)?;
+        return Ok(result.into_response());
+    }
+
     let (table, format, shape);
     let mut sqlrest_params = query_params.clone();
-    sqlrest_params.remove("shape".into());
-    sqlrest_params.remove("view".into());
-    sqlrest_params.remove("format".into());
+    sqlrest_params.remove("shape");
+    sqlrest_params.remove("view");
+    sqlrest_params.remove("format");
     for key in sqlrest_params.clone().keys() {
         if key.starts_with("nb.") {
             sqlrest_params.remove(key);
@@ -177,15 +352,15 @@ async fn table(
 
     // Handle actions such as filtering.
     if query_params.contains_key("nb.action") {
-        tracing::warn!("ACTION {:?}", query_params);
+        tracing::debug!("ACTION {:?}", query_params);
         let action = query_params.get("nb.action").unwrap();
         if action == "filter" {
             let column = query_params.get("nb.column").unwrap();
             let operator = query_params.get("nb.operator").unwrap();
             let constraint = query_params.get("nb.constraint").unwrap();
-            tracing::warn!("FILTER {}, {}, {}", column, operator, constraint);
+            tracing::debug!("FILTER {}, {}, {}", column, operator, constraint);
             sqlrest_params.insert(column.into(), format!("{}.{}", operator, constraint));
-            tracing::warn!("SQLREST {:?}", sqlrest_params);
+            tracing::debug!("SQLREST {:?}", sqlrest_params);
 
             let url = {
                 let url = sqlrest_params
@@ -273,7 +448,7 @@ async fn table(
             match get_row_as_form_map(config, &table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::warn!("Rendering error {}", e);
+                    tracing::debug!("Rendering error {}", e);
                     form_map = None
                 }
             };
@@ -340,7 +515,7 @@ async fn table(
             match get_row_as_form_map(config, &table, &new_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::warn!("Rendering error {}", e);
+                    tracing::debug!("Rendering error {}", e);
                     form_map = None
                 }
             };
@@ -359,8 +534,10 @@ async fn table(
         // passing (through page_to_html()) to the minijinja template:
         let page = json!({
             "page": {
+                "root": "",
                 "project_name": "Nanobot",
                 "tables": table_map,
+                "actions": get::get_action_map(&state.config).unwrap_or_default(),
             },
             "title": "table",
             "table_name": table,
@@ -436,13 +613,21 @@ async fn get_row(
     Query(params): Query<RequestParams>,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("request row GET {:?} {:?} {:?}", table, row_number, params);
-    row(
+
+    if params.contains_key("user.action") {
+        let path = &format!("{table}/row/{row_number}");
+        let result = action(&path, &state, &params)?;
+        return Ok(result.into_response());
+    }
+
+    let row = row(
         Path((table, row_number)),
         &state,
         &params,
         &RequestParams::new(),
         RequestType::GET,
-    )
+    )?;
+    Ok(row.into_response())
 }
 
 fn row(
@@ -601,7 +786,7 @@ fn render_row_from_database(
             match get_row_as_form_map(config, table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::warn!("Rendering error {}", e);
+                    tracing::debug!("Rendering error {}", e);
                     form_map = None
                 }
             };
@@ -618,10 +803,10 @@ fn render_row_from_database(
             messages = get_messages(&validated_row)?;
             if let Some(error_messages) = messages.get_mut("error") {
                 let extra_message = format!("Row updated with {} errors", error_messages.len());
-                match messages.get_mut("warn") {
-                    Some(warn_messages) => warn_messages.push(extra_message),
+                match messages.get_mut("debug") {
+                    Some(debug_messages) => debug_messages.push(extra_message),
                     None => {
-                        messages.insert("warn".to_string(), vec![extra_message]);
+                        messages.insert("debug".to_string(), vec![extra_message]);
                     }
                 };
             } else {
@@ -656,7 +841,7 @@ fn render_row_from_database(
             match get_row_as_form_map(config, table, &metafied_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::warn!("Rendering error {}", e);
+                    tracing::debug!("Rendering error {}", e);
                     form_map = None
                 }
             };
@@ -677,7 +862,7 @@ fn render_row_from_database(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(config)? {
-            table_map.insert(table.to_string(), json!(format!("../../{}", table)));
+            table_map.insert(table.to_string(), json!(table.clone()));
         }
         json!(table_map)
     };
@@ -686,8 +871,10 @@ fn render_row_from_database(
     // minijinja template (through page_to_html()):
     let page = json!({
         "page": {
+            "root": "../../",
             "project_name": "Nanobot",
             "tables": table_map,
+            "actions": get::get_action_map(&state.config).unwrap_or_default(),
         },
         "title": "table",
         "table_name": table,
@@ -753,19 +940,19 @@ fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> 
                         };
                         error_list.push(error_msg.to_string());
                     }
-                    Some(level) if level == "warn" => {
-                        if !messages.contains_key("warn") {
-                            messages.insert("warn".to_string(), vec![]);
+                    Some(level) if level == "debug" => {
+                        if !messages.contains_key("debug") {
+                            messages.insert("debug".to_string(), vec![]);
                         }
-                        let warn_list = match messages.get_mut("warn") {
+                        let debug_list = match messages.get_mut("debug") {
                             Some(e) => e,
-                            None => return Err("No 'warn' in messages".to_string()),
+                            None => return Err("No 'debug' in messages".to_string()),
                         };
-                        let warn_msg = match msg.get("message").and_then(|m| m.as_str()) {
+                        let debug_msg = match msg.get("message").and_then(|m| m.as_str()) {
                             Some(s) => s,
                             None => return Err(format!("No str called 'message' in {}", msg)),
                         };
-                        warn_list.push(warn_msg.to_string());
+                        debug_list.push(debug_msg.to_string());
                     }
                     Some(level) if level == "info" => {
                         if !messages.contains_key("info") {
@@ -781,8 +968,8 @@ fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> 
                         };
                         info_list.push(info_msg.to_string());
                     }
-                    Some(level) => tracing::warn!("Unrecognized level '{}' in {}", level, msg),
-                    None => tracing::warn!("Message: {} has no 'level'. Ignoring it.", msg),
+                    Some(level) => tracing::debug!("Unrecognized level '{}' in {}", level, msg),
+                    None => tracing::debug!("Message: {} has no 'level'. Ignoring it.", msg),
                 };
             }
         }
@@ -1041,15 +1228,21 @@ fn stringify_messages(messages: &Vec<SerdeValue>) -> Result<String, String> {
     for m in messages {
         match m.as_object() {
             None => return Err(format!("{:?} is not an object.", m)),
-            Some(message) => match message.get("message") {
-                None => return Err(format!("No 'message' in {:?}", message)),
-                Some(message) => {
-                    match message.as_str() {
-                        Some(message) => msg_parts.push(message.to_string()),
-                        None => return Err(format!("{} is not a str", message)),
-                    };
+            Some(message) => {
+                let level = message.get("level").unwrap_or(&serde_json::Value::Null);
+                if level == "update" {
+                    continue;
                 }
-            },
+                match message.get("message") {
+                    None => return Err(format!("No 'message' in {:?}", message)),
+                    Some(message) => {
+                        match message.as_str() {
+                            Some(message) => msg_parts.push(message.to_string()),
+                            None => return Err(format!("{} is not a str", message)),
+                        };
+                    }
+                }
+            }
         };
     }
     Ok(msg_parts.join("<br>"))
@@ -1068,6 +1261,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
         }
         let mut metafied_cell = SerdeMap::new();
         metafied_cell.insert("value".to_string(), value.clone());
+        let mut valid = true;
         let metafied_messages = {
             let mut metafied_messages = vec![];
             for m in &mut messages {
@@ -1077,6 +1271,11 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
                             Some(m) => m,
                             None => return Err(format!("{} is not an object", m)),
                         };
+                        if let Some(level) = m.get("level") {
+                            if level != "update" {
+                                valid = false;
+                            }
+                        }
                         m.remove("column");
                         metafied_messages.push(m.clone());
                         // Overwrite the value in the metafied_cell:
@@ -1094,7 +1293,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
             metafied_messages
         };
         metafied_cell.insert("messages".to_string(), json!(metafied_messages));
-        metafied_cell.insert("valid".to_string(), json!(metafied_messages.is_empty()));
+        metafied_cell.insert("valid".to_string(), valid.into());
         metafied_row.insert(column.to_string(), json!(metafied_cell));
     }
     Ok(metafied_row)
@@ -1147,6 +1346,19 @@ fn get_row_as_form_map(
             },
             None => cell_header.to_string(),
         };
+        let label = match column_config.get("label") {
+            Some(l) => match l.as_str().and_then(|l| Some(l.to_string())) {
+                None => cell_header.to_string(),
+                Some(l) => {
+                    if l.trim().is_empty() {
+                        cell_header.to_string()
+                    } else {
+                        l
+                    }
+                }
+            },
+            None => cell_header.to_string(),
+        };
         let datatype = match column_config.get("datatype") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
                 None => return Err(format!("Could not convert '{}' to string", d)),
@@ -1188,7 +1400,7 @@ fn get_row_as_form_map(
             &None,
             &allowed_values,
             &Some(description),
-            &None,
+            &Some(label),
             &html_type,
             &Some(message),
             &Some(readonly),
