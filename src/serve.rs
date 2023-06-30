@@ -247,6 +247,8 @@ fn action(
         }
     }
 
+    let root = if path.contains("/") { "../../" } else { "" };
+    tracing::debug!("ROOT! {root} {path}");
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(state.config.valve.as_ref().ok_or("No VALVE config")?)? {
@@ -256,6 +258,7 @@ fn action(
     };
     let page = json!({
         "page": {
+            "root": root,
             "project_name": "Nanobot",
             "tables": table_map,
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
@@ -532,6 +535,7 @@ async fn table(
         // passing (through page_to_html()) to the minijinja template:
         let page = json!({
             "page": {
+                "root": "",
                 "project_name": "Nanobot",
                 "tables": table_map,
                 "actions": get::get_action_map(&state.config).unwrap_or_default(),
@@ -612,7 +616,8 @@ async fn get_row(
     tracing::info!("request row GET {:?} {:?} {:?}", table, row_number, params);
 
     if params.contains_key("user.action") {
-        let result = action(&table, &state, &params)?;
+        let path = &format!("{table}/row/{row_number}");
+        let result = action(&path, &state, &params)?;
         return Ok(result.into_response());
     }
 
@@ -864,7 +869,7 @@ fn render_row_from_database(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(config)? {
-            table_map.insert(table.to_string(), json!(format!("../../{}", table)));
+            table_map.insert(table.to_string(), json!(table.clone()));
         }
         json!(table_map)
     };
@@ -873,6 +878,7 @@ fn render_row_from_database(
     // minijinja template (through page_to_html()):
     let page = json!({
         "page": {
+            "root": "../../",
             "project_name": "Nanobot",
             "tables": table_map,
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
