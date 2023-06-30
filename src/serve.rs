@@ -19,7 +19,7 @@ use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select};
 use ontodev_valve::{
     ast::Expression,
-    insert_new_row, update_row,
+    delete_row, insert_new_row, update_row,
     validate::{get_matching_values, validate_row},
 };
 use regex::{Captures, Regex};
@@ -815,6 +815,12 @@ fn render_row_from_database(
                     vec!["Row successfully updated!".to_string()],
                 );
             }
+        } else if action == "delete" {
+            if let Err(e) = delete_table_row(table, &row_number, state) {
+                return Err(e.to_string().into());
+            }
+            tracing::debug!("DELETED ROW {table} {row_number}, redirecting to ../../{table}");
+            return Ok(Redirect::to(&format!("../../{table}").to_string()).into_response());
         }
     }
 
@@ -1163,6 +1169,31 @@ fn update_table_row(
         &row_data,
         row_number,
         false,
+        false,
+    ))
+    .map_err(|e| e.to_string())
+}
+
+fn delete_table_row(
+    table_name: &str,
+    row_number: &u32,
+    state: &Arc<AppState>,
+) -> Result<(), String> {
+    let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+        None => return Err("Missing valve configuration".to_string()),
+    };
+    let pool = match state.config.pool.as_ref() {
+        Some(p) => p,
+        None => return Err("Missing database pool".to_string()),
+    };
+    block_on(delete_row(
+        &vconfig,
+        dt_conds,
+        rule_conds,
+        pool,
+        &table_name,
+        row_number,
         false,
     ))
     .map_err(|e| e.to_string())

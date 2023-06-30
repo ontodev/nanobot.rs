@@ -64,6 +64,8 @@
       <div class="col-auto">
         <button class="btn btn-primary" type="submit" name="action" value="validate">Validate</button>
         <button class="btn btn-success" type="submit" name="action" value="submit">Submit</button>
+        <button class="btn btn-danger" type="submit" name="action" value="delete"
+          onclick="return confirm('Permanently delete this row?')">Delete</button>
         <a class="btn btn-secondary" href="{{ page.root }}{{ table_name }}?offset={{ offset }}">Cancel</a>
       </div>
   </form>
