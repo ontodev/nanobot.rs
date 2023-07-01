@@ -55,20 +55,47 @@
 {% endif %}
 {% endif %}
 
-<div class="row" style="padding-bottom:5px; padding-top:20px;">
-  <form method="post">
-    {% for column, form_row in form_map|items %}
-    {{ form_row|safe }}
-    {% endfor %}
-    <div class="row pt-4">
-      <div class="col-auto">
-        <button class="btn btn-primary" type="submit" name="action" value="validate">Validate</button>
-        <button class="btn btn-success" type="submit" name="action" value="submit">Submit</button>
-        <button class="btn btn-danger" type="submit" name="action" value="delete"
-          onclick="return confirm('Permanently delete this row?')">Delete</button>
-        <a class="btn btn-secondary" href="{{ page.root }}{{ table_name }}?offset={{ offset }}">Cancel</a>
-      </div>
-  </form>
+{% if inputs %}
+<form class="form mt-4" style="max-width: 30em; margin-left: auto; margin-right: auto " action="">
+  <h4>Input required for '{{ action.label }}'</h4>
+  {% for input in inputs %}
+  <div class="row py-2">
+    <div class="col-md-4">
+      <label class="col-form-label" for="{{ input.name }}">{{ input.label }}</label>
+    </div>
+    <div class="col-md-8">
+      <input class="form-control" type="text" name="{{ input.name }}" value="{{ input.value if input.value }}"
+        placeholder="{{ input.placeholder }}" />
+    </div>
+  </div>
+  {% endfor %}
+  <div class="row py-2">
+    <div class="col text-end">
+      <button class="btn btn-primary" type="submit" name="user.action" value="{{ action_name }}">Submit</button>
+    </div>
+  </div>
+</form>
+{% endif %}
+
+{% if results %}
+<h4 class="mt-4">Results for for '{{ action.label }}'</h4>
+{% for result in results %}
+<div class="card mt-4">
+  <div class="card-header text-bg-{{ 'success' if result.status == 0 else 'danger' }}">
+    <pre class="mb-0">&gt; {{ result.command }}</pre>
+  </div>
+  <div class="card-body">
+    {% if result.stdout %}<pre>{{ result.stdout|safe }}</pre>{% endif %}
+    {% if result.status != 0 %}
+    <h5>Exit status: {{ result.status }}</h5>
+    {% endif %}
+    {% if result.stderr %}
+    <h5>Errors:</h5>
+    <pre>{{ result.stderr|safe }}</pre>
+    {% endif %}
+  </div>
 </div>
+{% endfor %}
+{% endif %}
 
 {% endblock %}

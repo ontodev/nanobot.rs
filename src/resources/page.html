@@ -101,13 +101,18 @@
       top: 2.375rem !important;
     }
   </style>
+  {% block head_end %}{% endblock %}
 </head>
 
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
       <a class="navbar-brand">{{ page.project_name }}</a>
-      <div class="collapse navbar-collapse">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+        aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -115,19 +120,51 @@
             </a>
             <ul class="dropdown-menu">
               {% for table, href in page.tables|items %}
-              <li><a class="dropdown-item" href="{{ href }}">{{ table }}</a></li>
+              <li><a class="dropdown-item" href="{{ page.root }}{{ href }}">{{ table }}</a></li>
               {% endfor %}
             </ul>
           </li>
         </ul>
+        {% if page.actions %}
+        <ul class="navbar-nav">
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+              Actions
+            </a>
+            <ul class="dropdown-menu">
+              {% for name, label in page.actions|items %}
+              <li><a class="dropdown-item" href="?user.action={{ name }}">{{ label or name }}</a></li>
+              {% endfor %}
+            </ul>
+          </li>
+        </ul>
+        {% endif %}
       </div>
     </div>
   </nav>
   <div id="content" class="container-fluid">
     {% if page.elapsed %}<p class="float-end">{{ page.elapsed }}ms</p>{% endif %}
+    {% if page.repo %}
+    <p class="mt-2">
+      On branch '{{ page.repo.local }}':
+      {{ page.repo.ahead }} ahead,
+      {{ page.repo.behind }} behind
+      '<a href="{{ page.repo.remote_url }}" target="_blank">{{ page.repo.upstream }}</a>'
+      {% if page.repo.fetched %}
+      (fetched <span class="since">{{ page.repo.fetched }}</span>)
+      {% else %}
+      (never fetched)
+      {% endif %}
+      {% if page.repo.uncommitted %}
+      with uncommitted changes
+      {% endif %}
+    </p>
+    {% endif %}
     {% block content %}{% endblock %}
   </div>
+  {% block script_start %}{% endblock %}
   <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
     integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
     crossorigin="anonymous"></script>
@@ -139,6 +176,20 @@
     src="https://cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.11.1/typeahead.bundle.min.js">
     </script>
   <script>
+
+    // Replace GMT dates with local dates, and replace GMT dates with friendly time
+    // period. We declare a function since we will need to use it again later during
+    // auto-refresh:
+    function friendlifyMoments() {
+      $('.date').each(function () {
+        $(this).text(moment($(this).text()).format('YYYY-MM-DD hh:mm:ss'));
+      });
+      $('.since').each(function () {
+        $(this).text(moment($(this).text()).fromNow());
+      });
+    }
+    friendlifyMoments();
+
     function configure_typeahead_form(node, table) {
       if (!node.id || !node.id.endsWith("-typeahead-form")) {
         return;
@@ -182,6 +233,7 @@
     }
     $('.typeahead').each(function () {configure_typeahead_form(this, "{{ table_name }}");});
   </script>
+  {% block body_end %}{% endblock %}
 </body>
 
 </html>

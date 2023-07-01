@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 async-std = { version = "1", features = [ "attributes" ] }
-axum = "0.6.1"
+axum = "0.6.18"
 axum-test-helper = { version = "0.3.0", default-features = false, features = ["withouttrace"] }
 clap = { version = "4.0.27", features = ["cargo", "derive"] }
 enquote = "1.1.0"
@@ -22,7 +22,7 @@ sqlx = { version = "0.6", features = [ "runtime-async-std-rustls", "any", "postg
 tabwriter = { version = "1.2.1" }
 tokio = { version = "1.22.0", features = ["full"] }
 tokio-test = "0.4.2"
-toml = { version = "0.5.9" }
+toml = "0.7.5"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 urlencoding = "2.1.2"
@@ -32,6 +32,12 @@ async-recursion = "1.0.2"
 reqwest = { version = "0.11.14", features = ["blocking"] }
 itertools = "0.10.5" 
 thiserror = "1.0"
+indexmap = { version = "2.0.0", features = ["serde"] }
+git2 = "0.17.2"
+chrono = "0.4.26"
+ansi-to-html = "0.1.3"
+tower-http = { version = "0.4.1", features = ["fs", "trace"] }
+rustls-native-certs = "0.6.3"
 
 [dependencies.ontodev_hiccup]
 git = "https://github.com/ontodev/hiccup.rs"

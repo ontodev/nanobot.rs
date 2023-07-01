@@ -1,3 +1,4 @@
+use indexmap::map::IndexMap;
 use ontodev_valve::{
     get_compiled_datatype_conditions, get_compiled_rule_conditions,
     get_parsed_structure_conditions, valve, valve_grammar::StartParser, ColumnRule,
@@ -21,7 +22,9 @@ pub struct Config {
     pub pool: Option<AnyPool>,
     pub valve_path: String,
     pub valve: Option<ValveConfig>,
+    pub asset_path: Option<String>,
     pub template_path: Option<String>,
+    pub actions: IndexMap<String, ActionConfig>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -52,7 +55,9 @@ pub struct TomlConfig {
     pub logging: Option<LoggingConfig>,
     pub database: Option<DatabaseConfig>,
     pub valve: Option<ValveTomlConfig>,
+    pub assets: Option<AssetsConfig>,
     pub templates: Option<TemplatesConfig>,
+    pub actions: Option<IndexMap<String, ActionConfig>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -102,8 +107,30 @@ impl Default for ValveTomlConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct AssetsConfig {
+    pub path: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TemplatesConfig {
     pub path: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct ActionConfig {
+    pub label: String,
+    pub inputs: Option<Vec<InputConfig>>,
+    pub commands: Vec<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct InputConfig {
+    pub name: String,
+    pub label: String,
+    pub value: Option<String>,
+    pub default: Option<String>,
+    pub placeholder: Option<String>,
+    pub test: Option<String>,
 }
 
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
@@ -138,6 +165,23 @@ impl Config {
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
             valve: None,
+            asset_path: {
+                match user.assets.unwrap_or_default().path {
+                    Some(p) => {
+                        if Path::new(&p).is_dir() {
+                            Some(p)
+                        } else {
+                            eprintln!(
+                                "WARNING: Configuration specifies an assets directory \
+                                '{}' but it does not exist.",
+                                p
+                            );
+                            None
+                        }
+                    }
+                    None => None,
+                }
+            },
             template_path: {
                 match user.templates.unwrap_or_default().path {
                     Some(p) => {
@@ -155,6 +199,7 @@ impl Config {
                     None => None,
                 }
             },
+            actions: user.actions.unwrap_or_default(),
         };
 
         Ok(config)
@@ -264,8 +309,12 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         valve: Some(ValveTomlConfig {
             path: Some(config.valve_path.clone()),
         }),
+        assets: Some(AssetsConfig {
+            path: config.asset_path.clone(),
+        }),
         templates: Some(TemplatesConfig {
             path: config.template_path.clone(),
         }),
+        actions: Some(config.actions.clone()),
     }
 }
