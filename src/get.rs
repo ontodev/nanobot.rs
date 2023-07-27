@@ -1054,6 +1054,7 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
     let page_html = include_str!("resources/page.html");
     let table_html = include_str!("resources/table.html");
     let form_html = include_str!("resources/form.html");
+    let tree_html = include_str!("resources/tree.html");
     let action_html = include_str!("resources/action.html");
 
     let mut env = Environment::new();
@@ -1075,6 +1076,10 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
         if !path.is_file() {
             env.add_template("form.html", form_html).unwrap();
         }
+        let path = Path::new(t).join("tree.html");
+        if !path.is_file() {
+            env.add_template("tree.html", tree_html).unwrap();
+        }
         let path = Path::new(t).join("action.html");
         if !path.is_file() {
             env.add_template("action.html", action_html).unwrap();
@@ -1084,6 +1089,7 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
         env.add_template("page.html", page_html).unwrap();
         env.add_template("table.html", table_html).unwrap();
         env.add_template("form.html", form_html).unwrap();
+        env.add_template("tree.html", tree_html).unwrap();
         env.add_template("action.html", action_html).unwrap();
     }
 

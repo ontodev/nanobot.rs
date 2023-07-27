@@ -41,15 +41,13 @@ rustls-native-certs = "0.6.3"
 
 [dependencies.ontodev_hiccup]
 git = "https://github.com/ontodev/hiccup.rs"
-rev = "fb8bfe02fc36389c89d335d81488d7d1da719c1f"
+rev = "f46fbd5450505644ed9970cef1ae14164699981f"
 
 [dependencies.ontodev_valve]
-# path = "../ontodev_demo/valve.rs"
 git = "https://github.com/ontodev/valve.rs"
-rev = "ee5e24d044bbf90d9e08ccea0a1c398034c3b355"
+rev = "074b99254e4cc956c84cf7b68bff26cae57f0d16"
 
 [dependencies.ontodev_sqlrest]
-# path = "../sqlrest.rs"
 git = "https://github.com/ontodev/sqlrest.rs"
 rev = "c063ac728d31ac4ea517fd423779d6c547639181"
 

@@ -1,0 +1,19 @@
+{% extends "page.html" %}
+{% block content %}
+
+<div class="row" style="padding-bottom:5px; padding-top:20px;">
+  <div class="col">
+    <h3>{{ subject }}</h3>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col">
+    {{ tree|safe }}
+  </div>
+  <div class="col">
+    {{ predicate_map|safe }}
+  </div>
+</div>
+
+{% endblock %}

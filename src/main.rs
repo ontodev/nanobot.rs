@@ -8,8 +8,10 @@ use url::Url;
 pub mod config;
 pub mod get;
 pub mod init;
+pub mod ldtab;
 pub mod serve;
 pub mod sql;
+pub mod tree_view;
 
 #[async_std::main]
 async fn main() {

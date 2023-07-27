@@ -119,10 +119,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
     let database = config.connection.to_owned();
     let path = Path::new(&database);
     if path.exists() {
-        return Err(format!(
-            "Cannot init: '{}' database already exists",
-            path.display()
-        ));
+        tracing::warn!("Initializing existing database: '{}'", path.display());
     }
 
     // Create nanobot.toml if it does not exist.
@@ -179,9 +176,13 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     //create database
-    match File::create(&database) {
-        Err(_x) => return Err(String::from("Couldn't create database")),
-        Ok(_x) => {}
+    let database = config.connection.to_owned();
+    let path = Path::new(&database);
+    if !path.exists() {
+        match File::create(&database) {
+            Err(_x) => return Err(String::from("Couldn't create database")),
+            Ok(_x) => {}
+        }
     }
 
     //add database to .gitignore
