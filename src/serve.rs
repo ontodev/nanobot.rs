@@ -19,7 +19,7 @@ use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select};
 use ontodev_valve::{
     ast::Expression,
-    insert_new_row, update_row,
+    delete_row, insert_new_row, update_row,
     validate::{get_matching_values, validate_row},
 };
 use regex::{Captures, Regex};
@@ -457,11 +457,10 @@ async fn table(
             // containing a javascript redirect as a response which points back to the last
             // page of the table:
             let offset = {
-                let row_number =
-                    match insert_new_row(&config.config, pool, &table, &validated_row).await {
-                        Ok(n) => n,
-                        Err(e) => return Err(e.to_string().into()),
-                    };
+                let row_number = match insert_table_row(&table, &validated_row, state) {
+                    Ok(n) => n,
+                    Err(e) => return Err(e.to_string().into()),
+                };
                 let pages = row_number / LIMIT_DEFAULT as u32;
                 pages * LIMIT_DEFAULT as u32
             };
@@ -797,13 +796,7 @@ fn render_row_from_database(
                 Ok(v) => v,
                 Err(e) => return Err(e.into()),
             };
-            if let Err(e) = block_on(update_row(
-                &config.config,
-                pool,
-                table,
-                &validated_row,
-                row_number,
-            )) {
+            if let Err(e) = update_table_row(table, &validated_row, &row_number, state) {
                 return Err(e.to_string().into());
             }
 
@@ -822,6 +815,12 @@ fn render_row_from_database(
                     vec!["Row successfully updated!".to_string()],
                 );
             }
+        } else if action == "delete" {
+            if let Err(e) = delete_table_row(table, &row_number, state) {
+                return Err(e.to_string().into());
+            }
+            tracing::debug!("DELETED ROW {table} {row_number}, redirecting to ../../{table}");
+            return Ok(Redirect::to(&format!("../../{table}").to_string()).into_response());
         }
     }
 
@@ -1121,6 +1120,85 @@ fn is_ontology(table: &str, config: &ValveConfig) -> Result<bool, String> {
         && columns.contains(&"annotation".to_string()))
 }
 
+fn insert_table_row(
+    table_name: &str,
+    row_data: &SerdeMap,
+    state: &Arc<AppState>,
+) -> Result<u32, String> {
+    let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+        None => return Err("Missing valve configuration".to_string()),
+    };
+    let pool = match state.config.pool.as_ref() {
+        Some(p) => p,
+        None => return Err("Missing database pool".to_string()),
+    };
+    block_on(insert_new_row(
+        &vconfig,
+        dt_conds,
+        rule_conds,
+        pool,
+        &table_name,
+        &row_data,
+        None,
+        false,
+    ))
+    .map_err(|e| e.to_string())
+}
+
+fn update_table_row(
+    table_name: &str,
+    row_data: &SerdeMap,
+    row_number: &u32,
+    state: &Arc<AppState>,
+) -> Result<(), String> {
+    let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+        None => return Err("Missing valve configuration".to_string()),
+    };
+    let pool = match state.config.pool.as_ref() {
+        Some(p) => p,
+        None => return Err("Missing database pool".to_string()),
+    };
+    block_on(update_row(
+        &vconfig,
+        dt_conds,
+        rule_conds,
+        pool,
+        &table_name,
+        &row_data,
+        row_number,
+        false,
+        false,
+    ))
+    .map_err(|e| e.to_string())
+}
+
+fn delete_table_row(
+    table_name: &str,
+    row_number: &u32,
+    state: &Arc<AppState>,
+) -> Result<(), String> {
+    let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+        None => return Err("Missing valve configuration".to_string()),
+    };
+    let pool = match state.config.pool.as_ref() {
+        Some(p) => p,
+        None => return Err("Missing database pool".to_string()),
+    };
+    block_on(delete_row(
+        &vconfig,
+        dt_conds,
+        rule_conds,
+        pool,
+        &table_name,
+        row_number,
+        false,
+    ))
+    .map_err(|e| e.to_string())
+}
+
 fn validate_table_row(
     table_name: &str,
     row_data: &SerdeMap,
@@ -1155,10 +1233,11 @@ fn validate_table_row(
                     &dt_conds,
                     &rule_conds,
                     &pool,
+                    None,
                     table_name,
                     &result_row,
-                    true,
                     Some(*row_number),
+                    None,
                 )) {
                     Ok(r) => r,
                     Err(e) => return Err(e.to_string()),
@@ -1169,9 +1248,10 @@ fn validate_table_row(
                 &dt_conds,
                 &rule_conds,
                 &pool,
+                None,
                 table_name,
                 &result_row,
-                false,
+                None,
                 None,
             )) {
                 Ok(r) => r,
