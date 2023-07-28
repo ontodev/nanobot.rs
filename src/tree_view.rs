@@ -1637,7 +1637,14 @@ pub async fn add_grandchildren(
         };
         let grand_children =
             get_immediate_children_tree(child_iri, &relations, table, pool).await?;
-        child["children"] = grand_children;
+        // child["children"] = grand_children;
+        // Set a has_children flag.
+        if let Some(gcs) = grand_children.as_array() {
+            if gcs.len() > 0 {
+                child["has_children"] = json!(true);
+                child["child_count"] = json!(gcs.len().clone());
+            }
+        }
     }
     Ok(())
 }
@@ -1970,7 +1977,7 @@ pub async fn get_rich_json_tree_view(
     let mut children = get_immediate_children_tree(entity, &relations, table, pool).await?;
 
     //... then and grandchildren ...
-    // add_grandchildren(&mut children, relations, table, pool).await?;
+    add_grandchildren(&mut children, relations, table, pool).await?;
 
     //... and then add these to the tree in the first occurrence of the input entity
     add_children(&mut sorted, &children)?;
@@ -2021,6 +2028,10 @@ pub fn tree_2_hiccup_direct_children(
                 res_element.push(json!("li"));
 
                 res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+                if let Some(count) = child.get("child_count") {
+                    res_element
+                        .push(json!(["span", {"class": "text-secondary"}, format!("({count})")]));
+                }
 
                 //encode grand children
                 let curie = match child["curie"].as_str() {
@@ -2477,7 +2488,7 @@ pub async fn get_hiccup_top_class_hierarchy(
 
         //add children & grandchildren
         let mut children = get_immediate_children_tree(entity, &vec![IS_A], table, pool).await?;
-        // add_grandchildren(&mut children, &vec![IS_A], table, pool).await?;
+        add_grandchildren(&mut children, &vec![IS_A], table, pool).await?;
         add_children(&mut root_tree, &children)?;
 
         top_hierarchy_nodes.push(root_tree);

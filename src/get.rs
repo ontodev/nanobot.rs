@@ -172,6 +172,11 @@ pub async fn get_rows(
 
     match shape {
         "value_rows" => {
+            if unquoted_table != "message" {
+                // use the *_view table
+                select.table(format!("\"{unquoted_table}_view\""));
+            }
+            tracing::debug!("VALUE SELECT {select:?}");
             let value_rows = match get_table_from_pool(&pool, &select).await {
                 Ok(value_rows) => value_rows,
                 Err(e) => return Err(GetError::new(e.to_string())),
@@ -390,6 +395,7 @@ async fn get_page(
     }
 
     // Use the view to select the data
+    tracing::debug!("VIEW SELECT {view_select:?}");
     let value_rows = match get_table_from_pool(&pool, &view_select).await {
         Ok(value_rows) => value_rows,
         Err(e) => return Err(GetError::new(e.to_string())),

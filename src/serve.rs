@@ -312,6 +312,10 @@ async fn tree(
         return Ok(result.into_response());
     }
 
+    if table.contains(" ") {
+        return Ok(tree2(state, table, subject, params).await?.into_response());
+    };
+
     if let Some(text) = params.get("text") {
         tracing::debug!("TEXT: {text}");
         let search = format!("\"%{text}%\"");
@@ -332,10 +336,6 @@ async fn tree(
             select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
-
-    if table.contains(" ") {
-        return Ok(tree2(state, table, subject, params).await?.into_response());
-    };
 
     tracing::info!("TREE '{table}' {subject}");
     let start = std::time::Instant::now();
@@ -410,12 +410,33 @@ async fn tree2(
     state: &Arc<AppState>,
     table: &str,
     subject: &str,
-    _params: &RequestParams,
+    params: &RequestParams,
 ) -> axum::response::Result<impl IntoResponse> {
     tracing::info!("TREE 2 '{table}' {subject}");
     let start = std::time::Instant::now();
 
     let (table1, table2) = table.split_once(" ").unwrap();
+
+    if let Some(text) = params.get("text") {
+        tracing::debug!("TEXT: {text}");
+        let search = format!("\"%{text}%\"");
+        let mut select = Select::new(table2);
+        select
+            .add_explicit_select(&SelectColumn::new("subject", Some("id"), None))
+            .add_explicit_select(&SelectColumn::new("object", Some("label"), None))
+            // TODO: filter predicates
+            .filter(vec![
+                Filter::new("object", "not_eq", json!("\"\""))?,
+                Filter::new("object", "ilike", json!(search))?,
+                Filter::new("datatype", "eq", json!("\"xsd:string\""))?,
+            ])
+            .order_by(vec!["LENGTH(object)", "object"])
+            .limit(20);
+        tracing::debug!("SELECT {:?}", select.to_sqlite());
+        let result =
+            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        return Ok(Json(result).into_response());
+    }
 
     let tree1 =
         tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool.as_ref().unwrap())
@@ -498,6 +519,8 @@ async fn tree2(
         },
         "title": "table",
         "table_name": table,
+        "table1_name": table1,
+        "table2_name": table2,
         "subject": subject,
         "label": label,
         "tree1": tree1,
@@ -798,7 +821,7 @@ async fn table(
         };
         tracing::info!("URL: {}", url);
         let select = parse(&url)?;
-        tracing::info!("select {:?}", select);
+        tracing::info!("SELECT {:?}", select);
         match get::get_rows(&state.config, &select, &shape, &format).await {
             Ok(x) => match format {
                 "text" => Ok(([("content-type", "text/plain")], x).into_response()),
