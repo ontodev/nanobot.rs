@@ -321,7 +321,7 @@ pub async fn get_rich_json_property_tree_view(
     let mut sorted = sort_rich_tree_by_label(&tree)?;
 
     let mut immediate_children = get_immediate_property_children_tree(entity, table, pool).await?;
-    // add_property_grandchildren(&mut immediate_children, table, pool).await?;
+    add_property_grandchildren(&mut immediate_children, table, pool).await?;
     add_children(&mut sorted, &immediate_children)?;
 
     Ok(sorted)
@@ -2568,7 +2568,7 @@ pub async fn get_hiccup_top_property_hierarchy(
 
         //add children & grandchildren
         let mut children = get_immediate_property_children_tree(entity, table, pool).await?;
-        // add_property_grandchildren(&mut children, table, pool).await?;
+        add_property_grandchildren(&mut children, table, pool).await?;
         add_children(&mut root_tree, &children)?;
 
         top_hierarchy_nodes.push(root_tree);

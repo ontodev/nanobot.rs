@@ -575,6 +575,14 @@ async fn table(
         };
     } else if path.ends_with(".tsv") {
         table = path.replace(".tsv", "");
+        format = "tsv";
+        shape = "value_rows";
+    } else if path.ends_with(".csv") {
+        table = path.replace(".csv", "");
+        format = "csv";
+        shape = "value_rows";
+    } else if path.ends_with(".txt") {
+        table = path.replace(".txt", "");
         format = "text";
         shape = "value_rows";
     } else {
@@ -824,6 +832,8 @@ async fn table(
         tracing::info!("SELECT {:?}", select);
         match get::get_rows(&state.config, &select, &shape, &format).await {
             Ok(x) => match format {
+                "tsv" => Ok(([("content-type", "text/tab-separated-values")], x).into_response()),
+                "csv" => Ok(([("content-type", "text/csv")], x).into_response()),
                 "text" => Ok(([("content-type", "text/plain")], x).into_response()),
                 "html" => Ok(Html(x).into_response()),
                 "json" => {

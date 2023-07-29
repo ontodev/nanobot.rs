@@ -8,6 +8,7 @@ use crate::sql::{
     LIMIT_DEFAULT, LIMIT_MAX,
 };
 use chrono::prelude::{DateTime, Utc};
+use csv::WriterBuilder;
 use enquote::unquote;
 use git2::Repository;
 use minijinja::{Environment, Source};
@@ -57,6 +58,12 @@ impl From<String> for GetError {
 
 impl From<std::io::Error> for GetError {
     fn from(error: std::io::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
+impl From<csv::Error> for GetError {
+    fn from(error: csv::Error) -> GetError {
         GetError::new(format!("{:?}", error))
     }
 }
@@ -182,6 +189,8 @@ pub async fn get_rows(
                 Err(e) => return Err(GetError::new(e.to_string())),
             };
             match format {
+                "tsv" => value_rows_to_tsv(&value_rows),
+                "csv" => value_rows_to_csv(&value_rows),
                 "text" => value_rows_to_text(&value_rows),
                 "json" => Ok(json!(value_rows).to_string()),
                 "pretty.json" => match to_string_pretty(&json!(value_rows)) {
@@ -745,6 +754,28 @@ async fn get_page(
     };
     formats.insert("TSV".to_string(), json!(href));
 
+    select_format.table(format!("\"{}.csv\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("CSV".to_string(), json!(href));
+
+    select_format.table(format!("\"{}.txt\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("Plain Text".to_string(), json!(href));
+
     select_format.table(format!("\"{}.json\"", unquoted_table));
     let href = match select_format.to_url() {
         Ok(url) => url,
@@ -975,21 +1006,21 @@ pub fn get_repo_details() -> Result<SerdeMap, GetError> {
     Ok(result)
 }
 
-fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
-    // This would be nicer with map, but I got weird borrowing errors.
-    let mut lines: Vec<String> = vec![];
-    let mut line: Vec<String> = vec![];
+fn value_rows_to_strings(rows: &Vec<Map<String, Value>>) -> Result<Vec<Vec<String>>, GetError> {
+    let mut lines = vec![];
+    let mut row: Vec<String> = vec![];
     match rows.first().and_then(|f| Some(f.keys())) {
         Some(first_keys) => {
             for key in first_keys {
-                line.push(key.clone());
+                row.push(key.clone());
             }
         }
-        None => return Ok("".to_string()),
+        None => return Ok(lines),
     };
-    lines.push(line.join("\t"));
+    lines.push(row);
+
     for row in rows {
-        let mut line: Vec<String> = vec![];
+        let mut cells = vec![];
         for cell in row.values() {
             let mut value = cell.clone().to_string();
             if cell.is_string() {
@@ -1006,14 +1037,45 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError
                 // TODO: better null handling
                 value = "".to_string();
             }
-            line.push(value);
+            cells.push(value);
         }
-        lines.push(line.join("\t"));
+        lines.push(cells);
     }
+    Ok(lines)
+}
+
+fn value_rows_to_xsv(rows: &Vec<Map<String, Value>>, delimiter: u8) -> Result<String, GetError> {
+    let lines = value_rows_to_strings(rows)?;
+    let mut writer = WriterBuilder::new()
+        .delimiter(delimiter)
+        .from_writer(vec![]);
+    for line in lines {
+        writer.write_record(line)?;
+    }
+    let writer = match writer.into_inner() {
+        Ok(w) => w,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    match String::from_utf8(writer) {
+        Ok(text) => Ok(text),
+        Err(e) => Err(GetError::new(e.to_string())),
+    }
+}
+
+fn value_rows_to_csv(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
+    value_rows_to_xsv(rows, b',')
+}
+
+fn value_rows_to_tsv(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
+    value_rows_to_xsv(rows, b'\t')
+}
+
+fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
+    let tsv = value_rows_to_tsv(rows).unwrap_or_default();
 
     // Format using elastic tabstops
     let mut tw = TabWriter::new(vec![]);
-    if let Err(e) = write!(&mut tw, "{}", lines.join("\n")) {
+    if let Err(e) = write!(&mut tw, "{}", tsv) {
         return Err(GetError::new(e.to_string()));
     }
     if let Err(e) = tw.flush() {
