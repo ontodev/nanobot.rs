@@ -450,6 +450,58 @@ fn ldtab_datatype_2_hiccup(datatype: &str) -> Value {
     json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": datatype}, datatype]])
 }
 
+fn ldtab_annotation_2_hiccup(
+    annotation: &Map<String, Value>,
+    iri_2_label: &HashMap<String, String>,
+) -> Value {
+    let mut outer_list = Vec::new();
+    outer_list.push(json!("ul"));
+
+    for (key, value) in annotation {
+        let mut outer_list_element = Vec::new();
+        outer_list_element.push(json!("li"));
+
+        //get label
+        let label = match iri_2_label.get(key) {
+            Some(y) => y.clone(),
+            None => String::from(key),
+        };
+
+        outer_list_element.push(json!(["small", ["a", { "resource": key }, label]]));
+
+        let mut inner_list = Vec::new();
+        inner_list.push(json!("ul"));
+        match value {
+            Value::Array(vec) => {
+                for v in vec {
+                    let mut inner_list_element = Vec::new();
+                    inner_list_element.push(json!("li"));
+                    let datatype = &v["datatype"];
+
+                    match datatype {
+                        Value::String(x) => match x.as_str() {
+                            "_IRI" => {
+                                inner_list_element.push(ldtab_iri_2_hiccup(key, v, iri_2_label));
+                            }
+                            "_JSON" => {} //TODO nested annotations
+                            _ => {
+                                inner_list_element.push(ldtab_literal_2_hiccup(v));
+                                inner_list_element.push(ldtab_datatype_2_hiccup(x.as_str()));
+                            }
+                        },
+                        _ => {}
+                    };
+                    inner_list.push(Value::Array(inner_list_element));
+                }
+            }
+            _ => {}
+        }
+        outer_list_element.push(Value::Array(inner_list));
+        outer_list.push(Value::Array(outer_list_element));
+    }
+    Value::Array(outer_list)
+}
+
 /// Given a property, a value, and a map from CURIEs/IRIs to labels
 /// return a hiccup-style list encoding of the term property shape using:
 ///
@@ -467,6 +519,7 @@ fn ldtab_value_2_hiccup(
     list_element.push(json!("li"));
 
     let datatype = &value["datatype"];
+    let annotation = &value["annotation"];
 
     match datatype {
         Value::String(x) => match x.as_str() {
@@ -494,6 +547,12 @@ fn ldtab_value_2_hiccup(
             ))));
         }
     };
+
+    match annotation {
+        Value::Object(x) => list_element.push(ldtab_annotation_2_hiccup(x, iri_2_label)),
+        _ => {} //there is no annotation -- so do nothing
+    }
+
     Ok(Value::Array(list_element))
 }
 
