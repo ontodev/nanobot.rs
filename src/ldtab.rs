@@ -858,7 +858,7 @@ pub async fn get_subject_map(subject: &str, table: &str, pool: &AnyPool) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::sqlite::{AnyPool, AnyPoolOptions};
+    use sqlx::any::{AnyPool, AnyPoolOptions};
     use std::collections::{HashMap, HashSet};
 
     #[test]

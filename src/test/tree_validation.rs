@@ -2,7 +2,7 @@ use crate::test::part_of_term_tree::{
     get_hierarchy_maps, get_iris_from_subclass_map, get_label_hash_map, identify_roots,
 };
 use serde_json::{json, Map, Value};
-use sqlx::sqlite::SqlitePool;
+use sqlx::any::AnyPool;
 use std::collections::{HashMap, HashSet};
 
 /// Given an entity and an LDTab database,
@@ -40,7 +40,7 @@ use std::collections::{HashMap, HashSet};
 ///     }
 ///   }
 /// }
-pub async fn get_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+pub async fn get_json_tree_view(entity: &str, table: &str, pool: &AnyPool) -> Value {
     //extract information about an entities 'is-a' and 'part-of' relationships
     let (class_2_subclasses, class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
@@ -424,7 +424,7 @@ pub fn build_labelled_tree(tree: &Value, label_map: &HashMap<String, String>) ->
 ///    }
 ///  }
 ///}
-pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &SqlitePool) -> Value {
+pub async fn get_labelled_json_tree_view(entity: &str, table: &str, pool: &AnyPool) -> Value {
     //get information about subsumption and parthood relations
     let (class_2_subclasses, class_2_parts) =
         get_hierarchy_maps(entity, table, &pool).await.unwrap();
@@ -561,7 +561,7 @@ pub fn json_tree_2_text(json_tree: &Value, indent: usize) -> String {
 ///					- partOf gill
 ///						- owl:Nothing
 ///
-pub async fn get_text_view(entity: &str, table: &str, pool: &SqlitePool) -> String {
+pub async fn get_text_view(entity: &str, table: &str, pool: &AnyPool) -> String {
     //get term tree (encoded in JSON)
     let labelled_json_tree = get_labelled_json_tree_view(entity, table, pool).await;
     //transform JSON to Markdown

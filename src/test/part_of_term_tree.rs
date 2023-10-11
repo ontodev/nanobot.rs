@@ -1,5 +1,5 @@
 use serde_json::{from_str, json, Map, Value};
-use sqlx::sqlite::{SqlitePool, SqliteRow};
+use sqlx::any::{AnyPool, AnyRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::util::signature;
@@ -70,11 +70,11 @@ pub fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
 pub async fn get_label_hash_map(
     curies: &HashSet<String>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, String>, sqlx::Error> {
     let mut entity_2_label = HashMap::new();
     let query = build_label_query_for(&curies, table);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let entity: &str = row.get("subject");
         let label: &str = row.get("object");
@@ -489,7 +489,7 @@ pub fn identify_roots(
 pub async fn get_hierarchy_maps(
     entity: &str,
     table: &str,
-    pool: &SqlitePool, //
+    pool: &AnyPool, //
 ) -> Result<
     (
         HashMap<String, HashSet<String>>,
@@ -579,7 +579,7 @@ pub async fn get_hierarchy_maps(
 pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, HashSet<String>>, sqlx::Error> {
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -591,7 +591,7 @@ pub async fn get_class_2_subclass_map(
         SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
      ) SELECT * FROM superclasses;", table=table, entity=entity);
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     for row in rows {
         //axiom structure: subject rdfs:subClassOf object
@@ -1283,7 +1283,7 @@ pub fn add_children(tree: &mut Value, children: &Value) {
 pub async fn get_immediate_children_tree(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, sqlx::Error> {
     //get the entity's immediate descendents w.r.t. subsumption and parthood relations
     let direct_subclasses = get_direct_named_subclasses(entity, table, pool).await?;
@@ -1328,14 +1328,14 @@ pub async fn get_immediate_children_tree(
 /// then get_preferred_roots returns the set {a,d}.
 pub async fn get_preferred_roots(
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, sqlx::Error> {
     let mut preferred_roots = HashSet::new();
     let query = format!(
         "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
         table = table,
     );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let object: &str = row.get("object");
         preferred_roots.insert(String::from(object));
@@ -1366,7 +1366,7 @@ pub async fn get_preferred_roots_hierarchy_maps(
     class_2_subclasses: &mut HashMap<String, HashSet<String>>,
     class_2_parts: &mut HashMap<String, HashSet<String>>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) {
     //query for preferred roots
     let preferred_roots = get_preferred_roots(table, pool).await.unwrap();
@@ -1456,7 +1456,7 @@ pub async fn get_rich_json_tree_view(
     entity: &str,
     preferred_roots: bool,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, sqlx::Error> {
     //get the entity's ancestor information w.r.t. subsumption and parthood relations
     let (mut class_2_subclasses, mut class_2_parts) =
@@ -1523,7 +1523,7 @@ pub async fn get_rich_json_tree_view(
 pub async fn get_direct_named_subclasses(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, sqlx::Error> {
     let subclasses = get_direct_subclasses(entity, table, pool).await?;
 
@@ -1557,7 +1557,7 @@ pub async fn get_direct_named_subclasses(
 pub async fn get_direct_subclasses(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, sqlx::Error> {
     let mut subclasses = HashSet::new();
 
@@ -1567,7 +1567,7 @@ pub async fn get_direct_subclasses(
         entity = entity,
     );
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let subject: &str = row.get("subject");
         subclasses.insert(String::from(subject));
@@ -1592,7 +1592,7 @@ pub async fn get_direct_subclasses(
 pub async fn get_direct_sub_parts(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, sqlx::Error> {
     let mut sub_parts = HashSet::new();
 
@@ -1608,7 +1608,7 @@ pub async fn get_direct_sub_parts(
         part_of = part_of,
     );
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let subject: &str = row.get("subject");
 
@@ -1889,7 +1889,7 @@ pub async fn get_hiccup_term_tree(
     entity: &str,
     preferred_roots: bool,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, sqlx::Error> {
     let tree = get_rich_json_tree_view(entity, preferred_roots, table, pool).await?;
 
@@ -1942,7 +1942,7 @@ pub async fn get_hiccup_term_tree(
 pub async fn get_hiccup_top_hierarchy(
     case: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, sqlx::Error> {
     let mut top = "";
     let mut relation = "";
@@ -1990,7 +1990,7 @@ pub async fn get_hiccup_top_hierarchy(
         rdf_type = rdf_type,
     );
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     //build HTML view
     let mut res = Vec::new();

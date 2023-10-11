@@ -102,64 +102,17 @@
                                   "afferent branchial artery"
                                 ],
                                 [
+                                  "span",
+                                  {
+                                    "class": "text-secondary"
+                                  },
+                                  "(3)"
+                                ],
+                                [
                                   "ul",
                                   {
                                     "id": "children"
-                                  },
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005012",
-                                        "about": "obo:ZFA_0000716",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "afferent filamental artery"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005013",
-                                        "about": "obo:ZFA_0000716",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "concurrent branch afferent branchial artery"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005014",
-                                        "about": "obo:ZFA_0000716",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "recurrent branch afferent branchial artery"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ]
+                                  }
                                 ]
                               ],
                               [
@@ -192,28 +145,17 @@
                                   "efferent branchial artery"
                                 ],
                                 [
+                                  "span",
+                                  {
+                                    "class": "text-secondary"
+                                  },
+                                  "(1)"
+                                ],
+                                [
                                   "ul",
                                   {
                                     "id": "children"
-                                  },
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005018",
-                                        "about": "obo:ZFA_0000202",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "efferent filamental artery"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ]
+                                  }
                                 ]
                               ],
                               [
@@ -228,28 +170,17 @@
                                   "gill filament"
                                 ],
                                 [
+                                  "span",
+                                  {
+                                    "class": "text-secondary"
+                                  },
+                                  "(1)"
+                                ],
+                                [
                                   "ul",
                                   {
                                     "id": "children"
-                                  },
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0000666",
-                                        "about": "obo:ZFA_0000667",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "filamental artery"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ]
+                                  }
                                 ]
                               ],
                               [
@@ -282,46 +213,17 @@
                                   "gill lamella"
                                 ],
                                 [
+                                  "span",
+                                  {
+                                    "class": "text-secondary"
+                                  },
+                                  "(2)"
+                                ],
+                                [
                                   "ul",
                                   {
                                     "id": "children"
-                                  },
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005015",
-                                        "about": "obo:ZFA_0000211",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "afferent lamellar arteriole"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005019",
-                                        "about": "obo:ZFA_0000211",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "efferent lamellar arteriole"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ]
+                                  }
                                 ]
                               ],
                               [
@@ -336,154 +238,17 @@
                                   "pharyngeal arch 3-7"
                                 ],
                                 [
+                                  "span",
+                                  {
+                                    "class": "text-secondary"
+                                  },
+                                  "(8)"
+                                ],
+                                [
                                   "ul",
                                   {
                                     "id": "children"
-                                  },
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0000172",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "branchial muscle"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0005390",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "gill ray"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0001606",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "rdfs:subClassOf"
-                                      },
-                                      "pharyngeal arch 3"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0000095",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "obo:BFO_0000050"
-                                      },
-                                      "pharyngeal arch 3-7 skeleton"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0001607",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "rdfs:subClassOf"
-                                      },
-                                      "pharyngeal arch 4"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0001608",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "rdfs:subClassOf"
-                                      },
-                                      "pharyngeal arch 5"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0001609",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "rdfs:subClassOf"
-                                      },
-                                      "pharyngeal arch 6"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ],
-                                  [
-                                    "li",
-                                    [
-                                      "a",
-                                      {
-                                        "resource": "obo:ZFA_0001610",
-                                        "about": "obo:ZFA_0001613",
-                                        "rev": "rdfs:subClassOf"
-                                      },
-                                      "pharyngeal arch 7"
-                                    ],
-                                    [
-                                      "ul",
-                                      {
-                                        "id": "children"
-                                      }
-                                    ]
-                                  ]
+                                  }
                                 ]
                               ]
                             ]
