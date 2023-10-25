@@ -1008,7 +1008,7 @@ pub async fn get_hierarchy_maps(
     //initialise input relations
     for rel in relations {
         let class_2_subrelation: HashMap<String, HashSet<String>> = HashMap::new();
-        class_2_subrelations.insert(String::from(rel.clone()), class_2_subrelation);
+        class_2_subrelations.insert(String::from(rel.to_owned()), class_2_subrelation);
     }
 
     //start the search with the target entity

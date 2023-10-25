@@ -150,7 +150,7 @@ fn action(
     };
 
     let action = match &state.config.actions.get(action_name) {
-        Some(a) => a.clone(),
+        Some(a) => a.to_owned(),
         None => {
             let message = format!("Undefined user action '{}'", action_name);
             return Err((StatusCode::BAD_REQUEST, Html(message))

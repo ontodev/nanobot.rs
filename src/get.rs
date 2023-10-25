@@ -637,7 +637,7 @@ async fn get_page(
                 }
 
                 for (column, messages) in &output_messages {
-                    if let Some(cell) = crow.get_mut(column.clone()) {
+                    if let Some(cell) = crow.get_mut(column.to_owned()) {
                         if let Some(cell) = cell.as_object_mut() {
                             cell.remove("nulltype");
                             let mut new_classes = vec![];
