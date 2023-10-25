@@ -1,7 +1,8 @@
 use crate::{
     config::{Config, ValveConfig},
-    get,
+    get, ldtab,
     sql::LIMIT_DEFAULT,
+    tree_view,
 };
 use ansi_to_html;
 use axum::{
@@ -16,7 +17,7 @@ use enquote::unquote;
 use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
-use ontodev_sqlrest::{parse, Filter, Select};
+use ontodev_sqlrest::{parse, Filter, Select, SelectColumn};
 use ontodev_valve::{
     ast::Expression,
     delete_row, insert_new_row, update_row,
@@ -24,7 +25,9 @@ use ontodev_valve::{
 };
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
-use std::{collections::HashMap, net::SocketAddr, process::Command, sync::Arc};
+use std::{
+    collections::HashMap, collections::HashSet, net::SocketAddr, process::Command, sync::Arc,
+};
 use tower_http::services::ServeDir;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -51,6 +54,7 @@ pub fn build_app(shared_state: Arc<AppState>) -> Router {
     let router = Router::new()
         .route("/", get(root))
         .route("/:table", get(get_table).post(post_table))
+        .route("/:table/:subject", get(get_tree))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
         .with_state(shared_state);
     if let Some(asset_path) = asset_path {
@@ -146,7 +150,7 @@ fn action(
     };
 
     let action = match &state.config.actions.get(action_name) {
-        Some(a) => a.clone(),
+        Some(a) => a.to_owned(),
         None => {
             let message = format!("Undefined user action '{}'", action_name);
             return Err((StatusCode::BAD_REQUEST, Html(message))
@@ -286,6 +290,251 @@ fn action(
     }
 }
 
+async fn get_tree(
+    Path((table, subject)): Path<(String, String)>,
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<RequestParams>,
+) -> axum::response::Result<impl IntoResponse> {
+    tracing::info!("request tree GET {:?} {:?} {:?}", table, subject, params);
+    let tree = tree(&state, &table, &subject, &params).await?;
+    Ok(tree.into_response())
+}
+
+async fn tree(
+    state: &Arc<AppState>,
+    table: &str,
+    subject: &str,
+    params: &RequestParams,
+) -> axum::response::Result<impl IntoResponse> {
+    // TODO: Just hacking!
+    if params.contains_key("user.action") {
+        let result = action(&table.into(), state, params)?;
+        return Ok(result.into_response());
+    }
+
+    if table.contains(" ") {
+        return Ok(tree2(state, table, subject, params).await?.into_response());
+    };
+
+    if let Some(text) = params.get("text") {
+        tracing::debug!("TEXT: {text}");
+        let search = format!("\"%{text}%\"");
+        let mut select = Select::new(table);
+        select
+            .add_explicit_select(&SelectColumn::new("subject", Some("id"), None))
+            .add_explicit_select(&SelectColumn::new("object", Some("label"), None))
+            // TODO: filter predicates
+            .filter(vec![
+                Filter::new("object", "not_eq", json!("\"\""))?,
+                Filter::new("object", "ilike", json!(search))?,
+                Filter::new("datatype", "eq", json!("\"xsd:string\""))?,
+            ])
+            .order_by(vec!["LENGTH(object)", "object"])
+            .limit(20);
+        tracing::debug!("SELECT {:?}", select.to_sqlite());
+        let result =
+            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        return Ok(Json(result).into_response());
+    }
+
+    tracing::info!("TREE '{table}' {subject}");
+    let start = std::time::Instant::now();
+
+    let tree =
+        tree_view::get_hiccup_term_tree(subject, table, &state.config.pool.as_ref().unwrap())
+            .await
+            .unwrap_or_default();
+    let tree = hiccup::insert_href(&tree, &format!("../{table}/{{curie}}")).unwrap_or_default();
+    let tree = hiccup::render(&tree).unwrap_or_default();
+
+    let predicate_order_start: Vec<String> = vec!["rdfs:label".into()];
+    let predicate_order_end: Vec<String> =
+        vec!["owl:equivalentClass".into(), "rdfs:subClassOf".into()];
+    let pred = ldtab::get_predicate_map_hiccup(
+        subject,
+        table,
+        &state.config.pool.as_ref().unwrap(),
+        &predicate_order_start,
+        &predicate_order_end,
+    )
+    .await
+    .unwrap_or_default();
+    let hiccup = pred.clone();
+    let pred = hiccup::insert_href(&pred, &format!("../{table}/{{curie}}")).unwrap_or_default();
+    let pred = match hiccup::render(&pred) {
+        Ok(x) => x,
+        Err(x) => format!(
+            "ERROR {x} for <pre>{}</pre>",
+            serde_json::to_string_pretty(&hiccup).unwrap_or_default()
+        ),
+    };
+
+    let curies = HashSet::from([subject.to_string()]);
+    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
+        .await
+        .unwrap_or_default();
+    let empty = String::new();
+    let label = labels.get(subject).unwrap_or(&empty);
+
+    let table_map = {
+        let mut table_map = SerdeMap::new();
+        for table in get_tables(&state.config.valve.as_ref().clone().unwrap())? {
+            table_map.insert(table.to_string(), json!(table.clone()));
+        }
+        json!(table_map)
+    };
+    let elapsed = start.elapsed().as_millis() as usize;
+    let page = json!({
+        "page": {
+            "root": "../",
+            "project_name": "Nanobot",
+            "tables": table_map,
+            "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "elapsed": elapsed,
+        },
+        "title": "table",
+        "table_name": table,
+        "subject": subject,
+        "label": label,
+        "tree": tree,
+        "predicate_map": pred,
+    });
+    let page_html = match get::page_to_html(&state.config, "tree", &page) {
+        Ok(p) => p,
+        Err(e) => return Err(e.to_string().into()),
+    };
+    return Ok(Html(page_html).into_response());
+}
+
+async fn tree2(
+    state: &Arc<AppState>,
+    table: &str,
+    subject: &str,
+    params: &RequestParams,
+) -> axum::response::Result<impl IntoResponse> {
+    tracing::info!("TREE 2 '{table}' {subject}");
+    let start = std::time::Instant::now();
+
+    let (table1, table2) = table.split_once(" ").unwrap();
+
+    if let Some(text) = params.get("text") {
+        tracing::debug!("TEXT: {text}");
+        let search = format!("\"%{text}%\"");
+        let mut select = Select::new(table2);
+        select
+            .add_explicit_select(&SelectColumn::new("subject", Some("id"), None))
+            .add_explicit_select(&SelectColumn::new("object", Some("label"), None))
+            // TODO: filter predicates
+            .filter(vec![
+                Filter::new("object", "not_eq", json!("\"\""))?,
+                Filter::new("object", "ilike", json!(search))?,
+                Filter::new("datatype", "eq", json!("\"xsd:string\""))?,
+            ])
+            .order_by(vec!["LENGTH(object)", "object"])
+            .limit(20);
+        tracing::debug!("SELECT {:?}", select.to_sqlite());
+        let result =
+            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        return Ok(Json(result).into_response());
+    }
+
+    let tree1 =
+        tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool.as_ref().unwrap())
+            .await
+            .unwrap_or_default();
+    let tree1 = hiccup::insert_href(&tree1, &format!("../{table}/{{curie}}")).unwrap_or_default();
+    let tree1 = hiccup::render(&tree1).unwrap_or_default();
+
+    let tree2 =
+        tree_view::get_hiccup_term_tree(subject, table2, &state.config.pool.as_ref().unwrap())
+            .await
+            .unwrap_or_default();
+    let tree2 = hiccup::insert_href(&tree2, &format!("../{table}/{{curie}}")).unwrap_or_default();
+    let tree2 = hiccup::render(&tree2).unwrap_or_default();
+
+    let predicate_order_start: Vec<String> = vec!["rdfs:label".into()];
+    let predicate_order_end: Vec<String> =
+        vec!["owl:equivalentClass".into(), "rdfs:subClassOf".into()];
+
+    let pred1 = ldtab::get_predicate_map_hiccup(
+        subject,
+        table1,
+        &state.config.pool.as_ref().unwrap(),
+        &predicate_order_start,
+        &predicate_order_end,
+    )
+    .await
+    .unwrap_or_default();
+    let hiccup = pred1.clone();
+    let pred1 = hiccup::insert_href(&pred1, &format!("../{table}/{{curie}}")).unwrap_or_default();
+    let pred1 = match hiccup::render(&pred1) {
+        Ok(x) => x,
+        Err(x) => format!(
+            "ERROR {x} for <pre>{}</pre>",
+            serde_json::to_string_pretty(&hiccup).unwrap_or_default()
+        ),
+    };
+
+    let pred2 = ldtab::get_predicate_map_hiccup(
+        subject,
+        table2,
+        &state.config.pool.as_ref().unwrap(),
+        &predicate_order_start,
+        &predicate_order_end,
+    )
+    .await
+    .unwrap_or_default();
+    let hiccup = pred2.clone();
+    let pred2 = hiccup::insert_href(&pred2, &format!("../{table}/{{curie}}")).unwrap_or_default();
+    let pred2 = match hiccup::render(&pred2) {
+        Ok(x) => x,
+        Err(x) => format!(
+            "ERROR {x} for <pre>{}</pre>",
+            serde_json::to_string_pretty(&hiccup).unwrap_or_default()
+        ),
+    };
+
+    let curies = HashSet::from([subject.to_string()]);
+    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
+        .await
+        .unwrap_or_default();
+    let empty = String::new();
+    let label = labels.get(subject).unwrap_or(&empty);
+
+    let table_map = {
+        let mut table_map = SerdeMap::new();
+        for table in get_tables(&state.config.valve.as_ref().clone().unwrap())? {
+            table_map.insert(table.to_string(), json!(table.clone()));
+        }
+        json!(table_map)
+    };
+    let elapsed = start.elapsed().as_millis() as usize;
+    let page = json!({
+        "page": {
+            "root": "../",
+            "project_name": "Nanobot",
+            "tables": table_map,
+            "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "elapsed": elapsed,
+        },
+        "title": "table",
+        "table_name": table,
+        "table1_name": table1,
+        "table2_name": table2,
+        "subject": subject,
+        "label": label,
+        "tree1": tree1,
+        "tree2": tree2,
+        "predicate_map1": pred1,
+        "predicate_map2": pred2,
+    });
+    let page_html = match get::page_to_html(&state.config, "compare_tree", &page) {
+        Ok(p) => p,
+        Err(e) => return Err(e.to_string().into()),
+    };
+    return Ok(Html(page_html).into_response());
+}
+
 async fn table(
     path: &String,
     state: &Arc<AppState>,
@@ -326,6 +575,14 @@ async fn table(
         };
     } else if path.ends_with(".tsv") {
         table = path.replace(".tsv", "");
+        format = "tsv";
+        shape = "value_rows";
+    } else if path.ends_with(".csv") {
+        table = path.replace(".csv", "");
+        format = "csv";
+        shape = "value_rows";
+    } else if path.ends_with(".txt") {
+        table = path.replace(".txt", "");
         format = "text";
         shape = "value_rows";
     } else {
@@ -349,6 +606,12 @@ async fn table(
         Some(view) => view.to_string(),
         None => "".to_string(),
     };
+
+    // TODO: properly detect LDTab tables
+    if !get_tables(config)?.contains(&table) {
+        let url = format!("{table}/owl:Class");
+        return Ok(Redirect::permanent(&url).into_response());
+    }
 
     // Handle actions such as filtering.
     if query_params.contains_key("nb.action") {
@@ -566,9 +829,11 @@ async fn table(
         };
         tracing::info!("URL: {}", url);
         let select = parse(&url)?;
-        tracing::info!("select {:?}", select);
+        tracing::info!("SELECT {:?}", select);
         match get::get_rows(&state.config, &select, &shape, &format).await {
             Ok(x) => match format {
+                "tsv" => Ok(([("content-type", "text/tab-separated-values")], x).into_response()),
+                "csv" => Ok(([("content-type", "text/csv")], x).into_response()),
                 "text" => Ok(([("content-type", "text/plain")], x).into_response()),
                 "html" => Ok(Html(x).into_response()),
                 "json" => {

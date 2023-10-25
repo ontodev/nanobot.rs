@@ -1,6 +1,6 @@
 use ontodev_hiccup::hiccup;
 use serde_json::{from_str, json, Map, Value};
-use sqlx::sqlite::{SqlitePool, SqliteRow};
+use sqlx::any::{AnyPool, AnyRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -74,7 +74,7 @@ pub fn encode_iri(entity: &str) -> String {
 pub async fn get_property_2_subproperty_map(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, HashSet<String>>, TreeViewError> {
     let mut property_2_subproperties: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -86,7 +86,7 @@ pub async fn get_property_2_subproperty_map(
         SELECT {table}.subject, {table}.object FROM {table}, superproperties WHERE {table}.subject = superproperties.object AND {table}.predicate='rdfs:subPropertyOf'
      ) SELECT * FROM superproperties;", table=table, entity=entity);
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     for row in rows {
         //axiom structure: subject rdfs:subPropertyOf object
@@ -143,7 +143,7 @@ pub async fn get_property_2_subproperty_map(
 pub async fn get_immediate_property_children_tree(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let mut direct_sub_properties = HashSet::new();
 
@@ -153,7 +153,7 @@ pub async fn get_immediate_property_children_tree(
         entity = entity,
     );
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let subject: &str = row.get("subject");
         direct_sub_properties.insert(String::from(subject));
@@ -224,7 +224,7 @@ pub async fn get_immediate_property_children_tree(
 pub async fn add_property_grandchildren(
     children: &mut Value,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<(), TreeViewError> {
     let children_array = match children.as_array_mut() {
         Some(array) => array,
@@ -285,7 +285,7 @@ pub async fn get_rich_json_property_tree_view(
     entity: &str,
     preferred_roots: bool,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let property_hierarchy_map = get_property_2_subproperty_map(entity, table, pool).await?;
     let mut property_2_hierarchy_map = HashMap::new();
@@ -472,11 +472,11 @@ pub fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
 pub async fn get_label_hash_map(
     curies: &HashSet<String>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, String>, TreeViewError> {
     let mut entity_2_label = HashMap::new();
     let query = build_label_query_for(&curies, table);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let entity: &str = row.get("subject");
         let label: &str = row.get("object");
@@ -918,7 +918,7 @@ pub fn update_hierarchy_map(
 pub async fn get_class_2_subclass_map(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, HashSet<String>>, TreeViewError> {
     let mut class_2_subclasses: HashMap<String, HashSet<String>> = HashMap::new();
 
@@ -930,7 +930,7 @@ pub async fn get_class_2_subclass_map(
         SELECT {table}.subject, {table}.object FROM {table}, superclasses WHERE {table}.subject = superclasses.object AND {table}.predicate='rdfs:subClassOf'
      ) SELECT * FROM superclasses;", table=table, entity=entity);
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     for row in rows {
         //axiom structure: subject rdfs:subClassOf object
@@ -996,7 +996,7 @@ pub async fn get_hierarchy_maps(
     entity: &str,
     relations: &Vec<&str>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, HashMap<String, HashSet<String>>>, TreeViewError> {
     //init map from relations to associated entity hierarchies
     let mut class_2_subrelations = HashMap::new();
@@ -1008,7 +1008,7 @@ pub async fn get_hierarchy_maps(
     //initialise input relations
     for rel in relations {
         let class_2_subrelation: HashMap<String, HashSet<String>> = HashMap::new();
-        class_2_subrelations.insert(String::from(rel.clone()), class_2_subrelation);
+        class_2_subrelations.insert(String::from(rel.to_owned()), class_2_subrelation);
     }
 
     //start the search with the target entity
@@ -1381,7 +1381,7 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Result<Value, TreeViewError> {
 pub async fn get_direct_subclasses(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, TreeViewError> {
     let mut subclasses = HashSet::new();
 
@@ -1391,7 +1391,7 @@ pub async fn get_direct_subclasses(
         entity = entity,
     );
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let subject: &str = row.get("subject");
         subclasses.insert(String::from(subject));
@@ -1416,7 +1416,7 @@ pub async fn get_direct_subclasses(
 pub async fn get_direct_named_subclasses(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, TreeViewError> {
     let subclasses = get_direct_subclasses(entity, table, pool).await?;
 
@@ -1451,7 +1451,7 @@ pub async fn get_direct_sub_relations(
     entity: &str,
     relation: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, TreeViewError> {
     let mut sub_relations = HashSet::new();
 
@@ -1466,7 +1466,7 @@ pub async fn get_direct_sub_relations(
         restriction = restriction,
     );
 
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let subject: &str = row.get("subject");
 
@@ -1519,7 +1519,7 @@ pub async fn get_immediate_children_tree(
     entity: &str,
     relations: &Vec<&str>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let mut direct_sub_relations = Vec::new();
 
@@ -1613,7 +1613,7 @@ pub async fn add_grandchildren(
     children: &mut Value,
     relations: &Vec<&str>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<(), TreeViewError> {
     let grand_children = match children.as_array_mut() {
         Some(array) => array,
@@ -1637,7 +1637,14 @@ pub async fn add_grandchildren(
         };
         let grand_children =
             get_immediate_children_tree(child_iri, &relations, table, pool).await?;
-        child["children"] = grand_children;
+        // child["children"] = grand_children;
+        // Set a has_children flag.
+        if let Some(gcs) = grand_children.as_array() {
+            if gcs.len() > 0 {
+                child["has_children"] = json!(true);
+                child["child_count"] = json!(gcs.len().clone());
+            }
+        }
     }
     Ok(())
 }
@@ -1793,14 +1800,14 @@ pub fn add_children(tree: &mut Value, children: &Value) -> Result<(), TreeViewEr
 /// then get_preferred_roots returns the set {a,d}.
 pub async fn get_preferred_roots(
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashSet<String>, TreeViewError> {
     let mut preferred_roots = HashSet::new();
     let query = format!(
         "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
         table = table,
     );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let object: &str = row.get("object");
         preferred_roots.insert(String::from(object));
@@ -1830,7 +1837,7 @@ pub async fn get_preferred_roots(
 pub async fn get_preferred_roots_hierarchy_maps(
     relation_maps: &mut HashMap<String, HashMap<String, HashSet<String>>>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<(), TreeViewError> {
     //query for preferred roots
     let preferred_roots = get_preferred_roots(table, pool).await?;
@@ -1931,7 +1938,7 @@ pub async fn get_rich_json_tree_view(
     relations: &Vec<&str>,
     preferred_roots: bool,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     //get the entity's ancestor information w.r.t. subsumption and relations
     let mut relation_maps = get_hierarchy_maps(entity, &relations, table, &pool).await?;
@@ -2021,6 +2028,10 @@ pub fn tree_2_hiccup_direct_children(
                 res_element.push(json!("li"));
 
                 res_element.push(json!(["a", {"resource" : child["curie"], "about": parent, "rev":child["property"] }, child["label"] ]));
+                if let Some(count) = child.get("child_count") {
+                    res_element
+                        .push(json!(["span", {"class": "text-secondary"}, format!("({count})")]));
+                }
 
                 //encode grand children
                 let curie = match child["curie"].as_str() {
@@ -2273,7 +2284,7 @@ pub async fn get_hiccup_class_tree(
     relations: &Vec<&str>,
     preferred_roots: bool,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let tree = get_rich_json_tree_view(entity, relations, preferred_roots, table, pool).await?;
 
@@ -2327,7 +2338,7 @@ pub async fn get_hiccup_property_tree(
     case: OWLEntityType,
     preferred_roots: bool,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let tree = get_rich_json_property_tree_view(entity, preferred_roots, table, pool).await?;
 
@@ -2360,7 +2371,7 @@ pub async fn get_hiccup_property_tree(
 }
 
 /// Build database query for top level entities.
-pub async fn build_top_level_query(case: OWLEntityType, table: &str, _pool: &SqlitePool) -> String {
+pub async fn build_top_level_query(case: OWLEntityType, table: &str, _pool: &AnyPool) -> String {
     let mut top = "";
     let mut relation = "";
     let mut rdf_type = "";
@@ -2449,10 +2460,10 @@ pub async fn build_top_level_query(case: OWLEntityType, table: &str, _pool: &Sql
 /// ]
 pub async fn get_hiccup_top_class_hierarchy(
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let query = build_top_level_query(OWLEntityType::Class, table, pool).await;
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     //collect entities
     let mut entities = HashSet::new();
@@ -2517,7 +2528,7 @@ pub async fn get_hiccup_top_class_hierarchy(
 pub async fn get_hiccup_top_property_hierarchy(
     case: OWLEntityType,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     match case.clone() {
         OWLEntityType::AnnotationProperty => {}
@@ -2532,7 +2543,7 @@ pub async fn get_hiccup_top_property_hierarchy(
     }
 
     let query = build_top_level_query(case.clone(), table, pool).await;
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     //collect entities
     let mut entities = HashSet::new();
@@ -2617,11 +2628,11 @@ pub fn get_list_encoding(case: OWLEntityType) -> Value {
 pub async fn get_type(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<OWLEntityType, TreeViewError> {
     let query = format!(
         "SELECT subject, predicate, object FROM {table} WHERE subject='{entity}' AND predicate='rdf:type'",table=table, entity=entity);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     for row in rows {
         // let entity: &str = row.get("subject");
@@ -2649,7 +2660,7 @@ pub async fn get_type(
 pub async fn get_html_term_tree(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<String, TreeViewError> {
     let hiccup = get_hiccup_term_tree(entity, table, pool).await?;
     let html = match hiccup::render(&hiccup) {
@@ -2664,7 +2675,7 @@ pub async fn get_html_term_tree(
 pub async fn get_hiccup_term_tree(
     entity: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, TreeViewError> {
     let mut list_view = Vec::new();
 

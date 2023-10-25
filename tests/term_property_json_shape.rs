@@ -3,14 +3,17 @@ use nanobot::ldtab::{
     get_property_map, get_subject_map,
 };
 use serde_json::json;
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::any::{AnyPool, AnyPoolOptions};
 use std::collections::HashSet;
+
+#[cfg(test)]
+use pretty_assertions::assert_eq;
 
 #[tokio::test]
 async fn test_get_prefix_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await
@@ -28,7 +31,7 @@ async fn test_get_prefix_map() {
 async fn test_get_label_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await
@@ -47,7 +50,7 @@ async fn test_get_label_map() {
 async fn test_get_property_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await
@@ -225,7 +228,7 @@ async fn test_get_property_map() {
 async fn test_get_predicate_map_hiccup() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await
@@ -303,6 +306,42 @@ async fn test_get_predicate_map_hiccup() {
                 },
                 "xsd:string"
               ]
+            ],
+            [
+              "ul",
+              [
+                "li",
+                [
+                  "small",
+                  [
+                    "a",
+                    {
+                      "resource": "oboInOwl:hasDbXref"
+                    },
+                    "oboInOwl:hasDbXref"
+                  ]
+                ],
+                [
+                  "ul",
+                  [
+                    "li",
+                    "http:http://www.briancoad.com/Dictionary/DicPics/gill.htm",
+                    [
+                      "sup",
+                      {
+                        "class": "text-black-50"
+                      },
+                      [
+                        "a",
+                        {
+                          "resource": "xsd:string"
+                        },
+                        "xsd:string"
+                      ]
+                    ]
+                  ]
+                ]
+              ]
             ]
           ]
         ]
@@ -362,6 +401,36 @@ async fn test_get_predicate_map_hiccup() {
                   "resource": "xsd:string"
                 },
                 "xsd:string"
+              ]
+            ],
+            [
+              "ul",
+              [
+                "li",
+                [
+                  "small",
+                  [
+                    "a",
+                    {
+                      "resource": "oboInOwl:hasSynonymType"
+                    },
+                    "oboInOwl:hasSynonymType"
+                  ]
+                ],
+                [
+                  "ul",
+                  [
+                    "li",
+                    [
+                      "a",
+                      {
+                        "property": "oboInOwl:hasSynonymType",
+                        "resource": "obo:zfa#PLURAL"
+                      },
+                      "obo:zfa#PLURAL"
+                    ]
+                  ]
+                ]
               ]
             ]
           ]
@@ -592,7 +661,7 @@ async fn test_get_predicate_map_hiccup() {
 async fn test_get_predicate_map_html() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await
@@ -626,6 +695,20 @@ async fn test_get_predicate_map_html() {
         <sup class="text-black-50">
           <a resource="xsd:string">xsd:string</a>
         </sup>
+        <ul>
+          <li>
+            <small>
+              <a resource="oboInOwl:hasDbXref">oboInOwl:hasDbXref</a>
+            </small>
+            <ul>
+              <li>http:http://www.briancoad.com/Dictionary/DicPics/gill.htm
+                <sup class="text-black-50">
+                  <a resource="xsd:string">xsd:string</a>
+                </sup>
+              </li>
+            </ul>
+          </li>
+        </ul>
       </li>
     </ul>
   </li>
@@ -646,6 +729,18 @@ async fn test_get_predicate_map_html() {
         <sup class="text-black-50">
           <a resource="xsd:string">xsd:string</a>
         </sup>
+        <ul>
+          <li>
+            <small>
+              <a resource="oboInOwl:hasSynonymType">oboInOwl:hasSynonymType</a>
+            </small>
+            <ul>
+              <li>
+                <a property="oboInOwl:hasSynonymType" resource="obo:zfa#PLURAL">obo:zfa#PLURAL</a>
+              </li>
+            </ul>
+          </li>
+        </ul>
       </li>
     </ul>
   </li>
@@ -718,7 +813,7 @@ async fn test_get_predicate_map_html() {
 async fn test_get_subject_map() {
     let connection = "src/resources/test_data/zfa_excerpt.db";
     let connection_string = format!("sqlite://{}?mode=rwc", connection);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await

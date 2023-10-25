@@ -1,6 +1,6 @@
 use ontodev_hiccup::hiccup;
 use serde_json::{from_str, json, Map, Value};
-use sqlx::sqlite::{SqlitePool, SqliteRow};
+use sqlx::any::{AnyPool, AnyRow};
 use sqlx::Row;
 use std::collections::{HashMap, HashSet};
 use wiring_rs::ldtab_2_ofn::class_translation::translate;
@@ -113,11 +113,11 @@ fn build_prefix_query_for(prefixes: &HashSet<String>) -> String {
 ///  "rdfs": "http://www.w3.org/2000/01/rdf-schema#"}.  
 async fn get_prefix_hash_map(
     curies: &HashSet<String>,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, String>, sqlx::Error> {
     let prefixes = get_prefixes(&curies);
     let query = build_prefix_query_for(&prefixes);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     let mut prefix_2_base = HashMap::new();
     for r in rows {
         //NB: there is only one row (becase 'prefix' is a primary key)
@@ -143,7 +143,7 @@ async fn get_prefix_hash_map(
 /// }
 pub async fn get_prefix_map(
     curies: &HashSet<String>,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, sqlx::Error> {
     let prefix_2_base = get_prefix_hash_map(curies, pool).await?;
     Ok(json!({ "@prefixes": prefix_2_base }))
@@ -183,14 +183,14 @@ fn build_label_query_for(curies: &HashSet<String>, table: &str) -> String {
 /// {"obo:ZFA_0000354": "gill",
 ///  "rdfs:label": "label"}
 /// extracted from a given table in Ldb.  
-async fn get_label_hash_map(
+pub async fn get_label_hash_map(
     curies: &HashSet<String>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, String>, sqlx::Error> {
     let mut entity_2_label = HashMap::new();
     let query = build_label_query_for(&curies, table);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let entity: &str = row.get("subject");
         let label: &str = row.get("object");
@@ -215,7 +215,7 @@ async fn get_label_hash_map(
 pub async fn get_label_map(
     iris: &HashSet<String>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<Value, sqlx::Error> {
     let entity_2_label = get_label_hash_map(iris, table, pool).await?;
     Ok(json!({ "@labels": entity_2_label }))
@@ -239,17 +239,13 @@ pub async fn get_label_map(
 ///  "rdfs:label":[{"object":"gill","datatype":"xsd:string"}],
 ///  "oboInOwl:hasOBONamespace":[{"object":"zebrafish_anatomy","datatype":"xsd:string"}]
 ///  ... }
-pub async fn get_property_map(
-    subject: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<Value, Error> {
+pub async fn get_property_map(subject: &str, table: &str, pool: &AnyPool) -> Result<Value, Error> {
     let query = format!(
         "SELECT * FROM {table} WHERE subject='{subject}'",
         table = table,
         subject = subject
     );
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
 
     let predicates_2_values: Vec<(String, Value)> = rows
         .iter()
@@ -300,7 +296,7 @@ fn ldtab_string_2_serde_value(string: &str) -> Value {
 ///
 /// Let (subject=ZFA_0000354, predicate=rdfs:label, object="gill", datatype="xsd:string") a row.
 /// Return {"rdfs:label":{"object":"gill","datatype":"xsd:string"}}.
-fn ldtab_row_2_predicate_json_shape(row: &SqliteRow) -> (String, Value) {
+fn ldtab_row_2_predicate_json_shape(row: &AnyRow) -> (String, Value) {
     let predicate: &str = row.get("predicate");
     let object: &str = row.get("object");
     let datatype: &str = row.get("datatype");
@@ -362,11 +358,11 @@ fn build_type_query_for(curies: &HashSet<String>, table: &str) -> String {
 async fn get_type_hash_map(
     curies: &HashSet<String>,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
 ) -> Result<HashMap<String, HashSet<String>>, sqlx::Error> {
     let mut entity_2_type: HashMap<String, HashSet<String>> = HashMap::new();
     let query = build_type_query_for(&curies, table);
-    let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(pool).await?;
+    let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
     for row in rows {
         let entity: &str = row.get("subject");
         let rdf_type: &str = row.get("object");
@@ -454,6 +450,58 @@ fn ldtab_datatype_2_hiccup(datatype: &str) -> Value {
     json!(["sup", {"class" : "text-black-50"}, ["a", {"resource": datatype}, datatype]])
 }
 
+fn ldtab_annotation_2_hiccup(
+    annotation: &Map<String, Value>,
+    iri_2_label: &HashMap<String, String>,
+) -> Value {
+    let mut outer_list = Vec::new();
+    outer_list.push(json!("ul"));
+
+    for (key, value) in annotation {
+        let mut outer_list_element = Vec::new();
+        outer_list_element.push(json!("li"));
+
+        //get label
+        let label = match iri_2_label.get(key) {
+            Some(y) => y.clone(),
+            None => String::from(key),
+        };
+
+        outer_list_element.push(json!(["small", ["a", { "resource": key }, label]]));
+
+        let mut inner_list = Vec::new();
+        inner_list.push(json!("ul"));
+        match value {
+            Value::Array(vec) => {
+                for v in vec {
+                    let mut inner_list_element = Vec::new();
+                    inner_list_element.push(json!("li"));
+                    let datatype = &v["datatype"];
+
+                    match datatype {
+                        Value::String(x) => match x.as_str() {
+                            "_IRI" => {
+                                inner_list_element.push(ldtab_iri_2_hiccup(key, v, iri_2_label));
+                            }
+                            "_JSON" => {} //TODO nested annotations
+                            _ => {
+                                inner_list_element.push(ldtab_literal_2_hiccup(v));
+                                inner_list_element.push(ldtab_datatype_2_hiccup(x.as_str()));
+                            }
+                        },
+                        _ => {}
+                    };
+                    inner_list.push(Value::Array(inner_list_element));
+                }
+            }
+            _ => {}
+        }
+        outer_list_element.push(Value::Array(inner_list));
+        outer_list.push(Value::Array(outer_list_element));
+    }
+    Value::Array(outer_list)
+}
+
 /// Given a property, a value, and a map from CURIEs/IRIs to labels
 /// return a hiccup-style list encoding of the term property shape using:
 ///
@@ -471,6 +519,7 @@ fn ldtab_value_2_hiccup(
     list_element.push(json!("li"));
 
     let datatype = &value["datatype"];
+    let annotation = &value["annotation"];
 
     match datatype {
         Value::String(x) => match x.as_str() {
@@ -498,6 +547,12 @@ fn ldtab_value_2_hiccup(
             ))));
         }
     };
+
+    match annotation {
+        Value::Object(x) => list_element.push(ldtab_annotation_2_hiccup(x, iri_2_label)),
+        _ => {} //there is no annotation -- so do nothing
+    }
+
     Ok(Value::Array(list_element))
 }
 
@@ -611,7 +666,7 @@ fn sort_predicate_map_by_label(
 pub async fn get_predicate_map_hiccup(
     subject: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
     predicate_order_start: &Vec<String>,
     predicate_order_end: &Vec<String>,
 ) -> Result<Value, Error> {
@@ -673,7 +728,7 @@ pub async fn get_predicate_map_hiccup(
 pub async fn get_predicate_map_html(
     subject: &str,
     table: &str,
-    pool: &SqlitePool,
+    pool: &AnyPool,
     predicate_order_start: &Vec<String>,
     predicate_order_end: &Vec<String>,
 ) -> Result<String, Error> {
@@ -746,11 +801,7 @@ pub async fn get_predicate_map_html(
 ///       "obo":"http://purl.obolibrary.org/obo/"
 ///     }
 ///    }
-pub async fn get_subject_map(
-    subject: &str,
-    table: &str,
-    pool: &SqlitePool,
-) -> Result<Value, Error> {
+pub async fn get_subject_map(subject: &str, table: &str, pool: &AnyPool) -> Result<Value, Error> {
     //1. subject map
     let predicate_map = get_property_map(subject, table, pool).await?;
     let subject_map = json!({ subject: predicate_map });
@@ -807,7 +858,7 @@ pub async fn get_subject_map(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+    use sqlx::any::{AnyPool, AnyPoolOptions};
     use std::collections::{HashMap, HashSet};
 
     #[test]
@@ -845,7 +896,7 @@ mod tests {
     async fn test_get_prefix_hash_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
@@ -873,7 +924,7 @@ mod tests {
     async fn test_get_prefix_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
@@ -907,7 +958,7 @@ mod tests {
     async fn test_get_label_hash_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
@@ -930,7 +981,7 @@ mod tests {
     async fn test_get_label_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
@@ -965,7 +1016,7 @@ mod tests {
     async fn test_get_type_hash_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
@@ -990,7 +1041,7 @@ mod tests {
     async fn test_get_property_map() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
@@ -1050,14 +1101,14 @@ mod tests {
     async fn test_ldtab_row_2_predicate_json_shape() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await
             .unwrap();
 
         let query = "SELECT * FROM statement WHERE predicate='rdfs:label'";
-        let rows: Vec<SqliteRow> = sqlx::query(&query).fetch_all(&pool).await.unwrap();
+        let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(&pool).await.unwrap();
         let row = &rows[0]; //NB: there is a unique row (with rdfs:label)
         let json_shape = ldtab_row_2_predicate_json_shape(row);
         let expected = (
@@ -1071,7 +1122,7 @@ mod tests {
     async fn test_sort_predicate_map_by_label() {
         let connection = "src/resources/test_data/zfa_excerpt.db";
         let connection_string = format!("sqlite://{}?mode=rwc", connection);
-        let pool: SqlitePool = SqlitePoolOptions::new()
+        let pool: AnyPool = AnyPoolOptions::new()
             .max_connections(5)
             .connect(&connection_string)
             .await

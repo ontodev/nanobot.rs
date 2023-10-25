@@ -8,6 +8,7 @@ use crate::sql::{
     LIMIT_DEFAULT, LIMIT_MAX,
 };
 use chrono::prelude::{DateTime, Utc};
+use csv::WriterBuilder;
 use enquote::unquote;
 use git2::Repository;
 use minijinja::{Environment, Source};
@@ -57,6 +58,12 @@ impl From<String> for GetError {
 
 impl From<std::io::Error> for GetError {
     fn from(error: std::io::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
+impl From<csv::Error> for GetError {
+    fn from(error: csv::Error) -> GetError {
         GetError::new(format!("{:?}", error))
     }
 }
@@ -172,11 +179,18 @@ pub async fn get_rows(
 
     match shape {
         "value_rows" => {
+            if unquoted_table != "message" {
+                // use the *_view table
+                select.table(format!("\"{unquoted_table}_view\""));
+            }
+            tracing::debug!("VALUE SELECT {select:?}");
             let value_rows = match get_table_from_pool(&pool, &select).await {
                 Ok(value_rows) => value_rows,
                 Err(e) => return Err(GetError::new(e.to_string())),
             };
             match format {
+                "tsv" => value_rows_to_tsv(&value_rows),
+                "csv" => value_rows_to_csv(&value_rows),
                 "text" => value_rows_to_text(&value_rows),
                 "json" => Ok(json!(value_rows).to_string()),
                 "pretty.json" => match to_string_pretty(&json!(value_rows)) {
@@ -390,6 +404,7 @@ async fn get_page(
     }
 
     // Use the view to select the data
+    tracing::debug!("VIEW SELECT {view_select:?}");
     let value_rows = match get_table_from_pool(&pool, &view_select).await {
         Ok(value_rows) => value_rows,
         Err(e) => return Err(GetError::new(e.to_string())),
@@ -622,7 +637,7 @@ async fn get_page(
                 }
 
                 for (column, messages) in &output_messages {
-                    if let Some(cell) = crow.get_mut(column.clone()) {
+                    if let Some(cell) = crow.get_mut(column.to_owned()) {
                         if let Some(cell) = cell.as_object_mut() {
                             cell.remove("nulltype");
                             let mut new_classes = vec![];
@@ -738,6 +753,28 @@ async fn get_page(
         Err(e) => return Err(GetError::new(e.to_string())),
     };
     formats.insert("TSV".to_string(), json!(href));
+
+    select_format.table(format!("\"{}.csv\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("CSV".to_string(), json!(href));
+
+    select_format.table(format!("\"{}.txt\"", unquoted_table));
+    let href = match select_format.to_url() {
+        Ok(url) => url,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    let href = match decode(&href) {
+        Ok(href) => href,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    formats.insert("Plain Text".to_string(), json!(href));
 
     select_format.table(format!("\"{}.json\"", unquoted_table));
     let href = match select_format.to_url() {
@@ -903,7 +940,10 @@ pub fn get_action_map(config: &Config) -> Result<SerdeMap, GetError> {
 pub fn get_repo_details() -> Result<SerdeMap, GetError> {
     let mut result = SerdeMap::new();
 
-    let repo = Repository::open_from_env().expect("Couldn't open repository");
+    let repo = match Repository::open_from_env() {
+        Ok(repo) => repo,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
     let head = match repo.head() {
         Ok(head) => Some(head),
         Err(e) => return Err(GetError::new(e.to_string())),
@@ -969,21 +1009,21 @@ pub fn get_repo_details() -> Result<SerdeMap, GetError> {
     Ok(result)
 }
 
-fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
-    // This would be nicer with map, but I got weird borrowing errors.
-    let mut lines: Vec<String> = vec![];
-    let mut line: Vec<String> = vec![];
+fn value_rows_to_strings(rows: &Vec<Map<String, Value>>) -> Result<Vec<Vec<String>>, GetError> {
+    let mut lines = vec![];
+    let mut row: Vec<String> = vec![];
     match rows.first().and_then(|f| Some(f.keys())) {
         Some(first_keys) => {
             for key in first_keys {
-                line.push(key.clone());
+                row.push(key.clone());
             }
         }
-        None => return Ok("".to_string()),
+        None => return Ok(lines),
     };
-    lines.push(line.join("\t"));
+    lines.push(row);
+
     for row in rows {
-        let mut line: Vec<String> = vec![];
+        let mut cells = vec![];
         for cell in row.values() {
             let mut value = cell.clone().to_string();
             if cell.is_string() {
@@ -1000,14 +1040,45 @@ fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError
                 // TODO: better null handling
                 value = "".to_string();
             }
-            line.push(value);
+            cells.push(value);
         }
-        lines.push(line.join("\t"));
+        lines.push(cells);
     }
+    Ok(lines)
+}
+
+fn value_rows_to_xsv(rows: &Vec<Map<String, Value>>, delimiter: u8) -> Result<String, GetError> {
+    let lines = value_rows_to_strings(rows)?;
+    let mut writer = WriterBuilder::new()
+        .delimiter(delimiter)
+        .from_writer(vec![]);
+    for line in lines {
+        writer.write_record(line)?;
+    }
+    let writer = match writer.into_inner() {
+        Ok(w) => w,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
+    match String::from_utf8(writer) {
+        Ok(text) => Ok(text),
+        Err(e) => Err(GetError::new(e.to_string())),
+    }
+}
+
+fn value_rows_to_csv(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
+    value_rows_to_xsv(rows, b',')
+}
+
+fn value_rows_to_tsv(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
+    value_rows_to_xsv(rows, b'\t')
+}
+
+fn value_rows_to_text(rows: &Vec<Map<String, Value>>) -> Result<String, GetError> {
+    let tsv = value_rows_to_tsv(rows).unwrap_or_default();
 
     // Format using elastic tabstops
     let mut tw = TabWriter::new(vec![]);
-    if let Err(e) = write!(&mut tw, "{}", lines.join("\n")) {
+    if let Err(e) = write!(&mut tw, "{}", tsv) {
         return Err(GetError::new(e.to_string()));
     }
     if let Err(e) = tw.flush() {
@@ -1054,6 +1125,7 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
     let page_html = include_str!("resources/page.html");
     let table_html = include_str!("resources/table.html");
     let form_html = include_str!("resources/form.html");
+    let tree_html = include_str!("resources/tree.html");
     let action_html = include_str!("resources/action.html");
 
     let mut env = Environment::new();
@@ -1075,6 +1147,10 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
         if !path.is_file() {
             env.add_template("form.html", form_html).unwrap();
         }
+        let path = Path::new(t).join("tree.html");
+        if !path.is_file() {
+            env.add_template("tree.html", tree_html).unwrap();
+        }
         let path = Path::new(t).join("action.html");
         if !path.is_file() {
             env.add_template("action.html", action_html).unwrap();
@@ -1084,6 +1160,7 @@ pub fn page_to_html(config: &Config, template: &str, page: &Value) -> Result<Str
         env.add_template("page.html", page_html).unwrap();
         env.add_template("table.html", table_html).unwrap();
         env.add_template("form.html", form_html).unwrap();
+        env.add_template("tree.html", tree_html).unwrap();
         env.add_template("action.html", action_html).unwrap();
     }
 

@@ -2,16 +2,19 @@ use nanobot::test::tree_validation::get_json_tree_view;
 //use nanobot::tree_validation::get_json_tree_view;
 use nanobot::tree_view::{get_hiccup_class_tree, get_rich_json_tree_view};
 use serde_json::{from_str, Value};
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
+use sqlx::any::{AnyPool, AnyPoolOptions};
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 
-async fn set_up_database(tsv: &str, db: &str) -> SqlitePool {
+#[cfg(test)]
+use pretty_assertions::assert_eq;
+
+async fn set_up_database(tsv: &str, db: &str) -> AnyPool {
     let test_database = format!("src/resources/.tmp/{}", db);
     let connection_string = format!("sqlite://{}?mode=rwc", test_database);
-    let pool: SqlitePool = SqlitePoolOptions::new()
+    let pool: AnyPool = AnyPoolOptions::new()
         .max_connections(5)
         .connect(&connection_string)
         .await
@@ -68,6 +71,12 @@ async fn test_get_rich_json_tree_view() {
 
     tear_down_database(database);
 
+    // fs::write(
+    //     "ZFA_0000354.json",
+    //     serde_json::to_string_pretty(&rich_hierarchy).unwrap(),
+    // )
+    // .expect("Should write tree to file");
+
     assert_eq!(rich_hierarchy, expected.unwrap());
 }
 
@@ -91,6 +100,9 @@ async fn test_get_hiccup_class_tree() {
     let expected = from_str::<Value>(&expected_string);
 
     tear_down_database(database);
+
+    // fs::write("ZFA_0000354.hiccup", serde_json::to_string_pretty(&hiccup).unwrap())
+    //     .expect("Should write hiccup to file");
 
     assert_eq!(hiccup, expected.unwrap());
 }
@@ -116,6 +128,12 @@ async fn test_get_hiccup_class_tree_with_preferred_roots() {
     let expected = from_str::<Value>(&expected_string);
 
     tear_down_database(database);
+
+    // fs::write(
+    //     "ZFA_0000354_preferred_roots.hiccup",
+    //     serde_json::to_string_pretty(&hiccup).unwrap(),
+    // )
+    // .expect("Should write hiccup to file");
 
     assert_eq!(hiccup, expected.unwrap());
 }
@@ -147,16 +165,16 @@ async fn test_get_hiccup_class_tree_with_preferred_roots() {
 //}
 
 #[tokio::test]
-async fn test_compare_osl_2_ldtab_tree_zfa_0000354() {
+async fn test_compare_ols_2_ldtab_tree_zfa_0000354() {
     let pool = set_up_database("src/resources/test_data/zfa/0000354.tsv", "0000354.db").await;
 
     let subject = "obo:ZFA_0000354";
     let ldtab_term_tree: Value = get_json_tree_view(&subject, "statement", &pool).await;
 
-    let osl_tree_path = "src/resources/test_data/ols_term_trees/ZFA_0000354.json";
-    let osl_tree_string =
-        fs::read_to_string(osl_tree_path).expect("Should have been able to read the file");
-    let expected = from_str::<Value>(&osl_tree_string);
+    let ols_tree_path = "src/resources/test_data/ols_term_trees/ZFA_0000354.json";
+    let ols_tree_string =
+        fs::read_to_string(ols_tree_path).expect("Should have been able to read the file");
+    let expected = from_str::<Value>(&ols_tree_string);
 
     tear_down_database("0000354.db");
 
@@ -164,16 +182,16 @@ async fn test_compare_osl_2_ldtab_tree_zfa_0000354() {
 }
 
 #[tokio::test]
-async fn test_compare_osl_2_ldtab_tree_uberon_0002535() {
+async fn test_compare_ols_2_ldtab_tree_uberon_0002535() {
     let pool = set_up_database("src/resources/test_data/uberon/0002535.tsv", "0002535.db").await;
 
     let subject = "obo:UBERON_0002535";
     let ldtab_term_tree: Value = get_json_tree_view(&subject, "statement", &pool).await;
 
-    let osl_tree_path = "src/resources/test_data/ols_term_trees/UBERON_0002535.json";
-    let osl_tree_string =
-        fs::read_to_string(osl_tree_path).expect("Should have been able to read the file");
-    let expected = from_str::<Value>(&osl_tree_string);
+    let ols_tree_path = "src/resources/test_data/ols_term_trees/UBERON_0002535.json";
+    let ols_tree_string =
+        fs::read_to_string(ols_tree_path).expect("Should have been able to read the file");
+    let expected = from_str::<Value>(&ols_tree_string);
 
     tear_down_database("0002535.db");
 
@@ -181,16 +199,16 @@ async fn test_compare_osl_2_ldtab_tree_uberon_0002535() {
 }
 
 #[tokio::test]
-async fn test_compare_osl_2_ldtab_tree_uberon_0000956() {
+async fn test_compare_ols_2_ldtab_tree_uberon_0000956() {
     let pool = set_up_database("src/resources/test_data/uberon/0000956.tsv", "0000956.db").await;
 
     let subject = "obo:UBERON_0000956";
     let ldtab_term_tree: Value = get_json_tree_view(&subject, "statement", &pool).await;
 
-    let osl_tree_path = "src/resources/test_data/ols_term_trees/UBERON_0000956.json";
-    let osl_tree_string =
-        fs::read_to_string(osl_tree_path).expect("Should have been able to read the file");
-    let expected = from_str::<Value>(&osl_tree_string);
+    let ols_tree_path = "src/resources/test_data/ols_term_trees/UBERON_0000956.json";
+    let ols_tree_string =
+        fs::read_to_string(ols_tree_path).expect("Should have been able to read the file");
+    let expected = from_str::<Value>(&ols_tree_string);
 
     tear_down_database("0000956.db");
 
