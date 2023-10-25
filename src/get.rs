@@ -940,7 +940,10 @@ pub fn get_action_map(config: &Config) -> Result<SerdeMap, GetError> {
 pub fn get_repo_details() -> Result<SerdeMap, GetError> {
     let mut result = SerdeMap::new();
 
-    let repo = Repository::open_from_env().expect("Couldn't open repository");
+    let repo = match Repository::open_from_env() {
+        Ok(repo) => repo,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
     let head = match repo.head() {
         Ok(head) => Some(head),
         Err(e) => return Err(GetError::new(e.to_string())),
