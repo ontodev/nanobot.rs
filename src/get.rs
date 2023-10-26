@@ -605,7 +605,7 @@ async fn get_page(
                             )))
                         }
                     };
-                    error_values.insert(column.clone(), value);
+                    error_values.insert(column.to_owned(), value);
                     if let Some(v) = output_messages.get_mut(&column) {
                         v.push(m);
                     } else {
@@ -668,7 +668,7 @@ async fn get_page(
                                     }
                                 };
                             }
-                            let value = match error_values.get(column) {
+                            let value = match error_values.get(column.to_owned()) {
                                 Some(v) => v,
                                 None => {
                                     return Err(GetError::new(format!(
