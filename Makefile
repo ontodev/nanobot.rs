@@ -113,3 +113,4 @@ release: target/$(ARCH)/release/nanobot | build/
 		--title "$(TODAY) Alpha Release" \
 		--generate-notes \
 		v$(TODAY) $(TARGET)
+	echo "Please publish GitHub release v$(TODAY)"
