@@ -157,7 +157,7 @@ impl Config {
                 .database
                 .unwrap_or_default()
                 .connection
-                .unwrap_or(".nanobot,db".into()),
+                .unwrap_or(".nanobot.db".into()),
             pool: None,
             valve_path: user
                 .valve
