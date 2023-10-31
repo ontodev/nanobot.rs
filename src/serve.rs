@@ -20,7 +20,7 @@ use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select, SelectColumn};
 use ontodev_valve::{
     ast::Expression,
-    delete_row, insert_new_row, update_row,
+    delete_row, insert_new_row, redo, undo, update_row,
     validate::{get_matching_values, validate_row},
 };
 use regex::{Captures, Regex};
@@ -109,14 +109,33 @@ async fn post_table(
         query_params,
         form_params
     );
-    table(
-        &path,
-        &state,
-        &query_params,
-        &form_params,
-        RequestType::POST,
-    )
-    .await
+    let mut request_type = RequestType::POST;
+    if form_params.contains_key("undo") {
+        tracing::info!("UNDO");
+        let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+            Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+            None => return Err("Missing valve configuration".into()),
+        };
+        let pool = match state.config.pool.as_ref() {
+            Some(p) => p,
+            None => return Err("Missing database pool".into()),
+        };
+        block_on(undo(&vconfig, dt_conds, rule_conds, pool, "Nanobot")).map_err(|e| e.to_string());
+        request_type = RequestType::GET;
+    } else if form_params.contains_key("redo") {
+        tracing::info!("REDO");
+        let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
+            Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+            None => return Err("Missing valve configuration".into()),
+        };
+        let pool = match state.config.pool.as_ref() {
+            Some(p) => p,
+            None => return Err("Missing database pool".into()),
+        };
+        block_on(redo(&vconfig, dt_conds, rule_conds, pool, "Nanobot")).map_err(|e| e.to_string());
+        request_type = RequestType::GET;
+    }
+    table(&path, &state, &query_params, &form_params, request_type).await
 }
 
 async fn get_table(
@@ -256,6 +275,9 @@ fn action(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(state.config.valve.as_ref().ok_or("No VALVE config")?)? {
+            if table == "history" {
+                continue;
+            }
             table_map.insert(table.to_string(), json!(table.clone()));
         }
         json!(table_map)
@@ -379,6 +401,9 @@ async fn tree(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(&state.config.valve.as_ref().clone().unwrap())? {
+            if table == "history" {
+                continue;
+            }
             table_map.insert(table.to_string(), json!(table.clone()));
         }
         json!(table_map)
@@ -504,6 +529,9 @@ async fn tree2(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(&state.config.valve.as_ref().clone().unwrap())? {
+            if table == "history" {
+                continue;
+            }
             table_map.insert(table.to_string(), json!(table.clone()));
         }
         json!(table_map)
@@ -711,7 +739,7 @@ async fn table(
             match get_row_as_form_map(config, &table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::debug!("Rendering error {}", e);
+                    tracing::debug!("Rendering error 1 {}", e);
                     form_map = None
                 }
             };
@@ -745,10 +773,10 @@ async fn table(
     // TODO: Improve handling of custom views.
     if view != "" {
         // In this case the request is to view the "insert new row" form:
-        if table == "message" {
+        if vec!["message", "history"].contains(&&*table) {
             return Err((
                 StatusCode::BAD_REQUEST,
-                Html("Editing the message table is not possible"),
+                Html(format!("Editing the {} table is not possible", table)),
             )
                 .into_response()
                 .into());
@@ -778,7 +806,7 @@ async fn table(
             match get_row_as_form_map(config, &table, &new_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::debug!("Rendering error {}", e);
+                    tracing::debug!("Rendering error 2 {}", e);
                     form_map = None
                 }
             };
@@ -788,6 +816,9 @@ async fn table(
         let table_map = {
             let mut table_map = SerdeMap::new();
             for table in get_tables(config)? {
+                if table == "history" {
+                    continue;
+                }
                 table_map.insert(table.to_string(), json!(table.clone()));
             }
             json!(table_map)
@@ -1051,7 +1082,7 @@ fn render_row_from_database(
             match get_row_as_form_map(config, table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::debug!("Rendering error {}", e);
+                    tracing::debug!("Rendering error 3 {}", e);
                     form_map = None
                 }
             };
@@ -1092,10 +1123,10 @@ fn render_row_from_database(
     // Handle a request to display a form for editing and validiating the given row:
     if view != "" {
         if let None = form_map {
-            if table == "message" {
+            if vec!["message", "history"].contains(&table) {
                 return Err((
                     StatusCode::BAD_REQUEST,
-                    Html("Editing the message table is not possible"),
+                    Html(format!("Editing the {} table is not possible", table)),
                 )
                     .into_response()
                     .into());
@@ -1116,7 +1147,7 @@ fn render_row_from_database(
             match get_row_as_form_map(config, table, &metafied_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
-                    tracing::debug!("Rendering error {}", e);
+                    tracing::debug!("Rendering error 4 {}", e);
                     form_map = None
                 }
             };
@@ -1137,6 +1168,9 @@ fn render_row_from_database(
     let table_map = {
         let mut table_map = SerdeMap::new();
         for table in get_tables(config)? {
+            if table == "history" {
+                continue;
+            }
             table_map.insert(table.to_string(), json!(table.clone()));
         }
         json!(table_map)
@@ -1406,7 +1440,7 @@ fn insert_table_row(
         &table_name,
         &row_data,
         None,
-        false,
+        "Nanobot",
     ))
     .map_err(|e| e.to_string())
 }
@@ -1433,8 +1467,7 @@ fn update_table_row(
         &table_name,
         &row_data,
         row_number,
-        false,
-        false,
+        "Nanobot",
     ))
     .map_err(|e| e.to_string())
 }
@@ -1459,7 +1492,7 @@ fn delete_table_row(
         pool,
         &table_name,
         row_number,
-        false,
+        "Nanobot",
     ))
     .map_err(|e| e.to_string())
 }
@@ -1613,6 +1646,9 @@ fn get_row_as_form_map(
     let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
         if cell_header == "row_number" {
+            continue;
+        }
+        if cell_header == "history" {
             continue;
         }
         let (valid, value, messages);

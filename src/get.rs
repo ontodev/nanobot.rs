@@ -900,6 +900,9 @@ async fn get_page(
 
     let mut tables = Map::new();
     for key in table_map.keys() {
+        if key == "history" {
+            continue;
+        }
         tables.insert(key.clone(), Value::String(key.clone()));
     }
 
