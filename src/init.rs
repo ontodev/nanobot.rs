@@ -192,11 +192,14 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // load tables into database
+    let verbose = false;
+    let initial_load = !Path::new(&config.valve_path).is_file();
     match valve(
         &config.valve_path,
-        &database,
+        &config.connection,
         &ValveCommand::Load,
-        false,
+        verbose,
+        initial_load,
         "table",
     )
     .await

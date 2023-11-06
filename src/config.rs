@@ -248,12 +248,14 @@ impl Config {
     }
 
     pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
-        // TODO: Make the path configurable:
+        let verbose = false;
+        let initial_load = !Path::new(&self.valve_path).is_file();
         match valve(
             &self.valve_path,
             &self.connection,
             &ValveCommand::Config,
-            false,
+            verbose,
+            initial_load,
             "table",
         )
         .await
