@@ -20,8 +20,10 @@ pub struct Config {
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
-    pub valve_path: String,
     pub valve: Option<ValveConfig>,
+    pub valve_path: String,
+    pub valve_create_only: bool,
+    pub valve_initial_load: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
@@ -159,12 +161,14 @@ impl Config {
                 .connection
                 .unwrap_or(".nanobot.db".into()),
             pool: None,
+            valve: None,
             valve_path: user
                 .valve
                 .unwrap_or_default()
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
-            valve: None,
+            valve_create_only: false,
+            valve_initial_load: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
                     Some(p) => {
@@ -249,7 +253,7 @@ impl Config {
 
     pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
         let verbose = false;
-        let initial_load = !Path::new(&self.valve_path).is_file();
+        let initial_load = false;
         match valve(
             &self.valve_path,
             &self.connection,
@@ -286,6 +290,16 @@ impl Config {
 
     pub fn connection<S: Into<String>>(&mut self, connection: S) -> &mut Config {
         self.connection = connection.into();
+        self
+    }
+
+    pub fn create_only(&mut self, value: bool) -> &mut Config {
+        self.valve_create_only = value;
+        self
+    }
+
+    pub fn initial_load(&mut self, value: bool) -> &mut Config {
+        self.valve_initial_load = value;
         self
     }
 }
