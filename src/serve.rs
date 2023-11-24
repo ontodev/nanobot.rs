@@ -120,7 +120,9 @@ async fn post_table(
             Some(p) => p,
             None => return Err("Missing database pool".into()),
         };
-        block_on(undo(&vconfig, dt_conds, rule_conds, pool, "Nanobot")).map_err(|e| e.to_string());
+        block_on(undo(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
+            .map_err(|e| e.to_string())
+            .expect("Undo should succeed");
         request_type = RequestType::GET;
     } else if form_params.contains_key("redo") {
         tracing::info!("REDO");
@@ -132,7 +134,9 @@ async fn post_table(
             Some(p) => p,
             None => return Err("Missing database pool".into()),
         };
-        block_on(redo(&vconfig, dt_conds, rule_conds, pool, "Nanobot")).map_err(|e| e.to_string());
+        block_on(redo(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
+            .map_err(|e| e.to_string())
+            .expect("Redo should succeed");
         request_type = RequestType::GET;
     }
     table(&path, &state, &query_params, &form_params, request_type).await
@@ -287,6 +291,8 @@ fn action(
             "root": root,
             "project_name": "Nanobot",
             "tables": table_map,
+            "undo": get::get_undo_message(&state.config),
+            "redo": get::get_redo_message(&state.config),
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
             "repo": get::get_repo_details().unwrap_or_default(),
         },
@@ -414,7 +420,10 @@ async fn tree(
             "root": "../",
             "project_name": "Nanobot",
             "tables": table_map,
+            "undo": get::get_undo_message(&state.config),
+            "redo": get::get_redo_message(&state.config),
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "repo": get::get_repo_details().unwrap_or_default(),
             "elapsed": elapsed,
         },
         "title": "table",
@@ -542,7 +551,10 @@ async fn tree2(
             "root": "../",
             "project_name": "Nanobot",
             "tables": table_map,
+            "undo": get::get_undo_message(&state.config),
+            "redo": get::get_redo_message(&state.config),
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "repo": get::get_repo_details().unwrap_or_default(),
             "elapsed": elapsed,
         },
         "title": "table",
@@ -831,7 +843,10 @@ async fn table(
                 "root": "",
                 "project_name": "Nanobot",
                 "tables": table_map,
-                "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "undo": get::get_undo_message(&state.config),
+            "redo": get::get_redo_message(&state.config),
+            "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "repo": get::get_repo_details().unwrap_or_default(),
             },
             "title": "table",
             "table_name": table,
@@ -1183,7 +1198,10 @@ fn render_row_from_database(
             "root": "../../",
             "project_name": "Nanobot",
             "tables": table_map,
+            "undo": get::get_undo_message(&state.config),
+            "redo": get::get_redo_message(&state.config),
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
+            "repo": get::get_repo_details().unwrap_or_default(),
         },
         "title": "table",
         "table_name": table,

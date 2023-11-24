@@ -131,13 +131,13 @@
               Actions
             </a>
             <form class="dropdown-menu" method="POST" action="">
-              <button class="dropdown-item" type="submit" name="undo" value="Undo">
+              <button class="dropdown-item {% if not page.undo %}disabled{% endif %}" type="submit" name="undo" value="Undo">
                 <i class="bi bi-arrow-counterclockwise"></i>
-                Undo
+                {% if page.undo %}{{ page.undo }}{% else %}Undo{% endif %}
               </button>
-              <button class="dropdown-item" type="submit" name="redo" value="Redo">
-                <i class="bi bi-arrow-clockwise"></i>
-                Redo
+              <button class="dropdown-item {% if not page.redo %}disabled{% endif %}" type="submit" name="redo" value="redo">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                {% if page.redo %}{{ page.redo }}{% else %}Redo{% endif %}
               </button>
               {% for name, label in page.actions|items %}
           <li><a class="dropdown-item" href="?user.action={{ name }}">{{ label or name }}</a></li>

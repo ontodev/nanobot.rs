@@ -300,10 +300,10 @@
         {% else %}
         {{ cell.value }}
         {% endif %}
-        {% if cell.messages %}
+        {% if cell.messages or cell.history %}
         <div class="dropdown float-end">
           <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
-            {% if cell.messages|length > 1 %}
+            {% if cell.messages and cell.messages|length > 1 %}
             <strong>{{ cell.messages|length }}</strong>
             {% endif %}
             {% if cell.message_level == "error" %}
@@ -312,10 +312,9 @@
             <i class="bi bi-exclamation-triangle-fill text-warning"></i>
             {% elif cell.message_level == "info" %}
             <i class="bi bi-info-circle-fill text-info"></i>
-            {% elif cell.message_level == "update" %}
+            {% endif %}
+            {% if cell.history %}
             <i class="bi bi-clock-history text-secondary"></i>
-            {% else %}
-            <i class="bi bi-question-circle-fill"></i>
             {% endif %}
           </a>
           <ul class="dropdown-menu">
@@ -334,6 +333,14 @@
                 <i class="bi bi-question-circle-fill"></i>
                 {% endif %}
                 {{ message.message }}
+              </a>
+            </li>
+            {% endfor %}
+            {% for history in cell.history %}
+            <li>
+              <a class="dropdown-item" href="#">
+                <i class="bi bi-clock-history text-secondary"></i>
+                {{ history.message }}
               </a>
             </li>
             {% endfor %}

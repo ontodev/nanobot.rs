@@ -10,13 +10,16 @@ use crate::sql::{
 use chrono::prelude::{DateTime, Utc};
 use csv::WriterBuilder;
 use enquote::unquote;
+use futures::executor::block_on;
 use git2::Repository;
 use minijinja::{Environment, Source};
 use ontodev_sqlrest::{Direction, OrderByColumn, Select};
-use ontodev_valve::get_sql_type_from_global_config;
+use ontodev_valve as valve;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, to_string_pretty, Map, Value};
-use std::collections::HashMap;
+use sqlx::any::AnyRow;
+use sqlx::Row;
 use std::error::Error;
 use std::fmt;
 use std::fs;
@@ -84,6 +87,24 @@ impl From<std::time::SystemTimeError> for GetError {
     fn from(error: std::time::SystemTimeError) -> GetError {
         GetError::new(format!("{:?}", error))
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct ValveMessage {
+    column: String,
+    value: String,
+    rule: String,
+    level: String,
+    message: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+struct ValveChange {
+    column: String,
+    level: String,
+    old_value: String,
+    value: String,
+    message: String,
 }
 
 pub async fn get_table(
@@ -260,7 +281,7 @@ async fn get_page(
             }
         }
 
-        let sql_type = get_sql_type_from_global_config(
+        let sql_type = valve::get_sql_type_from_global_config(
             &config.valve.as_ref().unwrap().config,
             &unquote(&select.table).unwrap(),
             &key,
@@ -391,9 +412,10 @@ async fn get_page(
     for col in &curr_cols {
         view_select.add_explicit_select(col);
     }
-    // If this isn't the message table, explicitly include the message column from the table's view:
+    // If this isn't the message table, explicitly include the message and history columns from the table's view:
     if unquoted_table != "message" {
         view_select.add_select("message");
+        view_select.add_select("history");
     }
 
     // Only apply the limit to the view query if we're filtering for rows with messages:
@@ -415,280 +437,10 @@ async fn get_page(
         Err(e) => return Err(GetError::new(e.to_string())),
     };
     // convert value_rows to cell_rows
-    let mut cell_rows: Vec<Map<String, Value>> = vec![];
-    for row in &value_rows {
-        let mut crow: Map<String, Value> = Map::new();
-        for (k, v) in row.iter() {
-            if unquoted_table != "message" && k == "message" {
-                continue;
-            }
-            let mut cell: Map<String, Value> = Map::new();
-            let mut classes: Vec<String> = vec![];
-
-            // Add the value to the cell
-            cell.insert("value".to_string(), v.clone());
-
-            // Row numbers and message ids have an integer datatype but otherwise do not need to be
-            // processed, so we continue:
-            if (unquoted_table != "message" && k == "row_number")
-                || (unquoted_table == "message" && k == "message_id")
-            {
-                cell.insert("datatype".to_string(), Value::String("integer".to_string()));
-                crow.insert(k.to_string(), Value::Object(cell));
-                continue;
-            }
-
-            // Handle null and nulltype
-            if v.is_null() {
-                classes.push("bg-null".to_string());
-                match column_map.get(k) {
-                    Some(column) => {
-                        if let Some(nulltype) = column.get("nulltype") {
-                            if nulltype.is_string() {
-                                cell.insert("nulltype".to_string(), nulltype.clone());
-                            }
-                        }
-                    }
-                    None => {
-                        return Err(GetError::new(format!(
-                            "While handling nulltype: No key '{}' in column_map {:?}",
-                            k, column_map
-                        )))
-                    }
-                };
-            }
-
-            // Handle the datatype:
-            if !cell.contains_key("nulltype") {
-                let datatype = match column_map.get(k) {
-                    Some(column) => match column.get("datatype") {
-                        Some(datatype) => datatype,
-                        None => {
-                            return Err(GetError::new(format!(
-                                "While handling datatype: No 'datatype' entry in {:?}",
-                                column
-                            )))
-                        }
-                    },
-                    None => {
-                        return Err(GetError::new(format!(
-                            "No key '{}' in column_map {:?}",
-                            k, column_map
-                        )))
-                    }
-                };
-                cell.insert("datatype".to_string(), datatype.clone());
-            }
-            // Handle structure
-            match column_map.get(k) {
-                Some(column) => {
-                    let default_structure = json!("");
-                    let structure = column.get("structure").unwrap_or(&default_structure);
-                    if structure == "from(table.table)" {
-                        let href = format!("table?table=eq.{}", {
-                            match v.as_str() {
-                                Some(s) => s.to_string(),
-                                None => {
-                                    return Err(GetError::new(format!(
-                                        "Could not convert '{}' to str",
-                                        v
-                                    )))
-                                }
-                            }
-                        });
-                        cell.insert("href".to_string(), Value::String(href));
-                    } else if k == "table" && unquoted_table == "table" {
-                        // In the 'table' table, link to the other tables
-                        let href = match v.as_str() {
-                            Some(s) => s.to_string(),
-                            None => {
-                                return Err(GetError::new(format!(
-                                    "Could not convert '{}' to str",
-                                    v
-                                )))
-                            }
-                        };
-                        cell.insert("href".to_string(), Value::String(href));
-                    }
-                }
-                None => {
-                    return Err(GetError::new(format!(
-                        "No key '{}' in column_map {:?}",
-                        k, column_map
-                    )))
-                }
-            };
-
-            if classes.len() > 0 {
-                cell.insert("classes".to_string(), json!(classes));
-            }
-
-            crow.insert(k.to_string(), Value::Object(cell));
-        }
-
-        // Handle messages associated with the row:
-        let mut error_values = HashMap::new();
-        if unquoted_table != "message" {
-            if let Some(input_messages) = row.get("message") {
-                let input_messages = match input_messages {
-                    Value::Array(value) => value.clone(),
-                    Value::String(value) => {
-                        let value = unquote(&value).unwrap_or(value.to_string());
-                        match serde_json::from_str::<Value>(value.as_str()) {
-                            Err(e) => return Err(GetError::new(e.to_string())),
-                            Ok(value) => match value.as_array() {
-                                None => {
-                                    return Err(GetError::new(format!(
-                                        "Value '{}' is not an array.",
-                                        value
-                                    )))
-                                }
-                                Some(value) => value.to_vec(),
-                            },
-                        }
-                    }
-                    Value::Null => vec![],
-                    _ => {
-                        return Err(GetError::new(format!(
-                            "'{}' is not a Value String or Value Array",
-                            input_messages
-                        )))
-                    }
-                };
-                let mut output_messages: HashMap<&str, Vec<Map<String, Value>>> = HashMap::new();
-                let mut max_level: usize = 0;
-                let mut message_level = "info".to_string();
-                for message in &input_messages {
-                    let mut m = Map::new();
-                    let message_map = match message.as_object() {
-                        Some(o) => o,
-                        None => {
-                            return Err(GetError::new(format!("{:?} is not an object.", message)))
-                        }
-                    };
-                    for (key, value) in message_map.iter() {
-                        if key != "column" && key != "value" {
-                            m.insert(key.clone(), value.clone());
-                        }
-                    }
-                    let column = match message_map.get("column") {
-                        Some(c) => match c.as_str() {
-                            Some(s) => s,
-                            None => {
-                                return Err(GetError::new(format!(
-                                    "Could not convert '{}' to str",
-                                    c
-                                )))
-                            }
-                        },
-                        None => {
-                            return Err(GetError::new(format!(
-                                "No 'column' key in {:?}",
-                                message_map
-                            )))
-                        }
-                    };
-                    let value = match message.get("value") {
-                        Some(v) => match v.as_str() {
-                            Some(s) => s,
-                            None => {
-                                return Err(GetError::new(format!(
-                                    "Could not convert '{}' to str",
-                                    v
-                                )))
-                            }
-                        },
-                        None => {
-                            return Err(GetError::new(format!(
-                                "No 'value' key in {:?}",
-                                message_map
-                            )))
-                        }
-                    };
-                    error_values.insert(column.to_owned(), value);
-                    if let Some(v) = output_messages.get_mut(&column) {
-                        v.push(m);
-                    } else {
-                        output_messages.insert(column, vec![m]);
-                    }
-
-                    let level = match message.get("level") {
-                        Some(v) => match v.as_str() {
-                            Some(s) => s.to_string(),
-                            None => {
-                                return Err(GetError::new(format!(
-                                    "Could not convert '{}' to str",
-                                    v
-                                )))
-                            }
-                        },
-                        None => {
-                            return Err(GetError::new(format!(
-                                "No 'level' key in {:?}",
-                                message_map
-                            )))
-                        }
-                    };
-                    let lvl = level_to_int(&level);
-                    if lvl > max_level {
-                        max_level = lvl;
-                        message_level = level;
-                    }
-                }
-
-                for (column, messages) in &output_messages {
-                    if let Some(cell) = crow.get_mut(column.to_owned()) {
-                        if let Some(cell) = cell.as_object_mut() {
-                            cell.remove("nulltype");
-                            let mut new_classes = vec![];
-                            if let Some(classes) = cell.get_mut("classes") {
-                                match classes.as_array() {
-                                    None => {
-                                        return Err(GetError::new(format!(
-                                            "{:?} is not an array",
-                                            classes
-                                        )))
-                                    }
-                                    Some(classes_array) => {
-                                        for class in classes_array {
-                                            match class.as_str() {
-                                                None => {
-                                                    return Err(GetError::new(format!(
-                                                        "Could not convert '{}' to str",
-                                                        class
-                                                    )))
-                                                }
-                                                Some(s) => {
-                                                    if s.to_string() != "bg-null" {
-                                                        new_classes.push(class.clone());
-                                                    }
-                                                }
-                                            };
-                                        }
-                                    }
-                                };
-                            }
-                            let value = match error_values.get(column.to_owned()) {
-                                Some(v) => v,
-                                None => {
-                                    return Err(GetError::new(format!(
-                                        "No '{}' in {:?}",
-                                        column, error_values
-                                    )))
-                                }
-                            };
-                            cell.insert("value".to_string(), json!(value));
-                            cell.insert("classes".to_string(), json!(new_classes));
-                            cell.insert("message_level".to_string(), json!(message_level));
-                            cell.insert("messages".to_string(), json!(messages));
-                        }
-                    }
-                }
-            }
-        }
-
-        cell_rows.push(crow);
-    }
+    let cell_rows: Vec<Map<String, Value>> = value_rows
+        .iter()
+        .map(|r| decorate_row(&unquoted_table, &column_map, r))
+        .collect();
 
     let mut counts = Map::new();
     let count = {
@@ -920,6 +672,8 @@ async fn get_page(
             "select": select,
             "select_params": select2.to_params().unwrap_or_default(),
             "elapsed": elapsed,
+            "undo": get_undo_message(&config),
+            "redo": get_redo_message(&config),
             "actions": get_action_map(&config).unwrap_or_default(),
             "repo": get_repo_details().unwrap_or_default(),
         },
@@ -929,6 +683,150 @@ async fn get_page(
     });
     tracing::debug!("Elapsed time for get_page(): {}", elapsed);
     Ok(result)
+}
+
+// Given a table name, a column map, a cell value, and message list,
+// return a JSON value representing this cell.
+fn decorate_cell(
+    column_name: &str,
+    column: &Value,
+    value: &Value,
+    messages: &Vec<ValveMessage>,
+    history: &Vec<Vec<ValveChange>>,
+) -> Map<String, Value> {
+    let mut cell: Map<String, Value> = Map::new();
+    cell.insert("value".to_string(), value.clone());
+
+    let mut classes: Vec<String> = vec![];
+
+    // Handle null and nulltype
+    if value.is_null() {
+        classes.push("bg-null".to_string());
+        if let Some(nulltype) = column.get("nulltype") {
+            if nulltype.is_string() {
+                cell.insert("nulltype".to_string(), nulltype.clone());
+            }
+        }
+    } else {
+        let datatype = column
+            .get("datatype")
+            .expect("Column {k} must have a datatype in column_map {column_map:?}");
+        cell.insert("datatype".to_string(), datatype.clone());
+    }
+
+    if classes.len() > 0 {
+        cell.insert("classes".to_string(), json!(classes));
+    }
+
+    // Handle messages associated with the row:
+    let mut output_messages = vec![];
+    let mut max_level = 0;
+    let mut message_level = "none";
+    for message in messages.iter().filter(|m| m.column == column_name) {
+        output_messages.push(json!({
+            "level": message.level,
+            "rule": message.rule,
+            "message": message.message,
+        }));
+        let level = level_to_int(&message.level);
+        if level > max_level {
+            max_level = level;
+            message_level = message.level.as_str();
+        }
+    }
+
+    if output_messages.len() > 0 {
+        cell.insert("message_level".to_string(), json!(message_level));
+        cell.insert("messages".to_string(), json!(output_messages));
+    }
+
+    let mut changes = vec![];
+    for record in history.iter() {
+        for change in record.iter().filter(|c| c.column == column_name) {
+            changes.push(change);
+        }
+    }
+
+    if changes.len() > 0 {
+        cell.insert("history".to_string(), json!(changes));
+    }
+
+    cell
+}
+
+fn decorate_row(
+    table: &str,
+    column_map: &Map<String, Value>,
+    row: &Map<String, Value>,
+) -> Map<String, Value> {
+    // tracing::debug!("Decorate Row: table {table}");
+    let messages: Vec<ValveMessage> = match row.get("message") {
+        Some(serde_json::Value::Null) => vec![],
+        Some(json_value) => match serde_json::from_value(json_value.clone()) {
+            Ok(ms) => ms,
+            Err(x) => {
+                tracing::warn!("Could not parse message '{json_value:?}': {x:?}");
+                vec![]
+            }
+        },
+        None => vec![],
+    };
+    let history: Vec<Vec<ValveChange>> = match row.get("history") {
+        Some(serde_json::Value::Null) => vec![],
+        Some(json_value) => match serde_json::from_str(&json_value.as_str().unwrap_or_default()) {
+            Ok(ms) => ms,
+            Err(x) => {
+                tracing::warn!("Could not parse history '{json_value:?}': {x:?}");
+                vec![]
+            }
+        },
+        None => vec![],
+    };
+    let mut cell_row: Map<String, Value> = SerdeMap::new();
+    for (column_name, value) in row.iter() {
+        // tracing::debug!("Decorate Row: column {column_name}");
+        if table != "message" && ["message", "history"].contains(&column_name.as_str()) {
+            continue;
+        }
+        let default_column = json!({
+            "table": table.to_string(),
+            "column": column_name.to_string(),
+            "datatype": "integer",
+        });
+        let column = column_map.get(column_name).unwrap_or(&default_column);
+        let cell = decorate_cell(column_name, column, value, &messages, &history);
+        cell_row.insert(column_name.to_string(), serde_json::Value::Object(cell));
+    }
+    cell_row
+}
+
+pub fn get_change_message(record: &AnyRow) -> Option<String> {
+    let table = record.try_get::<&str, &str>("table").ok()?;
+    let row_number = record.try_get::<i64, &str>("row").ok()? + 1;
+    let from = record.try_get::<&str, &str>("from").ok()?;
+    let to = record.try_get::<&str, &str>("to").ok()?;
+    let message = match (from, to) {
+        ("", _) => format!("add row {row_number} to '{table}'"),
+        (_, "") => format!("delete row {row_number} from '{table}'"),
+        (_, _) => format!("update row {row_number} of '{table}'"),
+    };
+    Some(String::from(message))
+}
+
+// Get the undo message, or None.
+pub fn get_undo_message(config: &Config) -> Option<String> {
+    let pool = config.pool.as_ref()?;
+    let record = block_on(valve::get_record_to_undo(pool)).ok()??;
+    let message = get_change_message(&record)?;
+    Some(String::from(format!("Undo {message}")))
+}
+
+// Get the redo message, or None.
+pub fn get_redo_message(config: &Config) -> Option<String> {
+    let pool = config.pool.as_ref()?;
+    let record = block_on(valve::get_record_to_redo(pool)).ok()??;
+    let message = get_change_message(&record)?;
+    Some(String::from(format!("Redo {message}")))
 }
 
 pub fn get_action_map(config: &Config) -> Result<SerdeMap, GetError> {
