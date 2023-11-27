@@ -107,7 +107,7 @@
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <a class="navbar-brand">{{ page.project_name }}</a>
+      <a class="navbar-brand" href="/">{{ page.project_name }}</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
         aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -125,20 +125,26 @@
             </ul>
           </li>
         </ul>
-        {% if page.actions %}
         <ul class="navbar-nav">
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
               Actions
             </a>
-            <ul class="dropdown-menu">
+            <form class="dropdown-menu" method="POST" action="">
+              <button class="dropdown-item {% if not page.undo %}disabled{% endif %}" type="submit" name="undo" value="Undo">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                {% if page.undo %}{{ page.undo }}{% else %}Undo{% endif %}
+              </button>
+              <button class="dropdown-item {% if not page.redo %}disabled{% endif %}" type="submit" name="redo" value="redo">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                {% if page.redo %}{{ page.redo }}{% else %}Redo{% endif %}
+              </button>
               {% for name, label in page.actions|items %}
-              <li><a class="dropdown-item" href="?user.action={{ name }}">{{ label or name }}</a></li>
-              {% endfor %}
-            </ul>
+          <li><a class="dropdown-item" href="?user.action={{ name }}">{{ label or name }}</a></li>
+          {% endfor %}
+          </form>
           </li>
         </ul>
-        {% endif %}
       </div>
     </div>
   </nav>

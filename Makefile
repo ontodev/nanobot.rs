@@ -10,6 +10,7 @@ usage:
 
 .PHONY: deps
 deps:
+	sudo apt-get update
 	sudo apt-get install -y rustc cargo
 	sudo apt-get install -y python3-pip
 	sudo pip install tesh
@@ -90,7 +91,7 @@ TODAY := $(shell date +%Y-%m-%d)
 ARCH := x86_64-unknown-linux-musl
 TARGET := build/nanobot-$(ARCH)
 
-target/$(ARCH)/release/nanobot: src
+target/$(ARCH)/release/nanobot: src/*.rs
 	docker pull clux/muslrust:stable
 	docker run \
 		-v cargo-cache:/root/.cargo/registry \
@@ -99,7 +100,7 @@ target/$(ARCH)/release/nanobot: src
 		cargo build --release
 
 .PHONY: musl
-musl: target/$(ARCH)/release/nanobot src/ | build/
+musl: target/$(ARCH)/release/nanobot | build/
 
 .PHONY: upload
 upload: target/$(ARCH)/release/nanobot | build/
@@ -113,4 +114,4 @@ release: target/$(ARCH)/release/nanobot | build/
 		--title "$(TODAY) Alpha Release" \
 		--generate-notes \
 		v$(TODAY) $(TARGET)
-	echo "Please publish GitHub release v$(TODAY)"
+	@echo "Please publish GitHub release v$(TODAY)"

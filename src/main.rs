@@ -47,13 +47,17 @@ async fn main() {
         .subcommand_required(false)
         .arg_required_else_help(true)
         .subcommand(
-            Command::new("init").about("Initialises things").arg(
-                arg!(
-                    -d --database <FILE> "Specifies a custom database name"
+            Command::new("init")
+                .about("Initialises things")
+                .arg(
+                    arg!(
+                        -d --database <FILE> "Specifies a custom database name"
+                    )
+                    .required(false)
+                    .value_parser(value_parser!(String)),
                 )
-                .required(false)
-                .value_parser(value_parser!(String)),
-            ),
+                .arg(arg!(--create_only "Only create VALVE tables").required(false))
+                .arg(arg!(--initial_load "Use unsafe SQLite optimizations").required(false)),
         )
         .subcommand(Command::new("config").about("Configures things"))
         .subcommand(
@@ -79,15 +83,18 @@ async fn main() {
         .get_matches();
 
     let exit_result = match matches.subcommand() {
-        Some(("init", sub_matches)) => match sub_matches.get_one::<String>("database") {
-            Some(x) => {
-                //update config
-                config.connection(x);
-
-                init::init(&config).await
+        Some(("init", sub_matches)) => {
+            if sub_matches.get_flag("create_only") {
+                config.create_only(true);
             }
-            _ => init::init(&config).await,
-        },
+            if sub_matches.get_flag("initial_load") {
+                config.initial_load(true);
+            }
+            if let Some(d) = sub_matches.get_one::<String>("database") {
+                config.connection(d);
+            }
+            init::init(&config).await
+        }
         Some(("config", _sub_matches)) => Ok(config.to_string()),
         Some(("get", sub_matches)) => {
             let table = match sub_matches.get_one::<String>("TABLE") {

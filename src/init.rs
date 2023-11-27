@@ -192,11 +192,20 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // load tables into database
+    let verbose = false;
+    let command = if config.valve_create_only {
+        &ValveCommand::Create
+    } else {
+        &ValveCommand::Load
+    };
+    tracing::debug!("VALVE command {:?}", command);
+    tracing::debug!("VALVE initial_load {}", config.valve_initial_load);
     match valve(
         &config.valve_path,
-        &database,
-        &ValveCommand::Load,
-        false,
+        &config.connection,
+        command,
+        verbose,
+        config.valve_initial_load,
         "table",
     )
     .await
