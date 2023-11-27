@@ -10,6 +10,7 @@ usage:
 
 .PHONY: deps
 deps:
+	sudo apt-get update
 	sudo apt-get install -y rustc cargo
 	sudo apt-get install -y python3-pip
 	sudo pip install tesh
