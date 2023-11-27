@@ -1,12 +1,50 @@
+use csv::WriterBuilder;
 use enquote::unquote;
+use futures::TryStreamExt;
 use ontodev_sqlrest::{get_db_type, Filter, Select};
 use serde_json::{from_str, json, Map, Value};
 use sqlx::any::{AnyKind, AnyPool};
 use sqlx::Row;
 use std::collections::HashMap;
+use std::error::Error;
 
 pub const LIMIT_MAX: usize = 10000;
 pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
+
+pub async fn save_table(
+    pool: &AnyPool,
+    table: &str,
+    columns: &Vec<&str>,
+    path: &str,
+) -> Result<(), Box<dyn Error>> {
+    let quoted_columns = columns.iter().map(|v| enquote::enquote('"', v)).collect();
+    let text_view = format!("\"{table}_text_view\"");
+    let mut select = Select::new(text_view);
+    select.select(quoted_columns);
+    select.order_by(vec!["row_number"]);
+
+    // let path = format!("build/{path}");
+    // tracing::debug!("SAVE to {path} using {select:?}");
+
+    let dbtype = get_db_type(&pool).unwrap();
+    let sql = select.to_sql(&dbtype).unwrap();
+    // tracing::debug!("SQL {sql}");
+
+    let mut writer = WriterBuilder::new().delimiter(b'\t').from_path(path)?;
+    writer.write_record(columns)?;
+    let mut stream = sqlx::query(&sql).fetch(pool);
+    while let Some(row) = stream.try_next().await? {
+        // tracing::debug!("Some Result");
+        let mut record: Vec<&str> = vec![];
+        for column in columns.iter() {
+            let cell = row.try_get::<&str, &str>(column).ok().unwrap_or_default();
+            record.push(cell);
+        }
+        writer.write_record(record)?;
+    }
+    writer.flush()?;
+    Ok(())
+}
 
 pub async fn get_table_from_pool(
     pool: &AnyPool,

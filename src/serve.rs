@@ -1,6 +1,6 @@
 use crate::{
     config::{Config, ValveConfig},
-    get, ldtab,
+    get, ldtab, sql,
     sql::LIMIT_DEFAULT,
     tree_view,
 };
@@ -110,7 +110,56 @@ async fn post_table(
         form_params
     );
     let mut request_type = RequestType::POST;
-    if form_params.contains_key("undo") {
+    if form_params.contains_key("save") {
+        tracing::info!("SAVE");
+        let (vconfig, _, _) = match &state.config.valve {
+            Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
+            None => return Err("Missing valve configuration".into()),
+        };
+        let pool = match state.config.pool.as_ref() {
+            Some(p) => p,
+            None => return Err("Missing database pool".into()),
+        };
+
+        // Write VALVE config to file
+        std::fs::write(
+            "config.json",
+            serde_json::to_string_pretty(vconfig).unwrap(),
+        )
+        .expect("Could not write VALVE config to config.json");
+        let table_paths: HashMap<String, String> = vconfig
+            .get("table")
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .iter()
+            .filter(|(k, _)| !["message", "history"].contains(&k.as_str()))
+            .filter(|(_, v)| v.get("path").is_some())
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    v.get("path").unwrap().as_str().unwrap().to_string(),
+                )
+            })
+            .collect();
+        tracing::debug!("Tables: {table_paths:?}");
+        for (table, path) in table_paths.iter() {
+            let columns: Vec<&str> = vconfig
+                .get("table")
+                .and_then(|v| v.as_object())
+                .and_then(|o| o.get(table))
+                .and_then(|v| v.as_object())
+                .and_then(|o| o.get("column_order"))
+                .and_then(|v| v.as_array())
+                .unwrap()
+                .iter()
+                .map(|v| v.as_str().unwrap_or_default())
+                .collect();
+            let result = sql::save_table(&pool, &table, &columns, &path).await;
+            tracing::debug!("Saving {table} to {path}: {result:?}");
+        }
+        request_type = RequestType::GET;
+    } else if form_params.contains_key("undo") {
         tracing::info!("UNDO");
         let (vconfig, dt_conds, rule_conds) = match &state.config.valve {
             Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),

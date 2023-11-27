@@ -131,6 +131,10 @@
               Actions
             </a>
             <form class="dropdown-menu" method="POST" action="">
+              <button class="dropdown-item" type="submit" name="save" value="Save">
+                <i class="bi bi-save"></i>
+                Save
+              </button>
               <button class="dropdown-item {% if not page.undo %}disabled{% endif %}" type="submit" name="undo" value="Undo">
                 <i class="bi bi-arrow-counterclockwise"></i>
                 {% if page.undo %}{{ page.undo }}{% else %}Undo{% endif %}
