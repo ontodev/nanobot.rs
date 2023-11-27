@@ -266,7 +266,7 @@ impl Config {
         {
             Err(e) => {
                 return Err(format!(
-                    "Could not load from '{}' due to: {:?}",
+                    "VALVE error while initializing from {}: {:?}",
                     &self.valve_path, e
                 ))
             }

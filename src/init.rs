@@ -212,7 +212,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
     {
         Err(e) => {
             return Err(format!(
-                "Could not load from '{}' due to: {:?}",
+                "VALVE error while initializing from {}: {:?}",
                 &config.valve_path, e
             ))
         }
