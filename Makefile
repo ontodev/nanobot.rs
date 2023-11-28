@@ -29,6 +29,9 @@ build:
 build/:
 	mkdir -p $@
 
+target/debug/nanobot: src/
+	cargo build
+
 target/release/nanobot: src/
 	cargo build --release
 
@@ -58,7 +61,7 @@ dev-serve:
 	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
 
 .PHONY: penguins
-penguins: target/release/nanobot examples/penguins/
+penguins: target/debug/nanobot examples/penguins/
 	rm -rf build/penguins/
 	mkdir -p build/penguins/
 	cp -r examples/penguins/* build/penguins/
