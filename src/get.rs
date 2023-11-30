@@ -436,10 +436,21 @@ async fn get_page(
         Ok(message_counts) => message_counts,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
+
     // convert value_rows to cell_rows
+    let table_type = config
+        .valve
+        .as_ref()
+        .and_then(|v| v.config.get("table"))
+        .and_then(|v| v.as_object())
+        .and_then(|o| o.get(&unquoted_table))
+        .and_then(|v| v.as_object())
+        .and_then(|o| o.get("type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
     let cell_rows: Vec<Map<String, Value>> = value_rows
         .iter()
-        .map(|r| decorate_row(&unquoted_table, &column_map, r))
+        .map(|r| decorate_row(&unquoted_table, &table_type, &column_map, r))
         .collect();
 
     let mut counts = Map::new();
@@ -685,9 +696,10 @@ async fn get_page(
     Ok(result)
 }
 
-// Given a table name, a column map, a cell value, and message list,
+// Given a table type, a column map, a cell value, and message list,
 // return a JSON value representing this cell.
 fn decorate_cell(
+    table_type: &str,
     column_name: &str,
     column: &Value,
     value: &Value,
@@ -701,7 +713,6 @@ fn decorate_cell(
 
     // Handle null and nulltype
     if value.is_null() {
-        classes.push("bg-null".to_string());
         if let Some(nulltype) = column.get("nulltype") {
             if nulltype.is_string() {
                 cell.insert("nulltype".to_string(), nulltype.clone());
@@ -714,8 +725,9 @@ fn decorate_cell(
         cell.insert("datatype".to_string(), datatype.clone());
     }
 
-    if classes.len() > 0 {
-        cell.insert("classes".to_string(), json!(classes));
+    // Add links to other tables
+    if ["table", "column"].contains(&table_type) && column_name == "table" {
+        cell.insert("href".to_string(), json!(value));
     }
 
     // Handle messages associated with the row:
@@ -723,6 +735,10 @@ fn decorate_cell(
     let mut max_level = 0;
     let mut message_level = "none";
     for message in messages.iter().filter(|m| m.column == column_name) {
+        // Override null values
+        if value.is_null() {
+            cell.insert("value".to_string(), json!(message.value));
+        }
         output_messages.push(json!({
             "level": message.level,
             "rule": message.rule,
@@ -751,11 +767,20 @@ fn decorate_cell(
         cell.insert("history".to_string(), json!(changes));
     }
 
+    if cell.get("value").unwrap().is_null() {
+        classes.push("null".to_string());
+    }
+
+    if classes.len() > 0 {
+        cell.insert("classes".to_string(), json!(classes));
+    }
+
     cell
 }
 
 fn decorate_row(
     table: &str,
+    table_type: &str,
     column_map: &Map<String, Value>,
     row: &Map<String, Value>,
 ) -> Map<String, Value> {
@@ -794,7 +819,7 @@ fn decorate_row(
             "datatype": "integer",
         });
         let column = column_map.get(column_name).unwrap_or(&default_column);
-        let cell = decorate_cell(column_name, column, value, &messages, &history);
+        let cell = decorate_cell(table_type, column_name, column, value, &messages, &history);
         cell_row.insert(column_name.to_string(), serde_json::Value::Object(cell));
     }
     cell_row
