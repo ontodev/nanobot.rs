@@ -701,7 +701,6 @@ fn decorate_cell(
 
     // Handle null and nulltype
     if value.is_null() {
-        classes.push("bg-null".to_string());
         if let Some(nulltype) = column.get("nulltype") {
             if nulltype.is_string() {
                 cell.insert("nulltype".to_string(), nulltype.clone());
@@ -714,15 +713,15 @@ fn decorate_cell(
         cell.insert("datatype".to_string(), datatype.clone());
     }
 
-    if classes.len() > 0 {
-        cell.insert("classes".to_string(), json!(classes));
-    }
-
     // Handle messages associated with the row:
     let mut output_messages = vec![];
     let mut max_level = 0;
     let mut message_level = "none";
     for message in messages.iter().filter(|m| m.column == column_name) {
+        // Override null values
+        if value.is_null() {
+            cell.insert("value".to_string(), json!(message.value));
+        }
         output_messages.push(json!({
             "level": message.level,
             "rule": message.rule,
@@ -749,6 +748,14 @@ fn decorate_cell(
 
     if changes.len() > 0 {
         cell.insert("history".to_string(), json!(changes));
+    }
+
+    if cell.get("value").unwrap().is_null() {
+        classes.push("null".to_string());
+    }
+
+    if classes.len() > 0 {
+        cell.insert("classes".to_string(), json!(classes));
     }
 
     cell
