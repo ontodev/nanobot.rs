@@ -436,10 +436,21 @@ async fn get_page(
         Ok(message_counts) => message_counts,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
+
     // convert value_rows to cell_rows
+    let table_type = config
+        .valve
+        .as_ref()
+        .and_then(|v| v.config.get("table"))
+        .and_then(|v| v.as_object())
+        .and_then(|o| o.get(&unquoted_table))
+        .and_then(|v| v.as_object())
+        .and_then(|o| o.get("type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
     let cell_rows: Vec<Map<String, Value>> = value_rows
         .iter()
-        .map(|r| decorate_row(&unquoted_table, &column_map, r))
+        .map(|r| decorate_row(&unquoted_table, &table_type, &column_map, r))
         .collect();
 
     let mut counts = Map::new();
@@ -685,9 +696,10 @@ async fn get_page(
     Ok(result)
 }
 
-// Given a table name, a column map, a cell value, and message list,
+// Given a table type, a column map, a cell value, and message list,
 // return a JSON value representing this cell.
 fn decorate_cell(
+    table_type: &str,
     column_name: &str,
     column: &Value,
     value: &Value,
@@ -711,6 +723,11 @@ fn decorate_cell(
             .get("datatype")
             .expect("Column {k} must have a datatype in column_map {column_map:?}");
         cell.insert("datatype".to_string(), datatype.clone());
+    }
+
+    // Add links to other tables
+    if ["table", "column"].contains(&table_type) && column_name == "table" {
+        cell.insert("href".to_string(), json!(value));
     }
 
     // Handle messages associated with the row:
@@ -763,6 +780,7 @@ fn decorate_cell(
 
 fn decorate_row(
     table: &str,
+    table_type: &str,
     column_map: &Map<String, Value>,
     row: &Map<String, Value>,
 ) -> Map<String, Value> {
@@ -801,7 +819,7 @@ fn decorate_row(
             "datatype": "integer",
         });
         let column = column_map.get(column_name).unwrap_or(&default_column);
-        let cell = decorate_cell(column_name, column, value, &messages, &history);
+        let cell = decorate_cell(table_type, column_name, column, value, &messages, &history);
         cell_row.insert(column_name.to_string(), serde_json::Value::Object(cell));
     }
     cell_row
