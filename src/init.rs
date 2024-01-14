@@ -1,5 +1,5 @@
 use crate::config::{Config, DEFAULT_TOML};
-use ontodev_valve::{valve_old, ValveCommand};
+use ontodev_valve::{valve_old, Valve, ValveCommandOld};
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -116,6 +116,7 @@ fn create_datatype_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
 
 pub async fn init(config: &Config) -> Result<String, String> {
     // Fail if the database already exists.
+    /*
     let database = config.connection.to_owned();
     let path = Path::new(&database);
     if path.exists() {
@@ -194,9 +195,9 @@ pub async fn init(config: &Config) -> Result<String, String> {
     // load tables into database
     let verbose = false;
     let command = if config.valve_create_only {
-        &ValveCommand::Create
+        &ValveCommandOld::Create
     } else {
-        &ValveCommand::Load
+        &ValveCommandOld::Load
     };
     tracing::debug!("VALVE command {:?}", command);
     tracing::debug!("VALVE initial_load {}", config.valve_initial_load);
@@ -220,6 +221,16 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     tracing::info!("Loaded '{}' using '{}'", database, &config.valve_path);
+    */
+
+    ////////////////// New API example
+    let valve = Valve::build(&config.valve_path, "new_api.db", false, false)
+        .await
+        .unwrap();
+    valve.load_all_tables(true).await.unwrap();
+    println!("{:#?}", valve);
+
+    //////////////////////////////////
 
     Ok(String::from("Initialized a Nanobot project"))
 }

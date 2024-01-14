@@ -2,7 +2,7 @@ use indexmap::map::IndexMap;
 use ontodev_valve::{
     get_compiled_datatype_conditions, get_compiled_rule_conditions,
     get_parsed_structure_conditions, valve_grammar::StartParser, valve_old, ColumnRule,
-    CompiledCondition, ParsedStructure, ValveCommand,
+    CompiledCondition, ParsedStructure, ValveCommandOld,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as SerdeValue;
@@ -257,7 +257,7 @@ impl Config {
         match valve_old(
             &self.valve_path,
             &self.connection,
-            &ValveCommand::Config,
+            &ValveCommandOld::Config,
             verbose,
             initial_load,
             "table",
