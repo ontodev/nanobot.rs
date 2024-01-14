@@ -20,8 +20,8 @@ use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select, SelectColumn};
 use ontodev_valve::{
     ast::Expression,
-    delete_row, insert_new_row, redo, undo, update_row,
-    validate::{get_matching_values, validate_row},
+    delete_row_old, insert_new_row_old, redo_old, undo_old, update_row_old,
+    validate::{get_matching_values_old, validate_row_old},
 };
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
@@ -169,7 +169,7 @@ async fn post_table(
             Some(p) => p,
             None => return Err("Missing database pool".into()),
         };
-        block_on(undo(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
+        block_on(undo_old(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
             .map_err(|e| e.to_string())
             .expect("Undo should succeed");
         request_type = RequestType::GET;
@@ -183,7 +183,7 @@ async fn post_table(
             Some(p) => p,
             None => return Err("Missing database pool".into()),
         };
-        block_on(redo(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
+        block_on(redo_old(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
             .map_err(|e| e.to_string())
             .expect("Redo should succeed");
         request_type = RequestType::GET;
@@ -741,7 +741,7 @@ async fn table(
             )
                 .into_response()
                 .into()),
-            Some(column_name) => match get_matching_values(
+            Some(column_name) => match get_matching_values_old(
                 &config.config,
                 &config.datatype_conditions,
                 &config.structure_conditions,
@@ -1086,7 +1086,7 @@ fn render_row_from_database(
                     .into_response()
                     .into())
             }
-            Some(column_name) => match block_on(get_matching_values(
+            Some(column_name) => match block_on(get_matching_values_old(
                 &config.config,
                 &config.datatype_conditions,
                 &config.structure_conditions,
@@ -1499,7 +1499,7 @@ fn insert_table_row(
         Some(p) => p,
         None => return Err("Missing database pool".to_string()),
     };
-    block_on(insert_new_row(
+    block_on(insert_new_row_old(
         &vconfig,
         dt_conds,
         rule_conds,
@@ -1526,7 +1526,7 @@ fn update_table_row(
         Some(p) => p,
         None => return Err("Missing database pool".to_string()),
     };
-    block_on(update_row(
+    block_on(update_row_old(
         &vconfig,
         dt_conds,
         rule_conds,
@@ -1552,7 +1552,7 @@ fn delete_table_row(
         Some(p) => p,
         None => return Err("Missing database pool".to_string()),
     };
-    block_on(delete_row(
+    block_on(delete_row_old(
         &vconfig,
         dt_conds,
         rule_conds,
@@ -1593,7 +1593,7 @@ fn validate_table_row(
         }
         match row_number {
             Some(row_number) => {
-                match block_on(validate_row(
+                match block_on(validate_row_old(
                     &vconfig,
                     &dt_conds,
                     &rule_conds,
@@ -1608,7 +1608,7 @@ fn validate_table_row(
                     Err(e) => return Err(e.to_string()),
                 }
             }
-            None => match block_on(validate_row(
+            None => match block_on(validate_row_old(
                 &vconfig,
                 &dt_conds,
                 &rule_conds,

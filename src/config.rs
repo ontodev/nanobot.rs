@@ -1,7 +1,7 @@
 use indexmap::map::IndexMap;
 use ontodev_valve::{
     get_compiled_datatype_conditions, get_compiled_rule_conditions,
-    get_parsed_structure_conditions, valve, valve_grammar::StartParser, ColumnRule,
+    get_parsed_structure_conditions, valve_grammar::StartParser, valve_old, ColumnRule,
     CompiledCondition, ParsedStructure, ValveCommand,
 };
 use serde::{Deserialize, Serialize};
@@ -254,7 +254,7 @@ impl Config {
     pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
         let verbose = false;
         let initial_load = false;
-        match valve(
+        match valve_old(
             &self.valve_path,
             &self.connection,
             &ValveCommand::Config,

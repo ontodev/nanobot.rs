@@ -841,7 +841,7 @@ pub fn get_change_message(record: &AnyRow) -> Option<String> {
 // Get the undo message, or None.
 pub fn get_undo_message(config: &Config) -> Option<String> {
     let pool = config.pool.as_ref()?;
-    let record = block_on(valve::get_record_to_undo(pool)).ok()??;
+    let record = block_on(valve::get_record_to_undo_old(pool)).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Undo {message}")))
 }
@@ -849,7 +849,7 @@ pub fn get_undo_message(config: &Config) -> Option<String> {
 // Get the redo message, or None.
 pub fn get_redo_message(config: &Config) -> Option<String> {
     let pool = config.pool.as_ref()?;
-    let record = block_on(valve::get_record_to_redo(pool)).ok()??;
+    let record = block_on(valve::get_record_to_redo_old(pool)).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Redo {message}")))
 }

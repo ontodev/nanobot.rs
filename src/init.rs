@@ -1,5 +1,5 @@
 use crate::config::{Config, DEFAULT_TOML};
-use ontodev_valve::{valve, ValveCommand};
+use ontodev_valve::{valve_old, ValveCommand};
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -200,7 +200,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
     };
     tracing::debug!("VALVE command {:?}", command);
     tracing::debug!("VALVE initial_load {}", config.valve_initial_load);
-    match valve(
+    match valve_old(
         &config.valve_path,
         &config.connection,
         command,
