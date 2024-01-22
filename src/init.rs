@@ -116,7 +116,6 @@ fn create_datatype_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
 
 pub async fn init(config: &Config) -> Result<String, String> {
     // Fail if the database already exists.
-    /*
     let database = config.connection.to_owned();
     let path = Path::new(&database);
     if path.exists() {
@@ -134,7 +133,8 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // Create the basic VALVE schema tables, if they don't exist
-    let path = Path::new(&config.valve_path).parent().unwrap();
+    let valve_path = &config.valve_old.as_ref().unwrap().get_path();
+    let path = Path::new(valve_path).parent().unwrap();
     if !path.exists() {
         match fs::create_dir_all(&path) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -143,7 +143,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
         tracing::info!("Created '{}' directory", path.display());
     }
 
-    let path = Path::new(&config.valve_path);
+    let path = Path::new(valve_path);
     if !path.exists() {
         match create_table_tsv(&path) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -152,7 +152,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
         tracing::info!("Created '{}' file", path.display());
     }
 
-    let path = Path::new(&config.valve_path)
+    let path = Path::new(valve_path)
         .parent()
         .unwrap()
         .join("column.tsv");
@@ -164,7 +164,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
         tracing::info!("Created '{}' file", path.display());
     }
 
-    let path = Path::new(&config.valve_path)
+    let path = Path::new(valve_path)
         .parent()
         .unwrap()
         .join("datatype.tsv");
@@ -194,19 +194,21 @@ pub async fn init(config: &Config) -> Result<String, String> {
 
     // load tables into database
     let verbose = false;
-    let command = if config.valve_create_only {
+    let create_only = false;
+    let initial_load = false;
+    let command = if create_only {
         &ValveCommandOld::Create
     } else {
         &ValveCommandOld::Load
     };
     tracing::debug!("VALVE command {:?}", command);
-    tracing::debug!("VALVE initial_load {}", config.valve_initial_load);
+    tracing::debug!("VALVE initial_load {}", initial_load);
     match valve_old(
-        &config.valve_path,
+        valve_path,
         &config.connection,
         command,
         verbose,
-        config.valve_initial_load,
+        initial_load,
         "table",
     )
     .await
@@ -214,21 +216,20 @@ pub async fn init(config: &Config) -> Result<String, String> {
         Err(e) => {
             return Err(format!(
                 "VALVE error while initializing from {}: {:?}",
-                &config.valve_path, e
+                valve_path, e
             ))
         }
         Ok(_x) => {}
     }
 
-    tracing::info!("Loaded '{}' using '{}'", database, &config.valve_path);
-    */
+    tracing::info!("Loaded '{}' using '{}'", database, valve_path);
 
     ////////////////// New API example
-    let valve = Valve::build(&config.valve_path, "new_api.db", false, false)
-        .await
-        .unwrap();
-    valve.load_all_tables(true).await.unwrap();
-    println!("{:#?}", valve);
+    //let valve = Valve::build(&config.valve_path, "new_api.db", false, false)
+    //    .await
+    //    .unwrap();
+    //valve.load_all_tables(true).await.unwrap();
+    //println!("{:#?}", valve);
 
     //////////////////////////////////
 

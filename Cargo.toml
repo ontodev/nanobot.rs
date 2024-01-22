@@ -45,8 +45,9 @@ git = "https://github.com/ontodev/hiccup.rs"
 rev = "f46fbd5450505644ed9970cef1ae14164699981f"
 
 [dependencies.ontodev_valve]
-git = "https://github.com/ontodev/valve.rs"
-rev = "db9502201ce5e1d8d2ff368ca6c1f3f873aecc4d"
+path = "../ontodev_demo/valve.rs"
+# git = "https://github.com/ontodev/valve.rs"
+# rev = "db9502201ce5e1d8d2ff368ca6c1f3f873aecc4d"
 
 [dependencies.ontodev_sqlrest]
 git = "https://github.com/ontodev/sqlrest.rs"

@@ -3,6 +3,7 @@ use ontodev_valve::{
     get_compiled_datatype_conditions, get_compiled_rule_conditions,
     get_parsed_structure_conditions, valve_grammar::StartParser, valve_old, ColumnRule,
     CompiledCondition, ParsedStructure, ValveCommandOld,
+    Valve,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value as SerdeValue;
@@ -20,10 +21,9 @@ pub struct Config {
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
-    pub valve: Option<ValveConfig>,
+    pub valve_old: Option<ValveConfigOld>,
+    pub valve: Option<Valve>,
     pub valve_path: String,
-    pub valve_create_only: bool,
-    pub valve_initial_load: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
@@ -44,11 +44,25 @@ impl Default for LoggingLevel {
 }
 
 #[derive(Clone, Debug)]
-pub struct ValveConfig {
+pub struct ValveConfigOld {
     pub config: SerdeMap,
     pub datatype_conditions: HashMap<String, CompiledCondition>,
     pub rule_conditions: HashMap<String, HashMap<String, Vec<ColumnRule>>>,
     pub structure_conditions: HashMap<String, ParsedStructure>,
+}
+
+impl ValveConfigOld {
+    pub fn get_path(&self) -> String {
+        self.config
+            .get("table")
+            .and_then(|t| t.as_object())
+            .and_then(|t| t.get("table"))
+            .and_then(|t| t.as_object())
+            .and_then(|t| t.get("path"))
+            .and_then(|p| p.as_str())
+            .unwrap()
+            .to_string()
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -161,14 +175,13 @@ impl Config {
                 .connection
                 .unwrap_or(".nanobot.db".into()),
             pool: None,
+            valve_old: None,
             valve: None,
             valve_path: user
                 .valve
                 .unwrap_or_default()
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
-            valve_create_only: false,
-            valve_initial_load: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
                     Some(p) => {
@@ -210,7 +223,7 @@ impl Config {
     }
 
     pub async fn init(&mut self) -> Result<&mut Config, String> {
-        self.start_pool().await.unwrap().load_valve_config().await?;
+        self.start_pool().await?.load_valve_config().await?;
         Ok(self)
     }
 
@@ -267,7 +280,8 @@ impl Config {
             Err(e) => {
                 return Err(format!(
                     "VALVE error while initializing from {}: {:?}",
-                    &self.valve_path, e
+                    &self.valve_path,
+                    e
                 ))
             }
             Ok(v) => {
@@ -276,7 +290,7 @@ impl Config {
                 let d = get_compiled_datatype_conditions(&v, &parser);
                 let r = get_compiled_rule_conditions(&v, d.clone(), &parser);
                 let p = get_parsed_structure_conditions(&v, &parser);
-                self.valve = Some(ValveConfig {
+                self.valve_old = Some(ValveConfigOld {
                     config: v,
                     datatype_conditions: d,
                     rule_conditions: r,
@@ -294,12 +308,16 @@ impl Config {
     }
 
     pub fn create_only(&mut self, value: bool) -> &mut Config {
-        self.valve_create_only = value;
+        // TODO: Reach into self.valve and set it there instead.
+        //self.valve_create_only = value;
+        todo!();
         self
     }
 
     pub fn initial_load(&mut self, value: bool) -> &mut Config {
-        self.valve_initial_load = value;
+        // TODO: Reach into self.valve and set it there instead.
+        //self.valve_initial_load = value;
+        todo!();
         self
     }
 }

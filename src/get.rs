@@ -127,7 +127,7 @@ pub async fn get_rows(
 ) -> Result<String, GetError> {
     // Get all the tables
     let table_map = match config
-        .valve
+        .valve_old
         .as_ref()
         .and_then(|v| v.config.get("table"))
         .and_then(|t| t.as_object())
@@ -150,7 +150,7 @@ pub async fn get_rows(
 
     // Get the columns for the selected table
     let column_config = match config
-        .valve
+        .valve_old
         .as_ref()
         .and_then(|v| v.config.get("table"))
         .and_then(|t| t.as_object())
@@ -282,7 +282,7 @@ async fn get_page(
         }
 
         let sql_type = valve::get_sql_type_from_global_config(
-            &config.valve.as_ref().unwrap().config,
+            &config.valve_old.as_ref().unwrap().config,
             &unquote(&select.table).unwrap(),
             &key,
             &config.pool.as_ref().unwrap(),
@@ -439,7 +439,7 @@ async fn get_page(
 
     // convert value_rows to cell_rows
     let table_type = config
-        .valve
+        .valve_old
         .as_ref()
         .and_then(|v| v.config.get("table"))
         .and_then(|v| v.as_object())
