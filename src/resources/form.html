@@ -55,7 +55,8 @@
 {% endif %}
 {% endif %}
 
-<h3>Return to <a href="{{ page.root }}{{ table_name }}?offset={{ row_number - 1 }}">{{ table_name }}</a> table.</h3>
+<h3>Return to <a href="{{ page.root }}{{ table_name }}{% if row_number %}?offset={{ row_number - 1 }}{% endif %}">{{
+    table_name }}</a> table.</h3>
 
 <div class="row" style="padding-bottom:5px; padding-top:20px;">
   <form method="post">
