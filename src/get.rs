@@ -126,12 +126,7 @@ pub async fn get_rows(
     format: &str,
 ) -> Result<String, GetError> {
     // Get all the tables
-    let table_map = match config
-        .valve_old
-        .as_ref()
-        .and_then(|v| v.config.get("table"))
-        .and_then(|t| t.as_object())
-    {
+    let table_map = match config.valve.config.get("table").and_then(|t| t.as_object()) {
         Some(table_map) => table_map,
         None => {
             return Err(GetError::new(format!(
@@ -150,9 +145,9 @@ pub async fn get_rows(
 
     // Get the columns for the selected table
     let column_config = match config
-        .valve_old
-        .as_ref()
-        .and_then(|v| v.config.get("table"))
+        .valve
+        .config
+        .get("table")
         .and_then(|t| t.as_object())
         .and_then(|t| t.get(&unquoted_table))
         .and_then(|t| t.as_object())
@@ -188,15 +183,7 @@ pub async fn get_rows(
         _ => select.limit(LIMIT_DEFAULT),
     };
 
-    let pool = match config.pool.as_ref() {
-        Some(p) => p,
-        _ => {
-            return Err(GetError::new(format!(
-                "Could not connect to database using pool {:?}",
-                config.pool
-            )))
-        }
-    };
+    let pool = &config.pool;
 
     match shape {
         "value_rows" => {
@@ -252,7 +239,7 @@ async fn get_page(
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
-    let pool = &config.pool.as_ref().unwrap();
+    let pool = &config.pool;
     let filter_messages = {
         let m = select
             .select
@@ -282,10 +269,10 @@ async fn get_page(
         }
 
         let sql_type = valve::get_sql_type_from_global_config(
-            &config.valve_old.as_ref().unwrap().config,
+            &config.valve.config,
             &unquote(&select.table).unwrap(),
             &key,
-            &config.pool.as_ref().unwrap(),
+            &config.pool,
         )
         .unwrap_or_default();
         r.insert("sql_type".into(), json!(sql_type));
@@ -439,9 +426,9 @@ async fn get_page(
 
     // convert value_rows to cell_rows
     let table_type = config
-        .valve_old
-        .as_ref()
-        .and_then(|v| v.config.get("table"))
+        .valve
+        .config
+        .get("table")
         .and_then(|v| v.as_object())
         .and_then(|o| o.get(&unquoted_table))
         .and_then(|v| v.as_object())
@@ -840,16 +827,14 @@ pub fn get_change_message(record: &AnyRow) -> Option<String> {
 
 // Get the undo message, or None.
 pub fn get_undo_message(config: &Config) -> Option<String> {
-    let pool = config.pool.as_ref()?;
-    let record = block_on(valve::get_record_to_undo_old(pool)).ok()??;
+    let record = block_on(config.valve.get_record_to_undo()).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Undo {message}")))
 }
 
 // Get the redo message, or None.
 pub fn get_redo_message(config: &Config) -> Option<String> {
-    let pool = config.pool.as_ref()?;
-    let record = block_on(valve::get_record_to_redo_old(pool)).ok()??;
+    let record = block_on(config.valve.get_record_to_redo()).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Redo {message}")))
 }

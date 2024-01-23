@@ -1,5 +1,4 @@
 use crate::config::{Config, DEFAULT_TOML};
-use ontodev_valve::{valve_old, Valve, ValveCommandOld};
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -133,7 +132,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // Create the basic VALVE schema tables, if they don't exist
-    let valve_path = &config.valve_old.as_ref().unwrap().get_path();
+    let valve_path = &config.valve_path;
     let path = Path::new(valve_path).parent().unwrap();
     if !path.exists() {
         match fs::create_dir_all(&path) {
@@ -152,10 +151,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
         tracing::info!("Created '{}' file", path.display());
     }
 
-    let path = Path::new(valve_path)
-        .parent()
-        .unwrap()
-        .join("column.tsv");
+    let path = Path::new(valve_path).parent().unwrap().join("column.tsv");
     if !path.exists() {
         match create_column_tsv(&path.as_path()) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -164,10 +160,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
         tracing::info!("Created '{}' file", path.display());
     }
 
-    let path = Path::new(valve_path)
-        .parent()
-        .unwrap()
-        .join("datatype.tsv");
+    let path = Path::new(valve_path).parent().unwrap().join("datatype.tsv");
     if !path.exists() {
         match create_datatype_tsv(&path.as_path()) {
             Err(_x) => return Err(format!("Could not create '{}'", path.display())),
@@ -192,46 +185,26 @@ pub async fn init(config: &Config) -> Result<String, String> {
         Ok(_x) => {}
     }
 
-    // load tables into database
-    let verbose = false;
-    let create_only = false;
-    let initial_load = false;
-    let command = if create_only {
-        &ValveCommandOld::Create
-    } else {
-        &ValveCommandOld::Load
-    };
-    tracing::debug!("VALVE command {:?}", command);
-    tracing::debug!("VALVE initial_load {}", initial_load);
-    match valve_old(
-        valve_path,
-        &config.connection,
-        command,
-        verbose,
-        initial_load,
-        "table",
-    )
-    .await
-    {
-        Err(e) => {
+    tracing::debug!("VALVE create_only {}", config.valve_create_only);
+    tracing::debug!("VALVE initial_load {}", config.valve.initial_load);
+
+    // Create and/or load tables into database
+    if config.valve_create_only {
+        if let Err(e) = config.valve.create_all_tables().await {
             return Err(format!(
-                "VALVE error while initializing from {}: {:?}",
+                "VALVE error while creating from {}: {:?}",
                 valve_path, e
-            ))
+            ));
         }
-        Ok(_x) => {}
+    } else {
+        if let Err(e) = config.valve.load_all_tables(true).await {
+            return Err(format!(
+                "VALVE error while loading from {}: {:?}",
+                valve_path, e
+            ));
+        }
     }
 
-    tracing::info!("Loaded '{}' using '{}'", database, valve_path);
-
-    ////////////////// New API example
-    //let valve = Valve::build(&config.valve_path, "new_api.db", false, false)
-    //    .await
-    //    .unwrap();
-    //valve.load_all_tables(true).await.unwrap();
-    //println!("{:#?}", valve);
-
-    //////////////////////////////////
-
+    tracing::info!("Initialized '{}' using '{}'", database, valve_path);
     Ok(String::from("Initialized a Nanobot project"))
 }

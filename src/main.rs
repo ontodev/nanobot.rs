@@ -16,7 +16,7 @@ pub mod tree_view;
 #[async_std::main]
 async fn main() {
     // initialize configuration
-    let mut config: config::Config = config::Config::new().await.unwrap();
+    let mut config: Config = Config::new().await.unwrap();
 
     let level = match config.logging_level {
         config::LoggingLevel::DEBUG => tracing::Level::DEBUG,
@@ -110,13 +110,13 @@ async fn main() {
                 _ => "text",
             };
             let result =
-                match get::get_table(config.init().await.unwrap(), table, shape, format).await {
+                match get::get_table(&config, table, shape, format).await {
                     Ok(x) => x,
                     Err(x) => format!("ERROR: {:?}", x),
                 };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
+        Some(("serve", _sub_matches)) => serve::app(&config),
         _ => Err(String::from(
             "Unrecognised or missing subcommand, but CGI environment vars are \
                              undefined",
@@ -139,7 +139,7 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     tracing::debug!("Processing CGI request with vars: {:?}", vars);
 
     let shared_state = Arc::new(serve::AppState {
-        config: config.init().await.unwrap().clone(),
+        config: config.clone(),
     });
     let app = build_app(shared_state);
     let client = TestClient::new(app);

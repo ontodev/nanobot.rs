@@ -1,9 +1,4 @@
-use crate::{
-    config::{Config, ValveConfigOld},
-    get, ldtab, sql,
-    sql::LIMIT_DEFAULT,
-    tree_view,
-};
+use crate::{config::Config, get, ldtab, sql, sql::LIMIT_DEFAULT, tree_view};
 use ansi_to_html;
 use axum::{
     extract::{Form, Path, Query, State},
@@ -18,11 +13,7 @@ use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select, SelectColumn};
-use ontodev_valve::{
-    ast::Expression,
-    delete_row_old, insert_new_row_old, redo_old, undo_old, update_row_old,
-    validate::{get_matching_values_old, validate_row_old},
-};
+use ontodev_valve::{ast::Expression, Valve};
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
 use std::{
@@ -111,15 +102,10 @@ async fn post_table(
     );
     let mut request_type = RequestType::POST;
     if form_params.contains_key("save") {
+        // TODO: Use the Valve::save_table() API function.
         tracing::info!("SAVE");
-        let (vconfig, _, _) = match &state.config.valve_old {
-            Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-            None => return Err("Missing valve configuration".into()),
-        };
-        let pool = match state.config.pool.as_ref() {
-            Some(p) => p,
-            None => return Err("Missing database pool".into()),
-        };
+        let vconfig = &state.config.valve.config;
+        let pool = &state.config.pool;
 
         // Write VALVE config to file
         std::fs::write(
@@ -161,31 +147,11 @@ async fn post_table(
         request_type = RequestType::GET;
     } else if form_params.contains_key("undo") {
         tracing::info!("UNDO");
-        let (vconfig, dt_conds, rule_conds) = match &state.config.valve_old {
-            Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-            None => return Err("Missing valve configuration".into()),
-        };
-        let pool = match state.config.pool.as_ref() {
-            Some(p) => p,
-            None => return Err("Missing database pool".into()),
-        };
-        block_on(undo_old(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
-            .map_err(|e| e.to_string())
-            .expect("Undo should succeed");
+        block_on(state.config.valve.undo()).expect("Undo should succeed");
         request_type = RequestType::GET;
     } else if form_params.contains_key("redo") {
         tracing::info!("REDO");
-        let (vconfig, dt_conds, rule_conds) = match &state.config.valve_old {
-            Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-            None => return Err("Missing valve configuration".into()),
-        };
-        let pool = match state.config.pool.as_ref() {
-            Some(p) => p,
-            None => return Err("Missing database pool".into()),
-        };
-        block_on(redo_old(&vconfig, dt_conds, rule_conds, pool, "Nanobot"))
-            .map_err(|e| e.to_string())
-            .expect("Redo should succeed");
+        block_on(state.config.valve.redo()).expect("Redo should succeed");
         request_type = RequestType::GET;
     }
     table(&path, &state, &query_params, &form_params, request_type).await
@@ -327,7 +293,7 @@ fn action(
     tracing::debug!("ROOT! {root} {path}");
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(state.config.valve_old.as_ref().ok_or("No VALVE config")?)? {
+        for table in get_tables(&state.config.valve)? {
             if table == "history" {
                 continue;
             }
@@ -409,18 +375,16 @@ async fn tree(
             .order_by(vec!["LENGTH(object)", "object"])
             .limit(20);
         tracing::debug!("SELECT {:?}", select.to_sqlite());
-        let result =
-            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        let result = select.fetch_rows_as_json(&state.config.pool, &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
 
     tracing::info!("TREE '{table}' {subject}");
     let start = std::time::Instant::now();
 
-    let tree =
-        tree_view::get_hiccup_term_tree(subject, table, &state.config.pool.as_ref().unwrap())
-            .await
-            .unwrap_or_default();
+    let tree = tree_view::get_hiccup_term_tree(subject, table, &state.config.pool)
+        .await
+        .unwrap_or_default();
     let tree = hiccup::insert_href(&tree, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree = hiccup::render(&tree).unwrap_or_default();
 
@@ -430,7 +394,7 @@ async fn tree(
     let pred = ldtab::get_predicate_map_hiccup(
         subject,
         table,
-        &state.config.pool.as_ref().unwrap(),
+        &state.config.pool,
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -447,7 +411,7 @@ async fn tree(
     };
 
     let curies = HashSet::from([subject.to_string()]);
-    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
+    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool)
         .await
         .unwrap_or_default();
     let empty = String::new();
@@ -455,7 +419,7 @@ async fn tree(
 
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve_old.as_ref().clone().unwrap())? {
+        for table in get_tables(&state.config.valve)? {
             if table == "history" {
                 continue;
             }
@@ -516,22 +480,19 @@ async fn tree2(
             .order_by(vec!["LENGTH(object)", "object"])
             .limit(20);
         tracing::debug!("SELECT {:?}", select.to_sqlite());
-        let result =
-            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        let result = select.fetch_rows_as_json(&state.config.pool, &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
 
-    let tree1 =
-        tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool.as_ref().unwrap())
-            .await
-            .unwrap_or_default();
+    let tree1 = tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool)
+        .await
+        .unwrap_or_default();
     let tree1 = hiccup::insert_href(&tree1, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree1 = hiccup::render(&tree1).unwrap_or_default();
 
-    let tree2 =
-        tree_view::get_hiccup_term_tree(subject, table2, &state.config.pool.as_ref().unwrap())
-            .await
-            .unwrap_or_default();
+    let tree2 = tree_view::get_hiccup_term_tree(subject, table2, &state.config.pool)
+        .await
+        .unwrap_or_default();
     let tree2 = hiccup::insert_href(&tree2, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree2 = hiccup::render(&tree2).unwrap_or_default();
 
@@ -542,7 +503,7 @@ async fn tree2(
     let pred1 = ldtab::get_predicate_map_hiccup(
         subject,
         table1,
-        &state.config.pool.as_ref().unwrap(),
+        &state.config.pool,
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -561,7 +522,7 @@ async fn tree2(
     let pred2 = ldtab::get_predicate_map_hiccup(
         subject,
         table2,
-        &state.config.pool.as_ref().unwrap(),
+        &state.config.pool,
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -578,7 +539,7 @@ async fn tree2(
     };
 
     let curies = HashSet::from([subject.to_string()]);
-    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
+    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool)
         .await
         .unwrap_or_default();
     let empty = String::new();
@@ -586,7 +547,7 @@ async fn tree2(
 
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve_old.as_ref().clone().unwrap())? {
+        for table in get_tables(&state.config.valve)? {
             if table == "history" {
                 continue;
             }
@@ -679,18 +640,7 @@ async fn table(
         format = "html";
         shape = "page";
     }
-    let config = match state.config.valve_old.as_ref() {
-        Some(c) => c,
-        None => {
-            return Err((StatusCode::BAD_REQUEST, Html("Valve config missing"))
-                .into_response()
-                .into());
-        }
-    };
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        None => return Err("Missing database pool".to_string().into()),
-    };
+    let config = &state.config.valve;
     let mut view = match query_params.get("view") {
         Some(view) => view.to_string(),
         None => "".to_string(),
@@ -741,11 +691,7 @@ async fn table(
             )
                 .into_response()
                 .into()),
-            Some(column_name) => match get_matching_values_old(
-                &config.config,
-                &config.datatype_conditions,
-                &config.structure_conditions,
-                pool,
+            Some(column_name) => match config.get_matching_values(
                 &table,
                 column_name,
                 query_params.get("text").and_then(|t| Some(t.as_str())),
@@ -754,7 +700,7 @@ async fn table(
             {
                 Ok(r) => return Ok(Json(r).into_response()),
                 Err(e) => {
-                    return Err((StatusCode::BAD_REQUEST, Html(e.to_string()))
+                    return Err((StatusCode::BAD_REQUEST, Html(format!("{:?}", e)))
                         .into_response()
                         .into())
                 }
@@ -997,14 +943,7 @@ fn row(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let config = match state.config.valve_old.as_ref() {
-        Some(c) => c,
-        None => {
-            return Err((StatusCode::BAD_REQUEST, Html("Valve config missing"))
-                .into_response()
-                .into());
-        }
-    };
+    let config = &state.config.valve;
 
     match is_ontology(&table, &config) {
         Err(e) => return Err((StatusCode::BAD_REQUEST, Html(e)).into_response().into()),
@@ -1048,22 +987,8 @@ fn render_row_from_database(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let config = match state.config.valve_old.as_ref() {
-        Some(c) => c,
-        None => {
-            return Err((StatusCode::BAD_REQUEST, Html("Valve config missing"))
-                .into_response()
-                .into());
-        }
-    };
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        _ => {
-            return Err((StatusCode::BAD_REQUEST, Html("Missing database pool"))
-                .into_response()
-                .into());
-        }
-    };
+    let config = &state.config.valve;
+    let pool = &state.config.pool;
     let view = match query_params.get("view") {
         Some(v) => v.to_string(),
         None => "form".to_string(),
@@ -1086,18 +1011,14 @@ fn render_row_from_database(
                     .into_response()
                     .into())
             }
-            Some(column_name) => match block_on(get_matching_values_old(
-                &config.config,
-                &config.datatype_conditions,
-                &config.structure_conditions,
-                pool,
+            Some(column_name) => match block_on(config.get_matching_values(
                 &table,
                 column_name,
                 query_params.get("text").and_then(|t| Some(t.as_str())),
             )) {
                 Ok(r) => return Ok(Json(r).into_response()),
                 Err(e) => {
-                    return Err((StatusCode::BAD_REQUEST, Html(e.to_string()))
+                    return Err((StatusCode::BAD_REQUEST, Html(format!("{:?}", e)))
                         .into_response()
                         .into())
                 }
@@ -1267,13 +1188,8 @@ fn render_row_from_database(
     Ok(Html(page_html).into_response())
 }
 
-fn matches_nulltype(
-    table: &str,
-    column: &str,
-    value: &str,
-    config: &ValveConfigOld,
-) -> Result<bool, String> {
-    let column_config = get_column_config(table, column, config)?;
+fn matches_nulltype(table: &str, column: &str, value: &str, valve: &Valve) -> Result<bool, String> {
+    let column_config = get_column_config(table, column, valve)?;
     let nulltype = match column_config.get("nulltype") {
         Some(dt) => match dt.as_str() {
             Some(s) => s,
@@ -1283,7 +1199,7 @@ fn matches_nulltype(
         None => return Ok(value != ""),
     };
 
-    let datatype_conditions = &config.datatype_conditions;
+    let datatype_conditions = &valve.compiled_datatype_conditions;
     match datatype_conditions.get(nulltype) {
         Some(datatype_condition) => {
             let compiled_cond = &datatype_condition.compiled;
@@ -1355,8 +1271,8 @@ fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> 
     Ok(messages)
 }
 
-fn get_tables(config: &ValveConfigOld) -> Result<Vec<String>, String> {
-    match config
+fn get_tables(valve: &Valve) -> Result<Vec<String>, String> {
+    match valve
         .config
         .get("table")
         .and_then(|t| t.as_object())
@@ -1367,8 +1283,8 @@ fn get_tables(config: &ValveConfigOld) -> Result<Vec<String>, String> {
     }
 }
 
-fn get_columns(table: &str, config: &ValveConfigOld) -> Result<Vec<String>, String> {
-    match config
+fn get_columns(table: &str, valve: &Valve) -> Result<Vec<String>, String> {
+    match valve
         .config
         .get("table")
         .and_then(|t| t.as_object())
@@ -1388,8 +1304,8 @@ fn get_columns(table: &str, config: &ValveConfigOld) -> Result<Vec<String>, Stri
     }
 }
 
-fn get_column_config(table: &str, column: &str, config: &ValveConfigOld) -> Result<SerdeMap, String> {
-    match config
+fn get_column_config(table: &str, column: &str, valve: &Valve) -> Result<SerdeMap, String> {
+    match valve
         .config
         .get("table")
         .and_then(|t| t.as_object())
@@ -1409,11 +1325,11 @@ fn get_column_config(table: &str, column: &str, config: &ValveConfigOld) -> Resu
 }
 
 fn get_html_type_and_values(
-    config: &ValveConfigOld,
+    valve: &Valve,
     datatype: &str,
     values: &Option<Vec<String>>,
 ) -> Result<(Option<String>, Option<Vec<String>>), String> {
-    let dt_config = match config
+    let dt_config = match valve
         .config
         .get("datatype")
         .and_then(|d| d.as_object())
@@ -1431,7 +1347,7 @@ fn get_html_type_and_values(
 
     let mut new_values = vec![];
     match values {
-        None => match config.datatype_conditions.get(datatype) {
+        None => match valve.compiled_datatype_conditions.get(datatype) {
             Some(compiled_condition) => match &compiled_condition.parsed {
                 Expression::Function(name, args) if name == "in" => {
                     for arg in args {
@@ -1470,15 +1386,15 @@ fn get_html_type_and_values(
 
     if let Some(parent) = dt_config.get("parent").and_then(|t| t.as_str()) {
         if !parent.is_empty() {
-            return get_html_type_and_values(config, parent, &new_values);
+            return get_html_type_and_values(valve, parent, &new_values);
         }
     }
 
     Ok((None, None))
 }
 
-fn is_ontology(table: &str, config: &ValveConfigOld) -> Result<bool, String> {
-    let columns = get_columns(table, config)?;
+fn is_ontology(table: &str, valve: &Valve) -> Result<bool, String> {
+    let columns = get_columns(table, valve)?;
     Ok(columns.contains(&"subject".to_string())
         && columns.contains(&"predicate".to_string())
         && columns.contains(&"object".to_string())
@@ -1491,25 +1407,8 @@ fn insert_table_row(
     row_data: &SerdeMap,
     state: &Arc<AppState>,
 ) -> Result<u32, String> {
-    let (vconfig, dt_conds, rule_conds) = match &state.config.valve_old {
-        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-        None => return Err("Missing valve configuration".to_string()),
-    };
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        None => return Err("Missing database pool".to_string()),
-    };
-    block_on(insert_new_row_old(
-        &vconfig,
-        dt_conds,
-        rule_conds,
-        pool,
-        &table_name,
-        &row_data,
-        None,
-        "Nanobot",
-    ))
-    .map_err(|e| e.to_string())
+    let (row_num, _) = block_on(state.config.valve.insert_row(&table_name, &row_data)).unwrap();
+    Ok(row_num)
 }
 
 fn update_table_row(
@@ -1518,25 +1417,14 @@ fn update_table_row(
     row_number: &u32,
     state: &Arc<AppState>,
 ) -> Result<(), String> {
-    let (vconfig, dt_conds, rule_conds) = match &state.config.valve_old {
-        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-        None => return Err("Missing valve configuration".to_string()),
-    };
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        None => return Err("Missing database pool".to_string()),
-    };
-    block_on(update_row_old(
-        &vconfig,
-        dt_conds,
-        rule_conds,
-        pool,
-        &table_name,
-        &row_data,
-        row_number,
-        "Nanobot",
-    ))
-    .map_err(|e| e.to_string())
+    block_on(
+        state
+            .config
+            .valve
+            .update_row(&table_name, row_number, &row_data),
+    )
+    .unwrap();
+    Ok(())
 }
 
 fn delete_table_row(
@@ -1544,24 +1432,8 @@ fn delete_table_row(
     row_number: &u32,
     state: &Arc<AppState>,
 ) -> Result<(), String> {
-    let (vconfig, dt_conds, rule_conds) = match &state.config.valve_old {
-        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-        None => return Err("Missing valve configuration".to_string()),
-    };
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        None => return Err("Missing database pool".to_string()),
-    };
-    block_on(delete_row_old(
-        &vconfig,
-        dt_conds,
-        rule_conds,
-        pool,
-        &table_name,
-        row_number,
-        "Nanobot",
-    ))
-    .map_err(|e| e.to_string())
+    block_on(state.config.valve.delete_row(&table_name, row_number)).unwrap();
+    Ok(())
 }
 
 fn validate_table_row(
@@ -1570,15 +1442,6 @@ fn validate_table_row(
     row_number: &Option<u32>,
     state: &Arc<AppState>,
 ) -> Result<SerdeMap, String> {
-    let (vconfig, dt_conds, rule_conds) = match &state.config.valve_old {
-        Some(v) => (&v.config, &v.datatype_conditions, &v.rule_conditions),
-        None => return Err("Missing valve configuration".to_string()),
-    };
-    let pool = match state.config.pool.as_ref() {
-        Some(p) => p,
-        None => return Err("Missing database pool".to_string()),
-    };
-
     let validated_row = {
         let mut result_row = SerdeMap::new();
         for (column, value) in row_data.iter() {
@@ -1591,37 +1454,14 @@ fn validate_table_row(
                 }),
             );
         }
-        match row_number {
-            Some(row_number) => {
-                match block_on(validate_row_old(
-                    &vconfig,
-                    &dt_conds,
-                    &rule_conds,
-                    &pool,
-                    None,
-                    table_name,
-                    &result_row,
-                    Some(*row_number),
-                    None,
-                )) {
-                    Ok(r) => r,
-                    Err(e) => return Err(e.to_string()),
-                }
-            }
-            None => match block_on(validate_row_old(
-                &vconfig,
-                &dt_conds,
-                &rule_conds,
-                &pool,
-                None,
-                table_name,
-                &result_row,
-                None,
-                None,
-            )) {
-                Ok(r) => r,
-                Err(e) => return Err(e.to_string()),
-            },
+        match block_on(
+            state
+                .config
+                .valve
+                .validate_row(table_name, &result_row, *row_number),
+        ) {
+            Ok(r) => r,
+            Err(e) => return Err(format!("{:?}", e)),
         }
     };
     Ok(validated_row)
@@ -1704,7 +1544,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
 }
 
 fn get_row_as_form_map(
-    config: &ValveConfigOld,
+    valve: &Valve,
     table_name: &str,
     row_data: &SerdeMap,
 ) -> Result<SerdeMap, String> {
@@ -1745,7 +1585,7 @@ fn get_row_as_form_map(
         };
 
         let message = stringify_messages(&messages)?;
-        let column_config = get_column_config(table_name, cell_header, config)?;
+        let column_config = get_column_config(table_name, cell_header, valve)?;
         let description = match column_config.get("description") {
             Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
                 None => return Err(format!("Could not convert '{}' to string", d)),
@@ -1786,7 +1626,7 @@ fn get_row_as_form_map(
         if vec!["from", "in", "tree", "under"].contains(&structure) {
             html_type = Some("search".into());
         } else {
-            (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
+            (html_type, allowed_values) = get_html_type_and_values(valve, &datatype, &None)?;
         }
 
         if allowed_values != None && html_type == None {
