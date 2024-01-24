@@ -17,7 +17,6 @@ pub struct Config {
     pub valve_path: String,
     pub valve: Option<Valve>,
     pub create_only: bool,
-    pub initial_load: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
@@ -151,7 +150,6 @@ impl Config {
                 .unwrap_or("src/schema/table.tsv".into()),
             valve: None,
             create_only: false,
-            initial_load: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
                     Some(p) => {
@@ -199,11 +197,6 @@ impl Config {
 
     pub fn create_only(&mut self, value: bool) -> &mut Config {
         self.create_only = value;
-        self
-    }
-
-    pub fn initial_load(&mut self, value: bool) -> &mut Config {
-        self.initial_load = value;
         self
     }
 }

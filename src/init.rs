@@ -1,5 +1,4 @@
 use crate::config::{Config, DEFAULT_TOML};
-use ontodev_valve::Valve;
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -115,13 +114,6 @@ fn create_datatype_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
 }
 
 pub async fn init(config: &mut Config) -> Result<String, String> {
-    // Fail if the database already exists.
-    let database = config.connection.to_owned();
-    let path = Path::new(&database);
-    if path.exists() {
-        tracing::warn!("Initializing existing database: '{}'", path.display());
-    }
-
     // Create nanobot.toml if it does not exist.
     let path = Path::new("nanobot.toml");
     if !path.exists() {
@@ -131,20 +123,6 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
         fs::write(path, toml).expect("Unable to write file");
         tracing::info!("Created config file '{}'", path.display());
     }
-
-    // Build the valve instance and assign it to the config struct, and also the pool:
-    (config.valve, config.pool) = {
-        let valve = Valve::build(
-            &config.valve_path,
-            &config.connection,
-            false,
-            config.initial_load,
-        )
-        .await
-        .map_err(|e| format!("{:?}", e))?;
-        let pool = valve.pool.clone();
-        (Some(valve), Some(pool))
-    };
 
     // Create files for the basic VALVE schema tables, if they don't exist
     let valve_path = &config.valve_path;
@@ -201,7 +179,6 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
     }
 
     tracing::debug!("VALVE create_only {}", config.create_only);
-    tracing::debug!("VALVE initial_load {}", config.initial_load);
 
     // Create and/or load tables into database
     match &config.valve {

@@ -1,6 +1,8 @@
 use crate::{config::Config, error::NanobotError, serve::build_app};
 use axum_test_helper::{TestClient, TestResponse};
 use clap::{arg, command, value_parser, Command};
+use ontodev_valve::Valve;
+use std::path::Path;
 use std::sync::Arc;
 use std::{collections::HashMap, env, io};
 use url::Url;
@@ -86,21 +88,50 @@ async fn main() -> Result<(), NanobotError> {
         .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
+    async fn build_valve(
+        config: &mut Config,
+        create_only: bool,
+        initial_load: bool,
+    ) -> Result<(), NanobotError> {
+        (config.valve, config.pool) = {
+            let valve = Valve::build(
+                &config.valve_path,
+                &config.connection,
+                create_only,
+                initial_load,
+            )
+            .await?;
+            let pool = valve.pool.clone();
+            (Some(valve), Some(pool))
+        };
+        Ok(())
+    }
+
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => {
-            if sub_matches.get_flag("create_only") {
-                config.create_only(true);
-            }
-            if sub_matches.get_flag("initial_load") {
-                config.initial_load(true);
-            }
             if let Some(d) = sub_matches.get_one::<String>("database") {
                 config.connection(d);
             }
+            if sub_matches.get_flag("create_only") {
+                config.create_only(true);
+            }
+
+            let database = config.connection.to_owned();
+            let path = Path::new(&database);
+            if path.exists() {
+                tracing::warn!("Initializing existing database: '{}'", path.display());
+            }
+
+            build_valve(&mut config, false, sub_matches.get_flag("initial_load")).await?;
             init::init(&mut config).await
         }
-        Some(("config", _sub_matches)) => Ok(config.to_string()),
+        Some(("config", _sub_matches)) => {
+            build_valve(&mut config, false, false).await?;
+            Ok(config.to_string())
+        }
         Some(("get", sub_matches)) => {
+            build_valve(&mut config, false, false).await?;
+
             let table = match sub_matches.get_one::<String>("TABLE") {
                 Some(x) => x,
                 _ => panic!("No table given"),
@@ -119,7 +150,16 @@ async fn main() -> Result<(), NanobotError> {
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(&config),
+        Some(("serve", _sub_matches)) => {
+            // Build the valve instance and assign it to the config struct, and also the pool:
+            (config.valve, config.pool) = {
+                let valve =
+                    Valve::build(&config.valve_path, &config.connection, false, false).await?;
+                let pool = valve.pool.clone();
+                (Some(valve), Some(pool))
+            };
+            serve::app(&config)
+        }
         _ => Err(String::from(
             "Unrecognised or missing subcommand, but CGI environment vars are \
                              undefined",
