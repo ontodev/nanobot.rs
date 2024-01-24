@@ -1,3 +1,4 @@
+use crate::error::NanobotError;
 use indexmap::map::IndexMap;
 use ontodev_valve::Valve;
 use serde::{Deserialize, Serialize};
@@ -120,25 +121,6 @@ pub struct InputConfig {
     pub test: Option<String>,
 }
 
-#[derive(Debug)]
-pub enum NanobotError {
-    GeneralError(String),
-    ValveError(ontodev_valve::ValveError),
-    TomlError(toml::de::Error),
-}
-
-impl From<ontodev_valve::ValveError> for NanobotError {
-    fn from(e: ontodev_valve::ValveError) -> Self {
-        Self::ValveError(e)
-    }
-}
-
-impl From<toml::de::Error> for NanobotError {
-    fn from(e: toml::de::Error) -> Self {
-        Self::TomlError(e)
-    }
-}
-
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub const DEFAULT_TOML: &str = "[nanobot]
@@ -151,17 +133,16 @@ impl Config {
             Err(_) => DEFAULT_TOML.into(),
         };
         let user: TomlConfig = toml::from_str(user_config_file.as_str())?;
-        let connection = user
-            .database
-            .unwrap_or_default()
-            .connection
-            .unwrap_or(".nanobot.db".into());
 
         let config = Config {
             config_version: user.nanobot.config_version,
             port: user.nanobot.port.unwrap_or(3000),
             logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
-            connection: connection,
+            connection: user
+                .database
+                .unwrap_or_default()
+                .connection
+                .unwrap_or(".nanobot.db".into()),
             pool: None,
             valve_path: user
                 .valve
@@ -222,7 +203,7 @@ impl Config {
     }
 
     pub fn initial_load(&mut self, value: bool) -> &mut Config {
-        self.valve.as_mut().unwrap().initial_load = value;
+        self.initial_load = value;
         self
     }
 }
@@ -246,7 +227,7 @@ pub fn to_toml(config: &Config) -> TomlConfig {
             connection: Some(config.connection.clone()),
         }),
         valve: Some(ValveTomlConfig {
-            path: Some(config.valve.as_ref().unwrap().get_path()),
+            path: Some(config.valve_path.clone()),
         }),
         assets: Some(AssetsConfig {
             path: config.asset_path.clone(),

@@ -1,4 +1,4 @@
-use crate::{config::Config, serve::build_app};
+use crate::{config::Config, error::NanobotError, serve::build_app};
 use axum_test_helper::{TestClient, TestResponse};
 use clap::{arg, command, value_parser, Command};
 use std::sync::Arc;
@@ -6,6 +6,7 @@ use std::{collections::HashMap, env, io};
 use url::Url;
 
 pub mod config;
+pub mod error;
 pub mod get;
 pub mod init;
 pub mod ldtab;
@@ -14,9 +15,9 @@ pub mod sql;
 pub mod tree_view;
 
 #[async_std::main]
-async fn main() {
+async fn main() -> Result<(), NanobotError> {
     // initialize configuration
-    let mut config: Config = Config::new().await.unwrap();
+    let mut config: Config = Config::new().await?;
 
     let level = match config.logging_level {
         config::LoggingLevel::DEBUG => tracing::Level::DEBUG,
@@ -38,7 +39,10 @@ async fn main() {
                 tracing::error!("{}", x);
                 std::process::exit(1)
             }
-            Ok(x) => println!("{}", x),
+            Ok(x) => {
+                println!("{}", x);
+                Ok(())
+            }
         };
     }
 
@@ -129,7 +133,10 @@ async fn main() {
             std::process::exit(1)
         }
 
-        Ok(x) => println!("{}", x),
+        Ok(x) => {
+            println!("{}", x);
+            Ok(())
+        }
     }
 }
 

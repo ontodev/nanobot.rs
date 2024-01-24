@@ -3,6 +3,7 @@
 // this later.
 
 use crate::config::Config;
+use crate::error::GetError;
 use crate::sql::{
     get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
     LIMIT_DEFAULT, LIMIT_MAX,
@@ -20,8 +21,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, to_string_pretty, Map, Value};
 use sqlx::any::AnyRow;
 use sqlx::Row;
-use std::error::Error;
-use std::fmt;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -29,65 +28,6 @@ use tabwriter::TabWriter;
 use urlencoding::decode;
 
 pub type SerdeMap = serde_json::Map<String, serde_json::Value>;
-
-#[derive(Debug)]
-pub struct GetError {
-    details: String,
-}
-
-impl GetError {
-    fn new(msg: String) -> GetError {
-        GetError { details: msg }
-    }
-}
-
-impl fmt::Display for GetError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for GetError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
-impl From<String> for GetError {
-    fn from(error: String) -> GetError {
-        GetError::new(error)
-    }
-}
-
-impl From<std::io::Error> for GetError {
-    fn from(error: std::io::Error) -> GetError {
-        GetError::new(format!("{:?}", error))
-    }
-}
-
-impl From<csv::Error> for GetError {
-    fn from(error: csv::Error) -> GetError {
-        GetError::new(format!("{:?}", error))
-    }
-}
-
-impl From<sqlx::Error> for GetError {
-    fn from(error: sqlx::Error) -> GetError {
-        GetError::new(format!("{:?}", error))
-    }
-}
-
-impl From<git2::Error> for GetError {
-    fn from(error: git2::Error) -> GetError {
-        GetError::new(format!("{:?}", error))
-    }
-}
-
-impl From<std::time::SystemTimeError> for GetError {
-    fn from(error: std::time::SystemTimeError) -> GetError {
-        GetError::new(format!("{:?}", error))
-    }
-}
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 struct ValveMessage {
@@ -126,7 +66,10 @@ pub async fn get_rows(
     format: &str,
 ) -> Result<String, GetError> {
     // Get all the tables
-    let valve = config.valve.as_ref().unwrap();
+    let valve = config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
     let table_map = match valve.config.get("table").and_then(|t| t.as_object()) {
         Some(table_map) => table_map,
         None => {
@@ -183,8 +126,6 @@ pub async fn get_rows(
         _ => select.limit(LIMIT_DEFAULT),
     };
 
-    let pool = &config.pool.as_ref().unwrap();
-
     match shape {
         "value_rows" => {
             if unquoted_table != "message" {
@@ -192,6 +133,10 @@ pub async fn get_rows(
                 select.table(format!("\"{unquoted_table}_view\""));
             }
             tracing::debug!("VALUE SELECT {select:?}");
+            let pool = &config
+                .pool
+                .as_ref()
+                .ok_or("Connection pool is not initialized.".to_string())?;
             let value_rows = match get_table_from_pool(&pool, &select).await {
                 Ok(value_rows) => value_rows,
                 Err(e) => return Err(GetError::new(e.to_string())),
@@ -239,7 +184,10 @@ async fn get_page(
     table_map: &Map<String, Value>,
     column_rows: &Vec<Map<String, Value>>,
 ) -> Result<Value, GetError> {
-    let pool = &config.pool;
+    let pool = &config
+        .pool
+        .as_ref()
+        .ok_or("Connection pool is not initialized.".to_string())?;
     let filter_messages = {
         let m = select
             .select
@@ -269,10 +217,14 @@ async fn get_page(
         }
 
         let sql_type = valve::get_sql_type_from_global_config(
-            &config.valve.as_ref().unwrap().config,
+            &config
+                .valve
+                .as_ref()
+                .ok_or("Valve is not initialized.".to_string())?
+                .config,
             &unquote(&select.table).unwrap(),
             &key,
-            &config.pool.as_ref().unwrap(),
+            &pool,
         )
         .unwrap_or_default();
         r.insert("sql_type".into(), json!(sql_type));
@@ -414,22 +366,21 @@ async fn get_page(
 
     // Use the view to select the data
     tracing::debug!("VIEW SELECT {view_select:?}");
-    let value_rows = match get_table_from_pool(&pool.as_ref().unwrap(), &view_select).await {
+    let value_rows = match get_table_from_pool(&pool, &view_select).await {
         Ok(value_rows) => value_rows,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
     // Get the number of messages of each type:
-    let message_counts =
-        match get_message_counts_from_pool(&pool.as_ref().unwrap(), &unquoted_table).await {
-            Ok(message_counts) => message_counts,
-            Err(e) => return Err(GetError::new(e.to_string())),
-        };
+    let message_counts = match get_message_counts_from_pool(&pool, &unquoted_table).await {
+        Ok(message_counts) => message_counts,
+        Err(e) => return Err(GetError::new(e.to_string())),
+    };
 
     // convert value_rows to cell_rows
     let table_type = config
         .valve
         .as_ref()
-        .unwrap()
+        .ok_or("Valve is not initialized.".to_string())?
         .config
         .get("table")
         .and_then(|v| v.as_object())
@@ -456,7 +407,7 @@ async fn get_page(
                 }
             }
         } else {
-            match get_count_from_pool(&config.pool.as_ref().unwrap(), &select).await {
+            match get_count_from_pool(&pool, &select).await {
                 Ok(count) => count,
                 Err(e) => return Err(GetError::new(e.to_string())),
             }
@@ -464,7 +415,7 @@ async fn get_page(
     };
     counts.insert("count".to_string(), json!(count));
 
-    let total = match get_total_from_pool(&pool.as_ref().unwrap(), &unquoted_table).await {
+    let total = match get_total_from_pool(&pool, &unquoted_table).await {
         Ok(total) => total,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
@@ -830,14 +781,28 @@ pub fn get_change_message(record: &AnyRow) -> Option<String> {
 
 // Get the undo message, or None.
 pub fn get_undo_message(config: &Config) -> Option<String> {
-    let record = block_on(config.valve.as_ref().unwrap().get_record_to_undo()).ok()??;
+    let valve = match config.valve.as_ref() {
+        None => {
+            tracing::error!("In get_undo_message(). Valve is not initialized.");
+            return None;
+        }
+        Some(valve) => valve,
+    };
+    let record = block_on(valve.get_record_to_undo()).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Undo {message}")))
 }
 
 // Get the redo message, or None.
 pub fn get_redo_message(config: &Config) -> Option<String> {
-    let record = block_on(config.valve.as_ref().unwrap().get_record_to_redo()).ok()??;
+    let valve = match config.valve.as_ref() {
+        None => {
+            tracing::error!("In get_redo_message(). Valve is not initialized.");
+            return None;
+        }
+        Some(valve) => valve,
+    };
+    let record = block_on(valve.get_record_to_redo()).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Redo {message}")))
 }

@@ -101,16 +101,19 @@ async fn post_table(
         form_params
     );
     let mut request_type = RequestType::POST;
+    let valve = state
+        .config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
     if form_params.contains_key("save") {
-        // TODO: Use the Valve::save_table() API function.
         tracing::info!("SAVE");
-        let vconfig = &state.config.valve.as_ref().unwrap().config;
-        let pool = &state.config.pool;
+        let vconfig = &valve.config;
 
         // Write VALVE config to file
         std::fs::write(
             "config.json",
-            serde_json::to_string_pretty(vconfig).unwrap(),
+            serde_json::to_string_pretty(&vconfig).unwrap(),
         )
         .expect("Could not write VALVE config to config.json");
         let table_paths: HashMap<String, String> = vconfig
@@ -129,6 +132,11 @@ async fn post_table(
             })
             .collect();
         tracing::debug!("Tables: {table_paths:?}");
+        let pool = &state
+            .config
+            .pool
+            .as_ref()
+            .ok_or("Pool is not initialized.".to_string())?;
         for (table, path) in table_paths.iter() {
             let columns: Vec<&str> = vconfig
                 .get("table")
@@ -141,17 +149,18 @@ async fn post_table(
                 .iter()
                 .map(|v| v.as_str().unwrap_or_default())
                 .collect();
-            let result = sql::save_table(&pool.as_ref().unwrap(), &table, &columns, &path).await;
+            // TODO: Use the Valve::save_table() API function.
+            let result = sql::save_table(&pool, &table, &columns, &path).await;
             tracing::debug!("Saving {table} to {path}: {result:?}");
         }
         request_type = RequestType::GET;
     } else if form_params.contains_key("undo") {
         tracing::info!("UNDO");
-        block_on(state.config.valve.as_ref().unwrap().undo()).expect("Undo should succeed");
+        block_on(valve.undo()).expect("Undo should succeed");
         request_type = RequestType::GET;
     } else if form_params.contains_key("redo") {
         tracing::info!("REDO");
-        block_on(state.config.valve.as_ref().unwrap().redo()).expect("Redo should succeed");
+        block_on(valve.redo()).expect("Redo should succeed");
         request_type = RequestType::GET;
     }
     table(&path, &state, &query_params, &form_params, request_type).await
@@ -291,9 +300,14 @@ fn action(
 
     let root = if path.contains("/") { "../../" } else { "" };
     tracing::debug!("ROOT! {root} {path}");
+    let valve = &state
+        .config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve.as_ref().unwrap())? {
+        for table in get_tables(valve)? {
             if table == "history" {
                 continue;
             }
@@ -359,6 +373,11 @@ async fn tree(
         return Ok(tree2(state, table, subject, params).await?.into_response());
     };
 
+    let pool = &state
+        .config
+        .pool
+        .as_ref()
+        .ok_or("Pool is not initialized.".to_string())?;
     if let Some(text) = params.get("text") {
         tracing::debug!("TEXT: {text}");
         let search = format!("\"%{text}%\"");
@@ -375,18 +394,16 @@ async fn tree(
             .order_by(vec!["LENGTH(object)", "object"])
             .limit(20);
         tracing::debug!("SELECT {:?}", select.to_sqlite());
-        let result =
-            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        let result = select.fetch_rows_as_json(&pool, &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
 
     tracing::info!("TREE '{table}' {subject}");
     let start = std::time::Instant::now();
 
-    let tree =
-        tree_view::get_hiccup_term_tree(subject, table, &state.config.pool.as_ref().unwrap())
-            .await
-            .unwrap_or_default();
+    let tree = tree_view::get_hiccup_term_tree(subject, table, &pool)
+        .await
+        .unwrap_or_default();
     let tree = hiccup::insert_href(&tree, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree = hiccup::render(&tree).unwrap_or_default();
 
@@ -396,7 +413,7 @@ async fn tree(
     let pred = ldtab::get_predicate_map_hiccup(
         subject,
         table,
-        &state.config.pool.as_ref().unwrap(),
+        &pool,
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -413,7 +430,7 @@ async fn tree(
     };
 
     let curies = HashSet::from([subject.to_string()]);
-    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
+    let labels = ldtab::get_label_hash_map(&curies, table, &pool)
         .await
         .unwrap_or_default();
     let empty = String::new();
@@ -421,7 +438,12 @@ async fn tree(
 
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve.as_ref().unwrap())? {
+        let valve = &state
+            .config
+            .valve
+            .as_ref()
+            .ok_or("Valve is not initialized.".to_string())?;
+        for table in get_tables(&valve)? {
             if table == "history" {
                 continue;
             }
@@ -466,6 +488,11 @@ async fn tree2(
 
     let (table1, table2) = table.split_once(" ").unwrap();
 
+    let pool = &state
+        .config
+        .pool
+        .as_ref()
+        .ok_or("Pool is not initialized.".to_string())?;
     if let Some(text) = params.get("text") {
         tracing::debug!("TEXT: {text}");
         let search = format!("\"%{text}%\"");
@@ -482,15 +509,13 @@ async fn tree2(
             .order_by(vec!["LENGTH(object)", "object"])
             .limit(20);
         tracing::debug!("SELECT {:?}", select.to_sqlite());
-        let result =
-            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
+        let result = select.fetch_rows_as_json(&pool, &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
 
-    let tree1 =
-        tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool.as_ref().unwrap())
-            .await
-            .unwrap_or_default();
+    let tree1 = tree_view::get_hiccup_term_tree(subject, table1, &pool)
+        .await
+        .unwrap_or_default();
     let tree1 = hiccup::insert_href(&tree1, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree1 = hiccup::render(&tree1).unwrap_or_default();
 
@@ -508,7 +533,7 @@ async fn tree2(
     let pred1 = ldtab::get_predicate_map_hiccup(
         subject,
         table1,
-        &state.config.pool.as_ref().unwrap(),
+        &pool,
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -527,7 +552,7 @@ async fn tree2(
     let pred2 = ldtab::get_predicate_map_hiccup(
         subject,
         table2,
-        &state.config.pool.as_ref().unwrap(),
+        &pool,
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -544,7 +569,7 @@ async fn tree2(
     };
 
     let curies = HashSet::from([subject.to_string()]);
-    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
+    let labels = ldtab::get_label_hash_map(&curies, table, &pool)
         .await
         .unwrap_or_default();
     let empty = String::new();
@@ -552,7 +577,12 @@ async fn tree2(
 
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve.as_ref().unwrap())? {
+        let valve = &state
+            .config
+            .valve
+            .as_ref()
+            .ok_or("Valve is not initialized.".to_string())?;
+        for table in get_tables(&valve)? {
             if table == "history" {
                 continue;
             }
@@ -645,7 +675,11 @@ async fn table(
         format = "html";
         shape = "page";
     }
-    let valve = &state.config.valve.as_ref().unwrap();
+    let valve = &state
+        .config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
     let mut view = match query_params.get("view") {
         Some(view) => view.to_string(),
         None => "".to_string(),
@@ -948,7 +982,11 @@ fn row(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let valve = &state.config.valve.as_ref().unwrap();
+    let valve = &state
+        .config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
 
     match is_ontology(&table, &valve) {
         Err(e) => return Err((StatusCode::BAD_REQUEST, Html(e)).into_response().into()),
@@ -992,8 +1030,16 @@ fn render_row_from_database(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let config = &state.config.valve.as_ref().unwrap();
-    let pool = &state.config.pool.as_ref().unwrap();
+    let valve = &state
+        .config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
+    let pool = &state
+        .config
+        .pool
+        .as_ref()
+        .ok_or("Pool is not initialized.".to_string())?;
     let view = match query_params.get("view") {
         Some(v) => v.to_string(),
         None => "form".to_string(),
@@ -1016,7 +1062,7 @@ fn render_row_from_database(
                     .into_response()
                     .into())
             }
-            Some(column_name) => match block_on(config.get_matching_values(
+            Some(column_name) => match block_on(valve.get_matching_values(
                 &table,
                 column_name,
                 query_params.get("text").and_then(|t| Some(t.as_str())),
@@ -1038,7 +1084,7 @@ fn render_row_from_database(
     if request_type == RequestType::POST {
         let mut new_row = SerdeMap::new();
         // Use the list of columns for the table from the db to look up their values in the form:
-        for column in &get_columns(table, config)? {
+        for column in &get_columns(table, valve)? {
             if column != "row_number" {
                 let value = match form_params.get(column) {
                     Some(v) => v.to_string(),
@@ -1069,7 +1115,7 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            match get_row_as_form_map(config, table, &validated_row) {
+            match get_row_as_form_map(valve, table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 3 {}", e);
@@ -1134,7 +1180,7 @@ fn render_row_from_database(
             }
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
-            match get_row_as_form_map(config, table, &metafied_row) {
+            match get_row_as_form_map(valve, table, &metafied_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 4 {}", e);
@@ -1157,7 +1203,7 @@ fn render_row_from_database(
     // Used to display a drop-down or menu containing all of the tables:
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(config)? {
+        for table in get_tables(valve)? {
             if table == "history" {
                 continue;
             }
@@ -1417,7 +1463,7 @@ fn insert_table_row(
             .config
             .valve
             .as_ref()
-            .unwrap()
+            .ok_or("Valve is not initialized.".to_string())?
             .insert_row(&table_name, &row_data),
     )
     .unwrap();
@@ -1435,7 +1481,7 @@ fn update_table_row(
             .config
             .valve
             .as_ref()
-            .unwrap()
+            .ok_or("Valve is not initialized.".to_string())?
             .update_row(&table_name, row_number, &row_data),
     )
     .unwrap();
@@ -1452,7 +1498,7 @@ fn delete_table_row(
             .config
             .valve
             .as_ref()
-            .unwrap()
+            .ok_or("Valve is not initialized.".to_string())?
             .delete_row(&table_name, row_number),
     )
     .unwrap();
@@ -1477,11 +1523,14 @@ fn validate_table_row(
                 }),
             );
         }
-        match block_on(state.config.valve.as_ref().unwrap().validate_row(
-            table_name,
-            &result_row,
-            *row_number,
-        )) {
+        match block_on(
+            state
+                .config
+                .valve
+                .as_ref()
+                .ok_or("Valve is not initialized.".to_string())?
+                .validate_row(table_name, &result_row, *row_number),
+        ) {
             Ok(r) => r,
             Err(e) => return Err(format!("{:?}", e)),
         }
