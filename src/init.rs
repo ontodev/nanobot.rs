@@ -132,7 +132,7 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     // Create the basic VALVE schema tables, if they don't exist
-    let valve_path = &config.valve_path;
+    let valve_path = &config.valve.get_path();
     let path = Path::new(valve_path).parent().unwrap();
     if !path.exists() {
         match fs::create_dir_all(&path) {
@@ -185,11 +185,11 @@ pub async fn init(config: &Config) -> Result<String, String> {
         Ok(_x) => {}
     }
 
-    tracing::debug!("VALVE create_only {}", config.valve_create_only);
+    tracing::debug!("VALVE create_only {}", config.create_only);
     tracing::debug!("VALVE initial_load {}", config.valve.initial_load);
 
     // Create and/or load tables into database
-    if config.valve_create_only {
+    if config.create_only {
         if let Err(e) = config.valve.create_all_tables().await {
             return Err(format!(
                 "VALVE error while creating from {}: {:?}",

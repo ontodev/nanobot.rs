@@ -12,8 +12,7 @@ pub struct Config {
     pub port: u16,
     pub logging_level: LoggingLevel,
     pub valve: Valve,
-    pub valve_path: String,
-    pub valve_create_only: bool,
+    pub create_only: bool,
     pub connection: String,
     pub pool: AnyPool,
     pub asset_path: Option<String>,
@@ -168,8 +167,7 @@ impl Config {
             port: user.nanobot.port.unwrap_or(3000),
             logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
             valve: valve,
-            valve_path: valve_path,
-            valve_create_only: false,
+            create_only: false,
             connection: connection,
             pool: pool,
             asset_path: {
@@ -218,7 +216,7 @@ impl Config {
     }
 
     pub fn create_only(&mut self, value: bool) -> &mut Config {
-        self.valve_create_only = value;
+        self.create_only = value;
         self
     }
 
@@ -247,7 +245,7 @@ pub fn to_toml(config: &Config) -> TomlConfig {
             connection: Some(config.connection.clone()),
         }),
         valve: Some(ValveTomlConfig {
-            path: Some(config.valve_path.clone()),
+            path: Some(config.valve.get_path()),
         }),
         assets: Some(AssetsConfig {
             path: config.asset_path.clone(),
