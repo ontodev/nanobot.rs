@@ -1,4 +1,4 @@
-use crate::{config::Config, get, ldtab, sql, sql::LIMIT_DEFAULT, tree_view};
+use crate::{config::Config, get, ldtab, sql::LIMIT_DEFAULT, tree_view};
 use ansi_to_html;
 use axum::{
     extract::{Form, Path, Query, State},
@@ -116,43 +116,9 @@ async fn post_table(
             serde_json::to_string_pretty(&vconfig).unwrap(),
         )
         .expect("Could not write VALVE config to config.json");
-        let table_paths: HashMap<String, String> = vconfig
-            .get("table")
-            .unwrap()
-            .as_object()
-            .unwrap()
-            .iter()
-            .filter(|(k, _)| !["message", "history"].contains(&k.as_str()))
-            .filter(|(_, v)| v.get("path").is_some())
-            .map(|(k, v)| {
-                (
-                    k.clone(),
-                    v.get("path").unwrap().as_str().unwrap().to_string(),
-                )
-            })
-            .collect();
-        tracing::debug!("Tables: {table_paths:?}");
-        let pool = &state
-            .config
-            .pool
-            .as_ref()
-            .ok_or("Pool is not initialized.".to_string())?;
-        for (table, path) in table_paths.iter() {
-            let columns: Vec<&str> = vconfig
-                .get("table")
-                .and_then(|v| v.as_object())
-                .and_then(|o| o.get(table))
-                .and_then(|v| v.as_object())
-                .and_then(|o| o.get("column_order"))
-                .and_then(|v| v.as_array())
-                .unwrap()
-                .iter()
-                .map(|v| v.as_str().unwrap_or_default())
-                .collect();
-            // TODO: Use the Valve::save_table() API function.
-            let result = sql::save_table(&pool, &table, &columns, &path).await;
-            tracing::debug!("Saving {table} to {path}: {result:?}");
-        }
+        valve
+            .save_all_tables(&None)
+            .map_err(|e| format!("{:?}", e))?;
         request_type = RequestType::GET;
     } else if form_params.contains_key("undo") {
         tracing::info!("UNDO");
