@@ -1,4 +1,5 @@
 use crate::config::{Config, DEFAULT_TOML};
+use ontodev_valve::Valve;
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -113,7 +114,7 @@ fn create_datatype_tsv(path: &Path) -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-pub async fn init(config: &Config) -> Result<String, String> {
+pub async fn init(config: &mut Config) -> Result<String, String> {
     // Fail if the database already exists.
     let database = config.connection.to_owned();
     let path = Path::new(&database);
@@ -131,8 +132,20 @@ pub async fn init(config: &Config) -> Result<String, String> {
         tracing::info!("Created config file '{}'", path.display());
     }
 
+    let valve = Valve::build(
+        &config.valve_path,
+        &config.connection,
+        false,
+        config.initial_load,
+    )
+    .await
+    .unwrap();
+    let pool = valve.pool.clone();
+    config.valve = Some(valve);
+    config.pool = Some(pool);
+
     // Create the basic VALVE schema tables, if they don't exist
-    let valve_path = &config.valve.get_path();
+    let valve_path = &config.valve.as_ref().unwrap().get_path();
     let path = Path::new(valve_path).parent().unwrap();
     if !path.exists() {
         match fs::create_dir_all(&path) {
@@ -186,18 +199,21 @@ pub async fn init(config: &Config) -> Result<String, String> {
     }
 
     tracing::debug!("VALVE create_only {}", config.create_only);
-    tracing::debug!("VALVE initial_load {}", config.valve.initial_load);
+    tracing::debug!(
+        "VALVE initial_load {}",
+        config.valve.as_ref().unwrap().initial_load
+    );
 
     // Create and/or load tables into database
     if config.create_only {
-        if let Err(e) = config.valve.create_all_tables().await {
+        if let Err(e) = config.valve.as_ref().unwrap().create_all_tables().await {
             return Err(format!(
                 "VALVE error while creating from {}: {:?}",
                 valve_path, e
             ));
         }
     } else {
-        if let Err(e) = config.valve.load_all_tables(true).await {
+        if let Err(e) = config.valve.as_ref().unwrap().load_all_tables(true).await {
             return Err(format!(
                 "VALVE error while loading from {}: {:?}",
                 valve_path, e

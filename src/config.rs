@@ -11,10 +11,12 @@ pub struct Config {
     pub config_version: u16,
     pub port: u16,
     pub logging_level: LoggingLevel,
-    pub valve: Valve,
-    pub create_only: bool,
     pub connection: String,
-    pub pool: AnyPool,
+    pub pool: Option<AnyPool>,
+    pub valve_path: String,
+    pub valve: Option<Valve>,
+    pub create_only: bool,
+    pub initial_load: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
@@ -154,22 +156,21 @@ impl Config {
             .unwrap_or_default()
             .connection
             .unwrap_or(".nanobot.db".into());
-        let valve_path = user
-            .valve
-            .unwrap_or_default()
-            .path
-            .unwrap_or("src/schema/table.tsv".into());
-        let valve = Valve::build(&valve_path, &connection, false, false).await?;
-        let pool = valve.pool.clone();
 
         let config = Config {
             config_version: user.nanobot.config_version,
             port: user.nanobot.port.unwrap_or(3000),
             logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
-            valve: valve,
-            create_only: false,
             connection: connection,
-            pool: pool,
+            pool: None,
+            valve_path: user
+                .valve
+                .unwrap_or_default()
+                .path
+                .unwrap_or("src/schema/table.tsv".into()),
+            valve: None,
+            create_only: false,
+            initial_load: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
                     Some(p) => {
@@ -221,7 +222,7 @@ impl Config {
     }
 
     pub fn initial_load(&mut self, value: bool) -> &mut Config {
-        self.valve.initial_load = value;
+        self.valve.as_mut().unwrap().initial_load = value;
         self
     }
 }
@@ -245,7 +246,7 @@ pub fn to_toml(config: &Config) -> TomlConfig {
             connection: Some(config.connection.clone()),
         }),
         valve: Some(ValveTomlConfig {
-            path: Some(config.valve.get_path()),
+            path: Some(config.valve.as_ref().unwrap().get_path()),
         }),
         assets: Some(AssetsConfig {
             path: config.asset_path.clone(),

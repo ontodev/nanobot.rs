@@ -104,7 +104,7 @@ async fn post_table(
     if form_params.contains_key("save") {
         // TODO: Use the Valve::save_table() API function.
         tracing::info!("SAVE");
-        let vconfig = &state.config.valve.config;
+        let vconfig = &state.config.valve.as_ref().unwrap().config;
         let pool = &state.config.pool;
 
         // Write VALVE config to file
@@ -141,17 +141,17 @@ async fn post_table(
                 .iter()
                 .map(|v| v.as_str().unwrap_or_default())
                 .collect();
-            let result = sql::save_table(&pool, &table, &columns, &path).await;
+            let result = sql::save_table(&pool.as_ref().unwrap(), &table, &columns, &path).await;
             tracing::debug!("Saving {table} to {path}: {result:?}");
         }
         request_type = RequestType::GET;
     } else if form_params.contains_key("undo") {
         tracing::info!("UNDO");
-        block_on(state.config.valve.undo()).expect("Undo should succeed");
+        block_on(state.config.valve.as_ref().unwrap().undo()).expect("Undo should succeed");
         request_type = RequestType::GET;
     } else if form_params.contains_key("redo") {
         tracing::info!("REDO");
-        block_on(state.config.valve.redo()).expect("Redo should succeed");
+        block_on(state.config.valve.as_ref().unwrap().redo()).expect("Redo should succeed");
         request_type = RequestType::GET;
     }
     table(&path, &state, &query_params, &form_params, request_type).await
@@ -293,7 +293,7 @@ fn action(
     tracing::debug!("ROOT! {root} {path}");
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve)? {
+        for table in get_tables(&state.config.valve.as_ref().unwrap())? {
             if table == "history" {
                 continue;
             }
@@ -375,16 +375,18 @@ async fn tree(
             .order_by(vec!["LENGTH(object)", "object"])
             .limit(20);
         tracing::debug!("SELECT {:?}", select.to_sqlite());
-        let result = select.fetch_rows_as_json(&state.config.pool, &HashMap::new())?;
+        let result =
+            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
 
     tracing::info!("TREE '{table}' {subject}");
     let start = std::time::Instant::now();
 
-    let tree = tree_view::get_hiccup_term_tree(subject, table, &state.config.pool)
-        .await
-        .unwrap_or_default();
+    let tree =
+        tree_view::get_hiccup_term_tree(subject, table, &state.config.pool.as_ref().unwrap())
+            .await
+            .unwrap_or_default();
     let tree = hiccup::insert_href(&tree, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree = hiccup::render(&tree).unwrap_or_default();
 
@@ -394,7 +396,7 @@ async fn tree(
     let pred = ldtab::get_predicate_map_hiccup(
         subject,
         table,
-        &state.config.pool,
+        &state.config.pool.as_ref().unwrap(),
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -411,7 +413,7 @@ async fn tree(
     };
 
     let curies = HashSet::from([subject.to_string()]);
-    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool)
+    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
         .await
         .unwrap_or_default();
     let empty = String::new();
@@ -419,7 +421,7 @@ async fn tree(
 
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve)? {
+        for table in get_tables(&state.config.valve.as_ref().unwrap())? {
             if table == "history" {
                 continue;
             }
@@ -480,19 +482,22 @@ async fn tree2(
             .order_by(vec!["LENGTH(object)", "object"])
             .limit(20);
         tracing::debug!("SELECT {:?}", select.to_sqlite());
-        let result = select.fetch_rows_as_json(&state.config.pool, &HashMap::new())?;
+        let result =
+            select.fetch_rows_as_json(&state.config.pool.as_ref().unwrap(), &HashMap::new())?;
         return Ok(Json(result).into_response());
     }
 
-    let tree1 = tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool)
-        .await
-        .unwrap_or_default();
+    let tree1 =
+        tree_view::get_hiccup_term_tree(subject, table1, &state.config.pool.as_ref().unwrap())
+            .await
+            .unwrap_or_default();
     let tree1 = hiccup::insert_href(&tree1, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree1 = hiccup::render(&tree1).unwrap_or_default();
 
-    let tree2 = tree_view::get_hiccup_term_tree(subject, table2, &state.config.pool)
-        .await
-        .unwrap_or_default();
+    let tree2 =
+        tree_view::get_hiccup_term_tree(subject, table2, &state.config.pool.as_ref().unwrap())
+            .await
+            .unwrap_or_default();
     let tree2 = hiccup::insert_href(&tree2, &format!("../{table}/{{curie}}")).unwrap_or_default();
     let tree2 = hiccup::render(&tree2).unwrap_or_default();
 
@@ -503,7 +508,7 @@ async fn tree2(
     let pred1 = ldtab::get_predicate_map_hiccup(
         subject,
         table1,
-        &state.config.pool,
+        &state.config.pool.as_ref().unwrap(),
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -522,7 +527,7 @@ async fn tree2(
     let pred2 = ldtab::get_predicate_map_hiccup(
         subject,
         table2,
-        &state.config.pool,
+        &state.config.pool.as_ref().unwrap(),
         &predicate_order_start,
         &predicate_order_end,
     )
@@ -539,7 +544,7 @@ async fn tree2(
     };
 
     let curies = HashSet::from([subject.to_string()]);
-    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool)
+    let labels = ldtab::get_label_hash_map(&curies, table, &state.config.pool.as_ref().unwrap())
         .await
         .unwrap_or_default();
     let empty = String::new();
@@ -547,7 +552,7 @@ async fn tree2(
 
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(&state.config.valve)? {
+        for table in get_tables(&state.config.valve.as_ref().unwrap())? {
             if table == "history" {
                 continue;
             }
@@ -640,14 +645,14 @@ async fn table(
         format = "html";
         shape = "page";
     }
-    let config = &state.config.valve;
+    let valve = &state.config.valve.as_ref().unwrap();
     let mut view = match query_params.get("view") {
         Some(view) => view.to_string(),
         None => "".to_string(),
     };
 
     // TODO: properly detect LDTab tables
-    if !get_tables(config)?.contains(&table) {
+    if !get_tables(valve)?.contains(&table) {
         let url = format!("{table}/owl:Class");
         return Ok(Redirect::permanent(&url).into_response());
     }
@@ -691,7 +696,7 @@ async fn table(
             )
                 .into_response()
                 .into()),
-            Some(column_name) => match config.get_matching_values(
+            Some(column_name) => match valve.get_matching_values(
                 &table,
                 column_name,
                 query_params.get("text").and_then(|t| Some(t.as_str())),
@@ -711,7 +716,7 @@ async fn table(
 
     // Handle a POST request to validate or submit a new row for insertion into the table:
     let mut form_map = None;
-    let columns = get_columns(&table, config)?;
+    let columns = get_columns(&table, valve)?;
     if request_type == RequestType::POST {
         // Override view, which isn't passed in POST. This value will then be picked up below.
         view = String::from("form");
@@ -743,7 +748,7 @@ async fn table(
 
         if action == "validate" {
             // If this is a validate action, fill in form_map which will then be handled below.
-            match get_row_as_form_map(config, &table, &validated_row) {
+            match get_row_as_form_map(valve, &table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 1 {}", e);
@@ -799,7 +804,7 @@ async fn table(
                     // Since this is supposed to be a new row, the initial value of this cell should
                     // match the nulltype (if it exists) of its associated datatype in order to be
                     // valid. Otherwise we mark it as invalid.
-                    let valid = matches_nulltype(&table, &column, &value, config)?;
+                    let valid = matches_nulltype(&table, &column, &value, valve)?;
                     new_row.insert(
                         column.to_string(),
                         json!({
@@ -810,7 +815,7 @@ async fn table(
                     );
                 }
             }
-            match get_row_as_form_map(config, &table, &new_row) {
+            match get_row_as_form_map(valve, &table, &new_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 2 {}", e);
@@ -822,7 +827,7 @@ async fn table(
         // Used to display a drop-down or menu of some kind containing all the available tables:
         let table_map = {
             let mut table_map = SerdeMap::new();
-            for table in get_tables(config)? {
+            for table in get_tables(valve)? {
                 if table == "history" {
                     continue;
                 }
@@ -943,9 +948,9 @@ fn row(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let config = &state.config.valve;
+    let valve = &state.config.valve.as_ref().unwrap();
 
-    match is_ontology(&table, &config) {
+    match is_ontology(&table, &valve) {
         Err(e) => return Err((StatusCode::BAD_REQUEST, Html(e)).into_response().into()),
         Ok(flag) if flag => {
             let error = format!("'row' path is not valid for ontology table '{}'", table);
@@ -987,8 +992,8 @@ fn render_row_from_database(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let config = &state.config.valve;
-    let pool = &state.config.pool;
+    let config = &state.config.valve.as_ref().unwrap();
+    let pool = &state.config.pool.as_ref().unwrap();
     let view = match query_params.get("view") {
         Some(v) => v.to_string(),
         None => "form".to_string(),
@@ -1407,7 +1412,15 @@ fn insert_table_row(
     row_data: &SerdeMap,
     state: &Arc<AppState>,
 ) -> Result<u32, String> {
-    let (row_num, _) = block_on(state.config.valve.insert_row(&table_name, &row_data)).unwrap();
+    let (row_num, _) = block_on(
+        state
+            .config
+            .valve
+            .as_ref()
+            .unwrap()
+            .insert_row(&table_name, &row_data),
+    )
+    .unwrap();
     Ok(row_num)
 }
 
@@ -1421,6 +1434,8 @@ fn update_table_row(
         state
             .config
             .valve
+            .as_ref()
+            .unwrap()
             .update_row(&table_name, row_number, &row_data),
     )
     .unwrap();
@@ -1432,7 +1447,15 @@ fn delete_table_row(
     row_number: &u32,
     state: &Arc<AppState>,
 ) -> Result<(), String> {
-    block_on(state.config.valve.delete_row(&table_name, row_number)).unwrap();
+    block_on(
+        state
+            .config
+            .valve
+            .as_ref()
+            .unwrap()
+            .delete_row(&table_name, row_number),
+    )
+    .unwrap();
     Ok(())
 }
 
@@ -1454,12 +1477,11 @@ fn validate_table_row(
                 }),
             );
         }
-        match block_on(
-            state
-                .config
-                .valve
-                .validate_row(table_name, &result_row, *row_number),
-        ) {
+        match block_on(state.config.valve.as_ref().unwrap().validate_row(
+            table_name,
+            &result_row,
+            *row_number,
+        )) {
             Ok(r) => r,
             Err(e) => return Err(format!("{:?}", e)),
         }

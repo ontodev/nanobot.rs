@@ -93,7 +93,7 @@ async fn main() {
             if let Some(d) = sub_matches.get_one::<String>("database") {
                 config.connection(d);
             }
-            init::init(&config).await
+            init::init(&mut config).await
         }
         Some(("config", _sub_matches)) => Ok(config.to_string()),
         Some(("get", sub_matches)) => {
@@ -109,11 +109,10 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result =
-                match get::get_table(&config, table, shape, format).await {
-                    Ok(x) => x,
-                    Err(x) => format!("ERROR: {:?}", x),
-                };
+            let result = match get::get_table(&config, table, shape, format).await {
+                Ok(x) => x,
+                Err(x) => format!("ERROR: {:?}", x),
+            };
             Ok(result)
         }
         Some(("serve", _sub_matches)) => serve::app(&config),

@@ -126,7 +126,8 @@ pub async fn get_rows(
     format: &str,
 ) -> Result<String, GetError> {
     // Get all the tables
-    let table_map = match config.valve.config.get("table").and_then(|t| t.as_object()) {
+    let valve = config.valve.as_ref().unwrap();
+    let table_map = match valve.config.get("table").and_then(|t| t.as_object()) {
         Some(table_map) => table_map,
         None => {
             return Err(GetError::new(format!(
@@ -144,8 +145,7 @@ pub async fn get_rows(
     }
 
     // Get the columns for the selected table
-    let column_config = match config
-        .valve
+    let column_config = match valve
         .config
         .get("table")
         .and_then(|t| t.as_object())
@@ -183,7 +183,7 @@ pub async fn get_rows(
         _ => select.limit(LIMIT_DEFAULT),
     };
 
-    let pool = &config.pool;
+    let pool = &config.pool.as_ref().unwrap();
 
     match shape {
         "value_rows" => {
@@ -269,10 +269,10 @@ async fn get_page(
         }
 
         let sql_type = valve::get_sql_type_from_global_config(
-            &config.valve.config,
+            &config.valve.as_ref().unwrap().config,
             &unquote(&select.table).unwrap(),
             &key,
-            &config.pool,
+            &config.pool.as_ref().unwrap(),
         )
         .unwrap_or_default();
         r.insert("sql_type".into(), json!(sql_type));
@@ -414,19 +414,22 @@ async fn get_page(
 
     // Use the view to select the data
     tracing::debug!("VIEW SELECT {view_select:?}");
-    let value_rows = match get_table_from_pool(&pool, &view_select).await {
+    let value_rows = match get_table_from_pool(&pool.as_ref().unwrap(), &view_select).await {
         Ok(value_rows) => value_rows,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
     // Get the number of messages of each type:
-    let message_counts = match get_message_counts_from_pool(&pool, &unquoted_table).await {
-        Ok(message_counts) => message_counts,
-        Err(e) => return Err(GetError::new(e.to_string())),
-    };
+    let message_counts =
+        match get_message_counts_from_pool(&pool.as_ref().unwrap(), &unquoted_table).await {
+            Ok(message_counts) => message_counts,
+            Err(e) => return Err(GetError::new(e.to_string())),
+        };
 
     // convert value_rows to cell_rows
     let table_type = config
         .valve
+        .as_ref()
+        .unwrap()
         .config
         .get("table")
         .and_then(|v| v.as_object())
@@ -453,7 +456,7 @@ async fn get_page(
                 }
             }
         } else {
-            match get_count_from_pool(&pool, &select).await {
+            match get_count_from_pool(&config.pool.as_ref().unwrap(), &select).await {
                 Ok(count) => count,
                 Err(e) => return Err(GetError::new(e.to_string())),
             }
@@ -461,7 +464,7 @@ async fn get_page(
     };
     counts.insert("count".to_string(), json!(count));
 
-    let total = match get_total_from_pool(&pool, &unquoted_table).await {
+    let total = match get_total_from_pool(&pool.as_ref().unwrap(), &unquoted_table).await {
         Ok(total) => total,
         Err(e) => return Err(GetError::new(e.to_string())),
     };
@@ -827,14 +830,14 @@ pub fn get_change_message(record: &AnyRow) -> Option<String> {
 
 // Get the undo message, or None.
 pub fn get_undo_message(config: &Config) -> Option<String> {
-    let record = block_on(config.valve.get_record_to_undo()).ok()??;
+    let record = block_on(config.valve.as_ref().unwrap().get_record_to_undo()).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Undo {message}")))
 }
 
 // Get the redo message, or None.
 pub fn get_redo_message(config: &Config) -> Option<String> {
-    let record = block_on(config.valve.get_record_to_redo()).ok()??;
+    let record = block_on(config.valve.as_ref().unwrap().get_record_to_redo()).ok()??;
     let message = get_change_message(&record)?;
     Some(String::from(format!("Redo {message}")))
 }
