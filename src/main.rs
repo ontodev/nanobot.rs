@@ -88,25 +88,6 @@ async fn main() -> Result<(), NanobotError> {
         .subcommand(Command::new("serve").about("Run HTTP server"))
         .get_matches();
 
-    async fn build_valve(
-        config: &mut Config,
-        create_only: bool,
-        initial_load: bool,
-    ) -> Result<(), NanobotError> {
-        (config.valve, config.pool) = {
-            let valve = Valve::build(
-                &config.valve_path,
-                &config.connection,
-                create_only,
-                initial_load,
-            )
-            .await?;
-            let pool = valve.pool.clone();
-            (Some(valve), Some(pool))
-        };
-        Ok(())
-    }
-
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => {
             if let Some(d) = sub_matches.get_one::<String>("database") {
@@ -115,23 +96,20 @@ async fn main() -> Result<(), NanobotError> {
             if sub_matches.get_flag("create_only") {
                 config.create_only(true);
             }
-
             let database = config.connection.to_owned();
             let path = Path::new(&database);
             if path.exists() {
                 tracing::warn!("Initializing existing database: '{}'", path.display());
             }
-
-            build_valve(&mut config, false, sub_matches.get_flag("initial_load")).await?;
+            build_valve(&mut config, sub_matches.get_flag("initial_load")).await?;
             init::init(&mut config).await
         }
         Some(("config", _sub_matches)) => {
-            build_valve(&mut config, false, false).await?;
+            build_valve(&mut config, false).await?;
             Ok(config.to_string())
         }
         Some(("get", sub_matches)) => {
-            build_valve(&mut config, false, false).await?;
-
+            build_valve(&mut config, false).await?;
             let table = match sub_matches.get_one::<String>("TABLE") {
                 Some(x) => x,
                 _ => panic!("No table given"),
@@ -151,13 +129,7 @@ async fn main() -> Result<(), NanobotError> {
             Ok(result)
         }
         Some(("serve", _sub_matches)) => {
-            // Build the valve instance and assign it to the config struct, and also the pool:
-            (config.valve, config.pool) = {
-                let valve =
-                    Valve::build(&config.valve_path, &config.connection, false, false).await?;
-                let pool = valve.pool.clone();
-                (Some(valve), Some(pool))
-            };
+            build_valve(&mut config, false).await?;
             serve::app(&config)
         }
         _ => Err(String::from(
@@ -178,6 +150,18 @@ async fn main() -> Result<(), NanobotError> {
             Ok(())
         }
     }
+}
+
+/// Builds and assigns a Valve struct to the field `config.valve` and a copy of valve's
+/// connection pool to the field `config.pool`.
+async fn build_valve(config: &mut Config, initial_load: bool) -> Result<(), NanobotError> {
+    (config.valve, config.pool) = {
+        let valve =
+            Valve::build(&config.valve_path, &config.connection, false, initial_load).await?;
+        let pool = valve.pool.clone();
+        (Some(valve), Some(pool))
+    };
+    Ok(())
 }
 
 #[tokio::main]

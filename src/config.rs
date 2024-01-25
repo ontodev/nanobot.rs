@@ -14,8 +14,8 @@ pub struct Config {
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
-    pub valve_path: String,
     pub valve: Option<Valve>,
+    pub valve_path: String,
     pub create_only: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
@@ -143,12 +143,12 @@ impl Config {
                 .connection
                 .unwrap_or(".nanobot.db".into()),
             pool: None,
+            valve: None,
             valve_path: user
                 .valve
                 .unwrap_or_default()
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
-            valve: None,
             create_only: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
@@ -156,8 +156,8 @@ impl Config {
                         if Path::new(&p).is_dir() {
                             Some(p)
                         } else {
-                            eprintln!(
-                                "WARNING: Configuration specifies an assets directory \
+                            tracing::warn!(
+                                "Configuration specifies an assets directory \
                                 '{}' but it does not exist.",
                                 p
                             );
@@ -173,8 +173,8 @@ impl Config {
                         if Path::new(&p).is_dir() {
                             Some(p)
                         } else {
-                            eprintln!(
-                                "WARNING: Configuration specifies a template directory \
+                            tracing::warn!(
+                                "Configuration specifies a template directory \
                                 '{}' but it does not exist. Using default templates.",
                                 p
                             );
@@ -191,7 +191,16 @@ impl Config {
     }
 
     pub fn connection<S: Into<String>>(&mut self, connection: S) -> &mut Config {
-        self.connection = connection.into();
+        let connection = connection.into();
+        if let Some(_) = self.valve {
+            tracing::warn!(
+                "Valve has already been initialized. Changing the connection \
+                 string from '{}' to '{}' will have no effect on the running Valve instance.",
+                self.connection,
+                connection
+            );
+        }
+        self.connection = connection;
         self
     }
 
