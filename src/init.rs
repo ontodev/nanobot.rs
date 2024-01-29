@@ -1,4 +1,4 @@
-use crate::config::{Config, DEFAULT_TOML};
+use crate::config::{to_toml, Config};
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -119,8 +119,11 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
     if !path.exists() {
         // Create default config nanobot.toml
         let path = Path::new("nanobot.toml");
-        let toml = DEFAULT_TOML;
-        fs::write(path, toml).expect("Unable to write file");
+        let toml = to_toml(config);
+        match toml.write_non_defaults(&path) {
+            Err(_) => return Err(format!("Could not create '{}'", path.display())),
+            _ => (),
+        };
         tracing::info!("Created config file '{}'", path.display());
     }
 
