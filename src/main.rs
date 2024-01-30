@@ -1,7 +1,7 @@
 use crate::{config::Config, error::NanobotError, serve::build_app};
 use axum_test_helper::{TestClient, TestResponse};
 use clap::{arg, command, value_parser, Command};
-use ontodev_valve::Valve;
+use ontodev_valve::valve::Valve;
 use std::path::Path;
 use std::sync::Arc;
 use std::{collections::HashMap, env, io};

@@ -13,7 +13,7 @@ use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select, SelectColumn};
-use ontodev_valve::{ast::Expression, Valve};
+use ontodev_valve::{ast::Expression, valve::Valve};
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
 use std::{

@@ -1,16 +1,17 @@
+use ontodev_valve::valve::ValveError;
 use std::error::Error;
 use std::fmt;
 
 #[derive(Debug)]
 pub enum NanobotError {
     GeneralError(String),
-    ValveError(ontodev_valve::ValveError),
+    ValveError(ValveError),
     TomlError(toml::de::Error),
     GetError(GetError),
 }
 
-impl From<ontodev_valve::ValveError> for NanobotError {
-    fn from(e: ontodev_valve::ValveError) -> Self {
+impl From<ValveError> for NanobotError {
+    fn from(e: ValveError) -> Self {
         Self::ValveError(e)
     }
 }

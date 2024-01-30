@@ -1,7 +1,7 @@
 use crate::error::NanobotError;
 use indexmap::map::IndexMap;
 use lazy_static::lazy_static;
-use ontodev_valve::Valve;
+use ontodev_valve::valve::Valve;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as SerdeValue;
 use sqlx::any::AnyPool;
