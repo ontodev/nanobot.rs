@@ -1,16 +1,11 @@
+use crate::error::NanobotError;
 use indexmap::map::IndexMap;
-use ontodev_valve::{
-    get_compiled_datatype_conditions, get_compiled_rule_conditions,
-    get_parsed_structure_conditions, valve, valve_grammar::StartParser, ColumnRule,
-    CompiledCondition, ParsedStructure, ValveCommand,
-};
+use lazy_static::lazy_static;
+use ontodev_valve::valve::Valve;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as SerdeValue;
-use sqlx::{
-    any::{AnyConnectOptions, AnyKind, AnyPool, AnyPoolOptions},
-    query as sqlx_query,
-};
-use std::{collections::HashMap, fmt, fs, path::Path, str::FromStr};
+use sqlx::any::AnyPool;
+use std::{error, fmt, fs, path::Path};
 use toml;
 
 #[derive(Clone, Debug)]
@@ -20,10 +15,9 @@ pub struct Config {
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
-    pub valve: Option<ValveConfig>,
+    pub valve: Option<Valve>,
     pub valve_path: String,
-    pub valve_create_only: bool,
-    pub valve_initial_load: bool,
+    pub create_only: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
@@ -43,15 +37,13 @@ impl Default for LoggingLevel {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct ValveConfig {
-    pub config: SerdeMap,
-    pub datatype_conditions: HashMap<String, CompiledCondition>,
-    pub rule_conditions: HashMap<String, HashMap<String, Vec<ColumnRule>>>,
-    pub structure_conditions: HashMap<String, ParsedStructure>,
+impl fmt::Display for LoggingLevel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TomlConfig {
     pub nanobot: NanobotConfig,
     pub logging: Option<LoggingConfig>,
@@ -62,7 +54,71 @@ pub struct TomlConfig {
     pub actions: Option<IndexMap<String, ActionConfig>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+impl Default for TomlConfig {
+    fn default() -> TomlConfig {
+        TomlConfig {
+            nanobot: NanobotConfig::default(),
+            logging: Some(LoggingConfig {
+                level: Some(LoggingLevel::default()),
+            }),
+            database: Some(DatabaseConfig::default()),
+            valve: Some(ValveTomlConfig::default()),
+            assets: Some(AssetsConfig::default()),
+            templates: Some(TemplatesConfig::default()),
+            actions: Some(IndexMap::default()),
+        }
+    }
+}
+
+impl TomlConfig {
+    pub fn write_non_defaults(&self, path: &Path) -> Result<(), Box<dyn error::Error>> {
+        let default_toml = Self::default();
+        let mut toml_contents = String::new();
+
+        // We always write the nanobot section of the toml config even when it matches the default.
+        // But for the other sections of the toml config, we only write them when they differ from
+        // the default.
+        toml_contents.push_str(&self.nanobot.to_string());
+
+        if let Some(logging) = &self.logging {
+            if &default_toml.logging.unwrap() != logging {
+                toml_contents.push_str(&format!("\n{}", logging.to_string()));
+            }
+        }
+        if let Some(database) = &self.database {
+            if &default_toml.database.unwrap() != database {
+                toml_contents.push_str(&format!("\n{}", database.to_string()));
+            }
+        }
+        if let Some(valve) = &self.valve {
+            if &default_toml.valve.unwrap() != valve {
+                toml_contents.push_str(&format!("\n{}", valve.to_string()));
+            }
+        }
+        if let Some(assets) = &self.assets {
+            if &default_toml.assets.unwrap() != assets {
+                toml_contents.push_str(&format!("\n{}", assets.to_string()));
+            }
+        }
+        if let Some(templates) = &self.templates {
+            if &default_toml.templates.unwrap() != templates {
+                toml_contents.push_str(&format!("\n{}", templates.to_string()));
+            }
+        }
+        if let Some(actions) = &self.actions {
+            if &default_toml.actions.unwrap() != actions {
+                for (name, details) in actions.iter() {
+                    toml_contents.push_str(&format!("[actions.{}]\n{}\n", name, details));
+                }
+            }
+        }
+
+        fs::write(path, toml_contents).expect("Unable to write file");
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub struct NanobotConfig {
     pub config_version: u16,
     pub port: Option<u16>,
@@ -71,18 +127,34 @@ pub struct NanobotConfig {
 impl Default for NanobotConfig {
     fn default() -> NanobotConfig {
         NanobotConfig {
-            config_version: 1,
-            port: Some(3000),
+            config_version: DEFAULT_CONFIG_VERSION,
+            port: Some(DEFAULT_PORT),
         }
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+impl fmt::Display for NanobotConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[nanobot]\n{}", toml::to_string(self).unwrap()).unwrap();
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct LoggingConfig {
     pub level: Option<LoggingLevel>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+impl fmt::Display for LoggingConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(level) = &self.level {
+            write!(f, "[logging]\nlevel = \"{}\"\n", level).unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatabaseConfig {
     pub connection: Option<String>,
 }
@@ -95,7 +167,16 @@ impl Default for DatabaseConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+impl fmt::Display for DatabaseConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(connection) = &self.connection {
+            write!(f, "[database]\nconnection = \"{}\"\n", connection).unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ValveTomlConfig {
     pub path: Option<String>,
 }
@@ -108,24 +189,72 @@ impl Default for ValveTomlConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+impl fmt::Display for ValveTomlConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(path) = &self.path {
+            write!(f, "[valve]\npath = \"{}\"\n", path).unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct AssetsConfig {
     pub path: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+impl fmt::Display for AssetsConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(path) = &self.path {
+            write!(f, "[assets]\npath = \"{}\"\n", path).unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct TemplatesConfig {
     pub path: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+impl fmt::Display for TemplatesConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(path) = &self.path {
+            write!(f, "[templates]\npath = \"{}\"\n", path).unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ActionConfig {
     pub label: String,
     pub inputs: Option<Vec<InputConfig>>,
     pub commands: Vec<Vec<String>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+impl fmt::Display for ActionConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "label = \"{}\"\n", self.label).unwrap();
+        if let Some(inputs) = &self.inputs {
+            write!(f, "inputs = [\n").unwrap();
+            for input in inputs {
+                write!(f, "  {}", input).unwrap();
+            }
+            write!(f, "]\n").unwrap();
+        }
+        if !self.commands.is_empty() {
+            write!(f, "commands = [\n").unwrap();
+            for command in self.commands.iter() {
+                write!(f, "  {:?},\n", command).unwrap();
+            }
+            write!(f, "]\n").unwrap();
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct InputConfig {
     pub name: String,
     pub label: String,
@@ -135,25 +264,38 @@ pub struct InputConfig {
     pub test: Option<String>,
 }
 
+impl fmt::Display for InputConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let entry = format!("{}", toml::to_string(self).unwrap()).replace("\n", ", ");
+        let entry = match entry.strip_suffix(", ") {
+            None => entry,
+            Some(e) => e.to_string(),
+        };
+        write!(f, "{{ {} }},\n", entry).unwrap();
+        Ok(())
+    }
+}
+
 pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
-pub const DEFAULT_TOML: &str = "[nanobot]
-config_version = 1";
+pub const DEFAULT_CONFIG_VERSION: u16 = 1;
+pub const DEFAULT_PORT: u16 = 3000;
+lazy_static! {
+    pub static ref DEFAULT_TOML: String =
+        format!("[nanobot]\nconfig_version = {}", DEFAULT_CONFIG_VERSION);
+}
 
 impl Config {
-    pub async fn new() -> Result<Config, String> {
+    pub async fn new() -> Result<Config, NanobotError> {
         let user_config_file = match fs::read_to_string("nanobot.toml") {
             Ok(x) => x,
-            Err(_) => DEFAULT_TOML.into(),
+            Err(_) => DEFAULT_TOML.to_string(),
         };
-        let user: TomlConfig = match toml::from_str(user_config_file.as_str()) {
-            Ok(d) => d,
-            Err(e) => return Err(e.to_string()),
-        };
+        let user: TomlConfig = toml::from_str(user_config_file.as_str())?;
 
         let config = Config {
             config_version: user.nanobot.config_version,
-            port: user.nanobot.port.unwrap_or(3000),
+            port: user.nanobot.port.unwrap_or(DEFAULT_PORT),
             logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
             connection: user
                 .database
@@ -167,16 +309,15 @@ impl Config {
                 .unwrap_or_default()
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
-            valve_create_only: false,
-            valve_initial_load: false,
+            create_only: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
                     Some(p) => {
                         if Path::new(&p).is_dir() {
                             Some(p)
                         } else {
-                            eprintln!(
-                                "WARNING: Configuration specifies an assets directory \
+                            tracing::warn!(
+                                "Configuration specifies an assets directory \
                                 '{}' but it does not exist.",
                                 p
                             );
@@ -192,8 +333,8 @@ impl Config {
                         if Path::new(&p).is_dir() {
                             Some(p)
                         } else {
-                            eprintln!(
-                                "WARNING: Configuration specifies a template directory \
+                            tracing::warn!(
+                                "Configuration specifies a template directory \
                                 '{}' but it does not exist. Using default templates.",
                                 p
                             );
@@ -209,97 +350,22 @@ impl Config {
         Ok(config)
     }
 
-    pub async fn init(&mut self) -> Result<&mut Config, String> {
-        self.start_pool().await.unwrap().load_valve_config().await?;
-        Ok(self)
-    }
-
-    pub async fn start_pool(&mut self) -> Result<&mut Config, String> {
-        let connection_options;
-        if self.connection.starts_with("postgresql://") {
-            connection_options = match AnyConnectOptions::from_str(&self.connection) {
-                Ok(o) => o,
-                Err(e) => return Err(e.to_string()),
-            };
-        } else {
-            let connection_string;
-            if !self.connection.starts_with("sqlite://") {
-                connection_string = format!("sqlite://{}?mode=rwc", self.connection);
-            } else {
-                connection_string = self.connection.to_string();
-            }
-            connection_options = match AnyConnectOptions::from_str(connection_string.as_str()) {
-                Ok(o) => o,
-                Err(e) => return Err(e.to_string()),
-            };
-        }
-
-        let pool = match AnyPoolOptions::new()
-            .max_connections(5)
-            .connect_with(connection_options)
-            .await
-        {
-            Ok(o) => o,
-            Err(e) => return Err(e.to_string()),
-        };
-        if pool.any_kind() == AnyKind::Sqlite {
-            if let Err(e) = sqlx_query("PRAGMA foreign_keys = ON").execute(&pool).await {
-                return Err(e.to_string());
-            }
-        }
-        self.pool = Some(pool);
-        Ok(self)
-    }
-
-    pub async fn load_valve_config(&mut self) -> Result<&mut Config, String> {
-        let verbose = false;
-        let initial_load = false;
-        match valve(
-            &self.valve_path,
-            &self.connection,
-            &ValveCommand::Config,
-            verbose,
-            initial_load,
-            "table",
-        )
-        .await
-        {
-            Err(e) => {
-                return Err(format!(
-                    "VALVE error while initializing from {}: {:?}",
-                    &self.valve_path, e
-                ))
-            }
-            Ok(v) => {
-                let v: SerdeMap = serde_json::from_str(&v).unwrap();
-                let parser = StartParser::new();
-                let d = get_compiled_datatype_conditions(&v, &parser);
-                let r = get_compiled_rule_conditions(&v, d.clone(), &parser);
-                let p = get_parsed_structure_conditions(&v, &parser);
-                self.valve = Some(ValveConfig {
-                    config: v,
-                    datatype_conditions: d,
-                    rule_conditions: r,
-                    structure_conditions: p,
-                });
-            }
-        };
-
-        Ok(self)
-    }
-
     pub fn connection<S: Into<String>>(&mut self, connection: S) -> &mut Config {
-        self.connection = connection.into();
+        let connection = connection.into();
+        if let Some(_) = self.valve {
+            tracing::warn!(
+                "Valve has already been initialized. Changing the connection \
+                 string from '{}' to '{}' will have no effect on the running Valve instance.",
+                self.connection,
+                connection
+            );
+        }
+        self.connection = connection;
         self
     }
 
     pub fn create_only(&mut self, value: bool) -> &mut Config {
-        self.valve_create_only = value;
-        self
-    }
-
-    pub fn initial_load(&mut self, value: bool) -> &mut Config {
-        self.valve_initial_load = value;
+        self.create_only = value;
         self
     }
 }

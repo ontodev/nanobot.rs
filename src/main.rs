@@ -1,11 +1,14 @@
-use crate::{config::Config, serve::build_app};
+use crate::{config::Config, error::NanobotError, serve::build_app};
 use axum_test_helper::{TestClient, TestResponse};
 use clap::{arg, command, value_parser, Command};
+use ontodev_valve::valve::Valve;
+use std::path::Path;
 use std::sync::Arc;
 use std::{collections::HashMap, env, io};
 use url::Url;
 
 pub mod config;
+pub mod error;
 pub mod get;
 pub mod init;
 pub mod ldtab;
@@ -14,9 +17,9 @@ pub mod sql;
 pub mod tree_view;
 
 #[async_std::main]
-async fn main() {
+async fn main() -> Result<(), NanobotError> {
     // initialize configuration
-    let mut config: config::Config = config::Config::new().await.unwrap();
+    let mut config: Config = Config::new().await?;
 
     let level = match config.logging_level {
         config::LoggingLevel::DEBUG => tracing::Level::DEBUG,
@@ -38,7 +41,10 @@ async fn main() {
                 tracing::error!("{}", x);
                 std::process::exit(1)
             }
-            Ok(x) => println!("{}", x),
+            Ok(x) => {
+                println!("{}", x);
+                Ok(())
+            }
         };
     }
 
@@ -84,19 +90,26 @@ async fn main() {
 
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => {
-            if sub_matches.get_flag("create_only") {
-                config.create_only(true);
-            }
-            if sub_matches.get_flag("initial_load") {
-                config.initial_load(true);
-            }
             if let Some(d) = sub_matches.get_one::<String>("database") {
                 config.connection(d);
             }
-            init::init(&config).await
+            if sub_matches.get_flag("create_only") {
+                config.create_only(true);
+            }
+            let database = config.connection.to_owned();
+            let path = Path::new(&database);
+            if path.exists() {
+                tracing::warn!("Initializing existing database: '{}'", path.display());
+            }
+            build_valve(&mut config, sub_matches.get_flag("initial_load")).await?;
+            init::init(&mut config).await
         }
-        Some(("config", _sub_matches)) => Ok(config.to_string()),
+        Some(("config", _sub_matches)) => {
+            build_valve(&mut config, false).await?;
+            Ok(config.to_string())
+        }
         Some(("get", sub_matches)) => {
+            build_valve(&mut config, false).await?;
             let table = match sub_matches.get_one::<String>("TABLE") {
                 Some(x) => x,
                 _ => panic!("No table given"),
@@ -109,14 +122,16 @@ async fn main() {
                 Some(x) => x,
                 _ => "text",
             };
-            let result =
-                match get::get_table(config.init().await.unwrap(), table, shape, format).await {
-                    Ok(x) => x,
-                    Err(x) => format!("ERROR: {:?}", x),
-                };
+            let result = match get::get_table(&config, table, shape, format).await {
+                Ok(x) => x,
+                Err(x) => format!("ERROR: {:?}", x),
+            };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => serve::app(config.init().await.unwrap()),
+        Some(("serve", _sub_matches)) => {
+            build_valve(&mut config, false).await?;
+            serve::app(&config)
+        }
         _ => Err(String::from(
             "Unrecognised or missing subcommand, but CGI environment vars are \
                              undefined",
@@ -130,8 +145,23 @@ async fn main() {
             std::process::exit(1)
         }
 
-        Ok(x) => println!("{}", x),
+        Ok(x) => {
+            println!("{}", x);
+            Ok(())
+        }
     }
+}
+
+/// Builds and assigns a Valve struct to the field `config.valve` and a copy of valve's
+/// connection pool to the field `config.pool`.
+async fn build_valve(config: &mut Config, initial_load: bool) -> Result<(), NanobotError> {
+    (config.valve, config.pool) = {
+        let valve =
+            Valve::build(&config.valve_path, &config.connection, false, initial_load).await?;
+        let pool = valve.pool.clone();
+        (Some(valve), Some(pool))
+    };
+    Ok(())
 }
 
 #[tokio::main]
@@ -139,7 +169,7 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     tracing::debug!("Processing CGI request with vars: {:?}", vars);
 
     let shared_state = Arc::new(serve::AppState {
-        config: config.init().await.unwrap().clone(),
+        config: config.clone(),
     });
     let app = build_app(shared_state);
     let client = TestClient::new(app);
