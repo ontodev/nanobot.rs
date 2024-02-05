@@ -1,7 +1,6 @@
 use crate::{
     config::{Config, ValveConfig},
     get, ldtab, sql,
-    sql::LIMIT_DEFAULT,
     tree_view,
 };
 use ansi_to_html;
@@ -813,8 +812,8 @@ async fn table(
                     Ok(n) => n,
                     Err(e) => return Err(e.to_string().into()),
                 };
-                let pages = row_number / LIMIT_DEFAULT as u32;
-                pages * LIMIT_DEFAULT as u32
+                let pages = row_number / state.config.results_per_page as u32 ;
+                pages * state.config.results_per_page as u32
             };
             let html = format!(
                 r#"<script>

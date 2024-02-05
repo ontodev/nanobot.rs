@@ -17,6 +17,7 @@ use toml;
 pub struct Config {
     pub config_version: u16,
     pub port: u16,
+    pub results_per_page: u16, 
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
@@ -66,6 +67,7 @@ pub struct TomlConfig {
 pub struct NanobotConfig {
     pub config_version: u16,
     pub port: Option<u16>,
+    pub results_per_page: Option<u16>, 
 }
 
 impl Default for NanobotConfig {
@@ -73,6 +75,7 @@ impl Default for NanobotConfig {
         NanobotConfig {
             config_version: 1,
             port: Some(3000),
+            results_per_page: Some(20), // TODO: 100?
         }
     }
 }
@@ -154,6 +157,7 @@ impl Config {
         let config = Config {
             config_version: user.nanobot.config_version,
             port: user.nanobot.port.unwrap_or(3000),
+            results_per_page: user.nanobot.results_per_page.unwrap_or(20), 
             logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
             connection: user
                 .database
@@ -315,6 +319,7 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         nanobot: NanobotConfig {
             config_version: config.config_version.clone(),
             port: Some(config.port.clone()),
+            results_per_page: Some(config.results_per_page.clone()),
         },
         logging: Some(LoggingConfig {
             level: Some(config.logging_level.clone()),

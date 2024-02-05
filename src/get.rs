@@ -4,8 +4,8 @@
 
 use crate::config::Config;
 use crate::sql::{
-    get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
-    LIMIT_DEFAULT, LIMIT_MAX,
+    get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool, 
+    LIMIT_MAX,
 };
 use chrono::prelude::{DateTime, Utc};
 use csv::WriterBuilder;
@@ -115,7 +115,7 @@ pub async fn get_table(
 ) -> Result<String, GetError> {
     let table = unquote(table).unwrap_or(table.to_string());
     let mut select = Select::new(format!("\"{}\"", table));
-    select.limit(LIMIT_DEFAULT);
+    select.limit(usize::from(config.results_per_page));
     get_rows(config, &select, shape, format).await
 }
 
@@ -185,7 +185,7 @@ pub async fn get_rows(
     match select.limit {
         Some(l) if l > LIMIT_MAX => select.limit(LIMIT_MAX),
         Some(l) if l > 0 => select.limit(l),
-        _ => select.limit(LIMIT_DEFAULT),
+        _ => select.limit(usize::from(config.results_per_page)),
     };
 
     let pool = match config.pool.as_ref() {
