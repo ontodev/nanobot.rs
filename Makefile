@@ -102,15 +102,6 @@ target/$(ARCH)/release/nanobot: src/*.rs
 		--rm -t clux/muslrust:stable \
 		cargo build --release
 
-# target/$(ARCH)/release/nanobot: src/*.rs
-# 	docker pull ekidd/rust-musl-builder
-# 	docker run \
-# 		--platform linux/amd64 \
-# 		-v cargo-registry:/root/.cargo/registry \
-# 		-v $$PWD:/home/rust/src \
-# 		--rm -t ekidd/rust-musl-builder \
-# 		cargo build --release
-
 .PHONY: musl
 musl: target/$(ARCH)/release/nanobot | build/
 
@@ -125,5 +116,5 @@ release: target/$(ARCH)/release/nanobot | build/
 	gh release create --draft --prerelease \
 		--title "$(TODAY) Alpha Release" \
 		--generate-notes \
-		v$(TODAY)-tdt $(TARGET)
+		v$(TODAY) $(TARGET)
 	@echo "Please publish GitHub release v$(TODAY)"
