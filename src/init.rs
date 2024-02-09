@@ -186,7 +186,7 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
 
     (config.valve, config.pool) = {
         let valve = Valve::build(&config.valve_path, &config.connection, false, false)
-            .await.
+            .await
             .expect("VALVE failed to load configuration");
         let pool = valve.pool.clone();
         (Some(valve), Some(pool))
