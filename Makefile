@@ -46,7 +46,7 @@ src/resources/test_data/zfa_excerpt.db: ${TEST_TSVS}
 test:
 	cargo fmt --check
 	cargo test --release
-	# PATH="$${PATH}:$$(pwd)/target/release"; tesh --debug false ./doc
+	PATH="$${PATH}:$$(pwd)/target/release"; tesh --debug false ./doc
 
 .PHONY: dev-check
 dev-check:

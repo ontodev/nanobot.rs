@@ -1,4 +1,5 @@
 use crate::config::{to_toml, Config};
+use ontodev_valve::valve::Valve;
 use std::error;
 use std::fs;
 use std::fs::File;
@@ -182,6 +183,15 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
     }
 
     tracing::debug!("VALVE create_only {}", config.create_only);
+
+    (config.valve, config.pool) = {
+        let valve = Valve::build(&config.valve_path, &config.connection, false, false)
+            .await.
+            .expect("VALVE failed to load configuration");
+        let pool = valve.pool.clone();
+        (Some(valve), Some(pool))
+    };
+    tracing::debug!("VALVE {:?}", config.valve);
 
     // Create and/or load tables into database
     match &config.valve {
