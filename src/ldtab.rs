@@ -910,7 +910,7 @@ mod tests {
 
         let prefix_hash_map = get_prefix_hash_map(&curies, &pool).await.unwrap();
 
-        let mut expected = HashMap::new();
+        let mut expected = IndexMap::new();
         expected.insert(
             String::from("obo"),
             String::from("http://purl.obolibrary.org/obo/"),
