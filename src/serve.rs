@@ -20,6 +20,7 @@ use std::{
     collections::HashMap, collections::HashSet, net::SocketAddr, process::Command, sync::Arc,
 };
 use tower_http::services::ServeDir;
+use wiring_rs::util::signature;
 
 #[derive(Debug, PartialEq, Eq)]
 enum RequestType {
@@ -344,6 +345,96 @@ async fn tree(
         .pool
         .as_ref()
         .ok_or("Pool is not initialized.".to_string())?;
+
+    // Return JSON-LD
+    if subject.ends_with(".json") {
+        let term_id = subject
+            .trim_end_matches(".json")
+            .trim_end_matches(".pretty");
+
+        let content = ldtab::get_property_map(&term_id, "ontology", &pool)
+            .await
+            .unwrap_or_default();
+        let mut iris = HashSet::from([term_id.into()]);
+        signature::get_iris(&content, &mut iris);
+        let prefixes = ldtab::get_prefix_hash_map(&iris, &pool).await.unwrap();
+        let mut context = SerdeMap::new();
+        for prefix in prefixes.keys() {
+            context.insert(
+                prefix.into(),
+                json!({"@id": prefixes.get(prefix), "@prefix": true}),
+            );
+        }
+
+        let specials = HashSet::from(["rdf:type", "rdfs:subClassOf", "owl:equivalentClass"]);
+        let mut sorted_iris = Vec::from_iter(iris);
+        sorted_iris.sort_unstable();
+        for iri in sorted_iris {
+            if specials.contains(&iri.as_str()) {
+                context.insert(
+                    iri.into(),
+                    json!({
+                        "@type": "@id"
+                    }),
+                );
+            }
+        }
+
+        let mut result = SerdeMap::new();
+        result.insert("@context".into(), json!(context));
+        result.insert("@id".into(), json!(term_id));
+        let content = content.as_object().unwrap();
+        for key in content.keys() {
+            let values = content.get(key).unwrap().as_array().unwrap();
+            let mut list = vec![];
+            for value in values {
+                let value = value.as_object().unwrap();
+                if let Some(object) = value.get("object") {
+                    if let Some(datatype) = value.get("datatype") {
+                        let datatype = datatype.as_str().unwrap();
+                        match datatype {
+                            "_IRI" => {
+                                if specials.contains(&key.as_str()) {
+                                    // predicate has @type=@id
+                                    list.push(json!(object));
+                                } else {
+                                    list.push(json!({"@id": object}))
+                                }
+                            }
+                            "_JSON" => (),
+                            "xsd:string" => list.push(json!(object)),
+                            d => {
+                                if d.starts_with("@") {
+                                    list.push(json!({
+                                        "@value": object,
+                                        "@language": datatype.replace("@", "")
+                                    }))
+                                } else {
+                                    list.push(json!({
+                                        "@value": object,
+                                        "@type": datatype
+                                    }))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if list.len() > 1 {
+                result.insert(key.into(), json!(list));
+            } else {
+                result.insert(key.into(), json!(list[0]));
+            }
+        }
+        if subject.ends_with(".pretty.json") {
+            return Ok(serde_json::to_string_pretty(&result)
+                .unwrap_or_default()
+                .into_response());
+        } else {
+            return Ok(Json(result).into_response());
+        }
+    }
+
     if let Some(text) = params.get("text") {
         tracing::debug!("TEXT: {text}");
         let search = format!("\"%{text}%\"");
@@ -435,6 +526,10 @@ async fn tree(
         "label": label,
         "tree": tree,
         "predicate_map": pred,
+        "formats": {
+            "JSON-LD": format!("./{subject}.json"),
+            "JSON-LD (pretty)": format!("./{subject}.pretty.json"),
+        },
     });
     let page_html = match get::page_to_html(&state.config, "tree", &page) {
         Ok(p) => p,

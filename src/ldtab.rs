@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use ontodev_hiccup::hiccup;
 use serde_json::{from_str, json, Map, Value};
 use sqlx::any::{AnyPool, AnyRow};
@@ -111,18 +112,19 @@ fn build_prefix_query_for(prefixes: &HashSet<String>) -> String {
 /// Then get_prefix_hash_map(S, Ldb) returns the map
 /// {"obo": "http://purl.obolibrary.org/obo/",
 ///  "rdfs": "http://www.w3.org/2000/01/rdf-schema#"}.  
-async fn get_prefix_hash_map(
+pub async fn get_prefix_hash_map(
     curies: &HashSet<String>,
     pool: &AnyPool,
-) -> Result<HashMap<String, String>, sqlx::Error> {
+) -> Result<IndexMap<String, String>, sqlx::Error> {
     let prefixes = get_prefixes(&curies);
     let query = build_prefix_query_for(&prefixes);
     let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
-    let mut prefix_2_base = HashMap::new();
+    let mut prefix_2_base = IndexMap::new();
     for r in rows {
         //NB: there is only one row (becase 'prefix' is a primary key)
         let prefix: &str = r.get("prefix");
         let base: &str = r.get("base");
+        tracing::debug!("ROW {prefix} {base}");
         prefix_2_base.insert(String::from(prefix), String::from(base));
     }
     Ok(prefix_2_base)
@@ -355,7 +357,7 @@ fn build_type_query_for(curies: &HashSet<String>, table: &str) -> String {
 /// {"obo:ZFA_0000354": "gill",
 ///  "rdfs:label": "label"}
 /// extracted from a given table in Ldb.  
-async fn get_type_hash_map(
+pub async fn get_type_hash_map(
     curies: &HashSet<String>,
     table: &str,
     pool: &AnyPool,
