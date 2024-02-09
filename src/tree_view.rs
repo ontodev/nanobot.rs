@@ -1357,11 +1357,7 @@ pub fn sort_rich_tree_by_label(tree: &Value) -> Result<Value, TreeViewError> {
     match tree {
         Value::Array(a) => Ok(sort_array(a)?),
         Value::Object(o) => Ok(sort_object(o)?),
-        Value::String(_s) => Ok(tree.clone()),
-        _ => Err(TreeViewError::TreeFormat(format!(
-            "Expected a tree, list of nodes, or string but got: {}",
-            tree.to_string()
-        ))),
+        _ => Ok(tree.clone()),
     }
 }
 
@@ -1804,7 +1800,7 @@ pub async fn get_preferred_roots(
 ) -> Result<HashSet<String>, TreeViewError> {
     let mut preferred_roots = HashSet::new();
     let query = format!(
-        "SELECT object FROM {table} WHERE predicate='obo:IAO_0000700'",
+        "SELECT object FROM {table} WHERE predicate IN('obo:IAO_0000700', 'IAO:0000700')",
         table = table,
     );
     let rows: Vec<AnyRow> = sqlx::query(&query).fetch_all(pool).await?;
@@ -2477,28 +2473,25 @@ pub async fn get_hiccup_top_class_hierarchy(
     //build term trees for top level nodes
     let mut top_hierarchy_nodes = Vec::new();
     for entity in &entities {
-        let mut root_tree = match entity_2_label.get(entity) {
-            Some(label) => {
-                json!({"curie":entity, "label":encode_iri(label), "property" : IS_A, "children" : []})
+        let mut root_tree = json!({"curie":entity, "property" : IS_A, "children": []});
+        if let Some(label) = entity_2_label.get(entity) {
+            root_tree["label"] = json!(encode_iri(label))
+        } else {
+            root_tree["label"] = json!(encode_iri(entity))
+        }
+        let children = get_immediate_children_tree(entity, &vec![IS_A], table, pool).await?;
+        if let Some(children) = children.as_array() {
+            if children.len() > 0 {
+                root_tree["has_children"] = json!(true);
+                root_tree["child_count"] = json!(children.len().clone());
             }
-            None => {
-                json!({"curie":entity, "label":encode_iri(entity), "property" : IS_A, "children" : []})
-            }
-        };
-
-        //add children & grandchildren
-        let mut children = get_immediate_children_tree(entity, &vec![IS_A], table, pool).await?;
-        add_grandchildren(&mut children, &vec![IS_A], table, pool).await?;
-        add_children(&mut root_tree, &children)?;
-
+        }
         top_hierarchy_nodes.push(root_tree);
     }
-
-    //add top level nodes as children of "owl:Class"
-    let owl_class_children = Value::Array(top_hierarchy_nodes);
-    let top_hierarchy_tree = json!([{"curie":"owl:Class", "label":"Class", "property":IS_A, "children": owl_class_children }]);
-    let sorted = sort_rich_tree_by_label(&top_hierarchy_tree)?;
-    let hiccup = tree_2_hiccup("owl:Class", &sorted)?;
+    let sorted = sort_array(&top_hierarchy_nodes)?;
+    let top_hierarchy_tree =
+        json!([{"curie":"owl:Class", "label":"Class", "property":IS_A, "children": sorted}]);
+    let hiccup = tree_2_hiccup("owl:Class", &top_hierarchy_tree)?;
     Ok(hiccup)
 }
 
