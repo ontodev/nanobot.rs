@@ -12,6 +12,7 @@ use toml;
 pub struct Config {
     pub config_version: u16,
     pub port: u16,
+    pub results_per_page: u16,
     pub logging_level: LoggingLevel,
     pub connection: String,
     pub pool: Option<AnyPool>,
@@ -122,6 +123,7 @@ impl TomlConfig {
 pub struct NanobotConfig {
     pub config_version: u16,
     pub port: Option<u16>,
+    pub results_per_page: Option<u16>,
 }
 
 impl Default for NanobotConfig {
@@ -129,6 +131,7 @@ impl Default for NanobotConfig {
         NanobotConfig {
             config_version: DEFAULT_CONFIG_VERSION,
             port: Some(DEFAULT_PORT),
+            results_per_page: Some(DEFAULT_RESULTS_PER_PAGE),
         }
     }
 }
@@ -280,6 +283,7 @@ pub type SerdeMap = serde_json::Map<String, SerdeValue>;
 
 pub const DEFAULT_CONFIG_VERSION: u16 = 1;
 pub const DEFAULT_PORT: u16 = 3000;
+pub const DEFAULT_RESULTS_PER_PAGE: u16 = 20;
 lazy_static! {
     pub static ref DEFAULT_TOML: String =
         format!("[nanobot]\nconfig_version = {}", DEFAULT_CONFIG_VERSION);
@@ -296,6 +300,10 @@ impl Config {
         let config = Config {
             config_version: user.nanobot.config_version,
             port: user.nanobot.port.unwrap_or(DEFAULT_PORT),
+            results_per_page: user
+                .nanobot
+                .results_per_page
+                .unwrap_or(DEFAULT_RESULTS_PER_PAGE),
             logging_level: user.logging.unwrap_or_default().level.unwrap_or_default(),
             connection: user
                 .database
@@ -381,6 +389,7 @@ pub fn to_toml(config: &Config) -> TomlConfig {
         nanobot: NanobotConfig {
             config_version: config.config_version.clone(),
             port: Some(config.port.clone()),
+            results_per_page: Some(config.results_per_page.clone()),
         },
         logging: Some(LoggingConfig {
             level: Some(config.logging_level.clone()),
