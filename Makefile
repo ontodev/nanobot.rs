@@ -26,7 +26,7 @@ format:
 build:
 	cargo build --release
 
-build/:
+build/ build/penguins/:
 	mkdir -p $@
 
 target/debug/nanobot: src/
@@ -43,10 +43,10 @@ src/resources/test_data/zfa_excerpt.db: ${TEST_TSVS}
 	$(foreach T,${TEST_TABLES},".import src/resources/test_data/${T}.tsv ${T}")
 
 .PHONY: test
-test:
+test: target/debug/nanobot build/penguins/.nanobot.db
 	cargo fmt --check
-	cargo test --release
-	# PATH="$${PATH}:$$(pwd)/target/release"; tesh --debug false ./doc
+	cargo test
+	PATH="$${PATH}:$$(pwd)/target/debug"; tesh --debug false ./doc
 
 .PHONY: dev-check
 dev-check:
@@ -60,16 +60,18 @@ dev-test:
 dev-serve:
 	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
 
-.PHONY: penguins
-penguins: target/debug/nanobot examples/penguins/
-	rm -rf build/penguins/
-	mkdir -p build/penguins/
-	cp -r examples/penguins/* build/penguins/
-	mkdir -p build/penguins/src/data/
-	cd build/penguins \
+build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
+	rm -rf $|
+	mkdir -p $|
+	cp -r examples/penguins/* $|
+	mkdir -p $|/src/data/
+	cd $| \
 	&& python3 generate.py \
-	&& ../../$< init \
-	&& ../../$< serve
+	&& ../../$< init
+
+.PHONY: penguins
+penguins: target/debug/nanobot build/penguins/.nanobot.db
+	cd build/penguins && ../../$< serve
 
 build/synthea.zip: | build
 	curl -L -o build/synthea.zip "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip"

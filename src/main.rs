@@ -101,7 +101,6 @@ async fn main() -> Result<(), NanobotError> {
             if path.exists() {
                 tracing::warn!("Initializing existing database: '{}'", path.display());
             }
-            build_valve(&mut config, sub_matches.get_flag("initial_load")).await?;
             init::init(&mut config).await
         }
         Some(("config", _sub_matches)) => {
