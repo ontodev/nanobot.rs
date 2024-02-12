@@ -14,8 +14,7 @@ datatype	datatype	datatype		label	primary	the name of this datatype
 datatype	parent	parent	empty	label	tree(datatype)	the parent datatype
 datatype	condition	condition	empty	line		the method for testing the datatype
 datatype	description	description	empty	text		a description of this datatype
-datatype	SQLite type	SQLite type	empty	sql_type		the SQLite type for representing this data
-datatype	PostgreSQL type	PostgreSQL type	empty	sql_type		the PostgresSQL type for representing this data
+datatype	SQL type	SQL type	empty	sql_type		the SQLite type for representing this data
 datatype	HTML type	HTML type	empty	html_type		the HTML type for viewing and editing this data
 penguin	study_name	studyName		word		the name of the study
 penguin	sample_number	Sample Number		natural_number	primary	the sample identifier
