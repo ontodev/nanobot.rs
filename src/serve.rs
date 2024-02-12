@@ -1,4 +1,4 @@
-use crate::{config::Config, get, ldtab, sql::LIMIT_DEFAULT, tree_view};
+use crate::{config::Config, get, ldtab, tree_view};
 use ansi_to_html;
 use axum::{
     extract::{Form, Path, Query, State},
@@ -859,8 +859,8 @@ async fn table(
                     Ok(n) => n,
                     Err(e) => return Err(e.to_string().into()),
                 };
-                let pages = row_number / LIMIT_DEFAULT as u32;
-                pages * LIMIT_DEFAULT as u32
+                let pages = row_number / state.config.results_per_page as u32;
+                pages * state.config.results_per_page as u32
             };
             let html = format!(
                 r#"<script>

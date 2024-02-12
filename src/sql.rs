@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::error::Error;
 
 pub const LIMIT_MAX: usize = 10000;
-pub const LIMIT_DEFAULT: usize = 20; // TODO: 100?
 
 // TODO: Possibly delete this function since it seems like it is superseded by the Valve API?
 pub async fn save_table(
