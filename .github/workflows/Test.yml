@@ -11,10 +11,4 @@ jobs:
       - name: Build and test
         run: |
           make deps
-          make target/release/nanobot
           make test
-      - uses: actions/upload-artifact@v3
-        with:
-          name: nanobot
-          path: target/release/nanobot
-          if-no-files-found: error 
