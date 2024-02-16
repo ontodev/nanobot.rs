@@ -1043,23 +1043,6 @@ fn row(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let valve = &state
-        .config
-        .valve
-        .as_ref()
-        .ok_or("Valve is not initialized.".to_string())?;
-
-    match is_ontology(&table, &valve) {
-        Err(e) => return Err((StatusCode::BAD_REQUEST, Html(e)).into_response().into()),
-        Ok(flag) if flag => {
-            let error = format!("'row' path is not valid for ontology table '{}'", table);
-            return Err((StatusCode::BAD_REQUEST, Html(error))
-                .into_response()
-                .into());
-        }
-        _ => (),
-    };
-
     let row_number = match row_number.parse::<u32>() {
         Ok(r) => r,
         Err(e) => {
@@ -1503,15 +1486,6 @@ fn get_html_type_and_values(
     }
 
     Ok((None, None))
-}
-
-fn is_ontology(table: &str, valve: &Valve) -> Result<bool, String> {
-    let columns = get_columns(table, valve)?;
-    Ok(columns.contains(&"subject".to_string())
-        && columns.contains(&"predicate".to_string())
-        && columns.contains(&"object".to_string())
-        && columns.contains(&"datatype".to_string())
-        && columns.contains(&"annotation".to_string()))
 }
 
 fn insert_table_row(
