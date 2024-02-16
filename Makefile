@@ -93,10 +93,23 @@ synthea: target/release/nanobot
 	&& ../../$< serve
 
 TODAY := $(shell date +%Y-%m-%d)
-ARCH := x86_64-unknown-linux-musl
-TARGET := build/nanobot-$(ARCH)
+YYYYMMDD := $(shell date +%Y%m%d)
+ifeq ($(shell uname -m),arm64)
+ARCH := aarch64
+else
+ARCH := x86_64
+endif
+ifeq ($(shell uname -s),Darwin)
+TARGET := target/release/nanobot
+BINARY := nanobot-v$(YYYYMMDD)-$(ARCH)-macos
+else
+TARGET := target/$(ARCH)-unknown-linux-musl/release/nanobot
+BINARY := nanobot-v$(YYYYMMDD)-$(ARCH)-linux
+endif
+BINARY_PATH := build/$(BINARY)
 
-target/$(ARCH)/release/nanobot: src/*.rs
+# Build a Linux binary using Musl instead of GCC.
+target/x86_64-unknown-linux-musl/release/nanobot: src/*.rs
 	docker pull clux/muslrust:stable
 	docker run \
 		-v cargo-cache:/root/.cargo/registry \
@@ -105,18 +118,19 @@ target/$(ARCH)/release/nanobot: src/*.rs
 		cargo build --release
 
 .PHONY: musl
-musl: target/$(ARCH)/release/nanobot | build/
+musl: target/x86_64-unknown-linux-musl/release/nanobot | build/
 
 .PHONY: upload
-upload: target/$(ARCH)/release/nanobot | build/
-	cp $< $(TARGET)
-	gh release upload --clobber v$(TODAY) $(TARGET)
+upload: $(TARGET) | build/
+	cp $< $(BINARY_PATH)
+	gh release upload --clobber v$(TODAY) $(BINARY_PATH)
 
 .PHONY: release
-release: target/$(ARCH)/release/nanobot | build/
-	cp $< $(TARGET)
+release: $(TARGET) | build/
+	cp $< $(BINARY_PATH)
 	gh release create --draft --prerelease \
 		--title "$(TODAY) Alpha Release" \
 		--generate-notes \
-		v$(TODAY) $(TARGET)
+		v$(TODAY) $(BINARY_PATH)
 	@echo "Please publish GitHub release v$(TODAY)"
+
