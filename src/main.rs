@@ -36,6 +36,7 @@ async fn main() -> Result<(), NanobotError> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     if let Some(vars) = cgi_vars() {
+        build_valve(&mut config, false).await?;
         return match handle_cgi(&vars, &mut config) {
             Err(x) => {
                 tracing::error!("{}", x);
