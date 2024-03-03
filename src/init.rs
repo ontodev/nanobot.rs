@@ -185,7 +185,7 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
     tracing::debug!("VALVE create_only {}", config.create_only);
 
     (config.valve, config.pool) = {
-        let valve = Valve::build(&config.valve_path, &config.connection, false, false)
+        let valve = Valve::build(&config.valve_path, &config.connection)
             .await
             .expect("VALVE failed to load configuration");
         let pool = valve.pool.clone();

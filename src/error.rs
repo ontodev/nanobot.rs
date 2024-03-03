@@ -69,6 +69,12 @@ impl From<csv::Error> for GetError {
     }
 }
 
+impl From<serde_json::Error> for GetError {
+    fn from(error: serde_json::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
 impl From<sqlx::Error> for GetError {
     fn from(error: sqlx::Error) -> GetError {
         GetError::new(format!("{:?}", error))

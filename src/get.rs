@@ -15,12 +15,13 @@ use futures::executor::block_on;
 use git2::Repository;
 use minijinja::{Environment, Source};
 use ontodev_sqlrest::{Direction, OrderByColumn, Select};
-use ontodev_valve as valve;
+use ontodev_valve::{
+    toolkit,
+    valve::{ValveChange, ValveColumnConfig, ValveMessage, ValveTableConfig},
+};
 use regex::Regex;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, to_string_pretty, Map, Value};
-use sqlx::any::AnyRow;
-use sqlx::Row;
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -28,24 +29,6 @@ use tabwriter::TabWriter;
 use urlencoding::decode;
 
 pub type SerdeMap = serde_json::Map<String, serde_json::Value>;
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct ValveMessage {
-    column: String,
-    value: String,
-    rule: String,
-    level: String,
-    message: String,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct ValveChange {
-    column: String,
-    level: String,
-    old_value: String,
-    value: String,
-    message: String,
-}
 
 pub async fn get_table(
     config: &Config,
@@ -70,17 +53,11 @@ pub async fn get_rows(
         .valve
         .as_ref()
         .ok_or("Valve is not initialized.".to_string())?;
-    let table_map = match valve.config.get("table").and_then(|t| t.as_object()) {
-        Some(table_map) => table_map,
-        None => {
-            return Err(GetError::new(format!(
-                "No object named 'table' in valve config"
-            )))
-        }
-    };
+
+    let table_config = &valve.config.table;
 
     let unquoted_table = unquote(&base_select.table).unwrap_or(base_select.table.to_string());
-    if !table_map.contains_key(&unquoted_table) {
+    if !table_config.contains_key(&unquoted_table) {
         return Err(GetError::new(format!(
             "Invalid table '{}'",
             &base_select.table
@@ -90,12 +67,9 @@ pub async fn get_rows(
     // Get the columns for the selected table
     let column_config = match valve
         .config
-        .get("table")
-        .and_then(|t| t.as_object())
-        .and_then(|t| t.get(&unquoted_table))
-        .and_then(|t| t.as_object())
-        .and_then(|t| t.get("column"))
-        .and_then(|c| c.as_object())
+        .table
+        .get(&unquoted_table)
+        .and_then(|t| Some(t.column.clone()))
     {
         None => {
             return Err(GetError::new(format!(
@@ -107,15 +81,11 @@ pub async fn get_rows(
     };
 
     let mut columns: Vec<String> = vec![];
-    let mut column_rows = vec![];
-    for (column, row) in column_config {
+    let mut column_configs = vec![];
+    for (column, col_config) in column_config {
         let unquoted_column = unquote(&column).unwrap_or(column.to_string());
         columns.push(format!("\"{}\"", unquoted_column));
-        let row = match row.as_object() {
-            Some(row) => row.clone(),
-            None => return Err(GetError::new(format!("{:?} is not an object", row))),
-        };
-        column_rows.push(row);
+        column_configs.push(col_config.clone());
     }
 
     let mut select = Select::clone(&base_select);
@@ -157,7 +127,7 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page = match get_page(&config, &select, &table_map, &column_rows).await {
+            let page = match get_page(&config, &select, &table_config, &column_configs).await {
                 Ok(page) => page,
                 Err(e) => return Err(GetError::new(e.to_string())),
             };
@@ -181,8 +151,8 @@ pub async fn get_rows(
 async fn get_page(
     config: &Config,
     select: &Select,
-    table_map: &Map<String, Value>,
-    column_rows: &Vec<Map<String, Value>>,
+    table_map: &HashMap<String, ValveTableConfig>,
+    column_configs: &Vec<ValveColumnConfig>,
 ) -> Result<Value, GetError> {
     let pool = &config
         .pool
@@ -202,21 +172,11 @@ async fn get_page(
 
     // Annotate columns with filters and sorting
     let mut column_map = Map::new();
-    for row in column_rows.iter() {
+    for col_config in column_configs.iter() {
         let mut r = Map::new();
-        let mut key = String::from("");
-        for (k, v) in row.iter() {
-            if k == "column" {
-                key = match v.as_str() {
-                    Some(key) => key.to_string(),
-                    None => return Err(GetError::new(format!("Could not convert '{}' to str", v))),
-                };
-            } else {
-                r.insert(k.to_string(), v.clone());
-            }
-        }
-
-        let sql_type = valve::get_sql_type_from_global_config(
+        let key = col_config.column.to_string();
+        r.insert("column".to_string(), json!(key));
+        let sql_type = toolkit::get_sql_type_from_global_config(
             &config
                 .valve
                 .as_ref()
@@ -225,8 +185,7 @@ async fn get_page(
             &unquote(&select.table).unwrap(),
             &key,
             &pool,
-        )
-        .unwrap_or_default();
+        );
         r.insert("sql_type".into(), json!(sql_type));
         let numeric_types = ["integer", "numeric", "real", "decimal"];
         r.insert(
@@ -321,7 +280,7 @@ async fn get_page(
 
         // TODO: Hide
 
-        column_map.insert(key, Value::Object(r));
+        column_map.insert(key.to_string(), Value::Object(r));
     }
 
     // We will need the table name without quotes for lookup purposes:
@@ -382,12 +341,9 @@ async fn get_page(
         .as_ref()
         .ok_or("Valve is not initialized.".to_string())?
         .config
-        .get("table")
-        .and_then(|v| v.as_object())
-        .and_then(|o| o.get(&unquoted_table))
-        .and_then(|v| v.as_object())
-        .and_then(|o| o.get("type"))
-        .and_then(|v| v.as_str())
+        .table
+        .get(&unquoted_table)
+        .and_then(|t| Some(t.table_type.to_string()))
         .unwrap_or_default();
     let cell_rows: Vec<Map<String, Value>> = value_rows
         .iter()
@@ -426,15 +382,15 @@ async fn get_page(
 
     let end = select.offset.unwrap_or(0) + cell_rows.len();
 
-    let mut this_table = match table_map.get(&unquoted_table).and_then(|t| t.as_object()) {
-        Some(t) => t.clone(),
-        None => {
-            return Err(GetError::new(format!(
-                "No '{}' in {:?}",
-                unquoted_table, table_map
-            )))
-        }
-    };
+    let mut this_table = json!(table_map.get(&unquoted_table).ok_or(GetError::new(format!(
+        "No '{}' in {:?}",
+        unquoted_table, table_map
+    )))?);
+    let this_table = this_table.as_object_mut().ok_or(GetError::new(format!(
+        "Could not parse table config for {} as a JSON object",
+        unquoted_table
+    )))?;
+
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
     this_table.insert("href".to_string(), json!(unquoted_table.clone()));
     this_table.insert("start".to_string(), json!(select.offset.unwrap_or(0) + 1));
@@ -766,19 +722,6 @@ fn decorate_row(
     cell_row
 }
 
-pub fn get_change_message(record: &AnyRow) -> Option<String> {
-    let table = record.try_get::<&str, &str>("table").ok()?;
-    let row_number = record.try_get::<i64, &str>("row").ok()? + 1;
-    let from = record.try_get::<&str, &str>("from").ok()?;
-    let to = record.try_get::<&str, &str>("to").ok()?;
-    let message = match (from, to) {
-        ("", _) => format!("add row {row_number} to '{table}'"),
-        (_, "") => format!("delete row {row_number} from '{table}'"),
-        (_, _) => format!("update row {row_number} of '{table}'"),
-    };
-    Some(String::from(message))
-}
-
 // Get the undo message, or None.
 pub fn get_undo_message(config: &Config) -> Option<String> {
     let valve = match config.valve.as_ref() {
@@ -788,9 +731,8 @@ pub fn get_undo_message(config: &Config) -> Option<String> {
         }
         Some(valve) => valve,
     };
-    let record = block_on(valve.get_record_to_undo()).ok()??;
-    let message = get_change_message(&record)?;
-    Some(String::from(format!("Undo {message}")))
+    let change = block_on(valve.get_change_to_undo()).ok()??;
+    Some(String::from(format!("Undo '{}'", change.message)))
 }
 
 // Get the redo message, or None.
@@ -802,9 +744,8 @@ pub fn get_redo_message(config: &Config) -> Option<String> {
         }
         Some(valve) => valve,
     };
-    let record = block_on(valve.get_record_to_redo()).ok()??;
-    let message = get_change_message(&record)?;
-    Some(String::from(format!("Redo {message}")))
+    let change = block_on(valve.get_change_to_redo()).ok()??;
+    Some(String::from(format!("Redo '{}'", change.message)))
 }
 
 pub fn get_action_map(config: &Config) -> Result<SerdeMap, GetError> {

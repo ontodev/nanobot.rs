@@ -13,7 +13,10 @@ use futures::executor::block_on;
 use html_escape::encode_text_to_string;
 use ontodev_hiccup::hiccup;
 use ontodev_sqlrest::{parse, Filter, Select, SelectColumn};
-use ontodev_valve::{ast::Expression, valve::Valve};
+use ontodev_valve::{
+    ast::Expression,
+    valve::{Valve, ValveColumnConfig},
+};
 use regex::{Captures, Regex};
 use serde_json::{json, Value as SerdeValue};
 use std::{
@@ -274,7 +277,7 @@ fn action(
         .ok_or("Valve is not initialized.".to_string())?;
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(valve)? {
+        for table in get_tables(valve) {
             if table == "history" {
                 continue;
             }
@@ -398,7 +401,7 @@ async fn tree(
                                     // predicate has @type=@id
                                     list.push(json!(object));
                                 } else {
-                                    list.push(json!({"@id": object}))
+                                    list.push(json!({ "@id": object }))
                                 }
                             }
                             "_JSON" => (),
@@ -500,7 +503,7 @@ async fn tree(
             .valve
             .as_ref()
             .ok_or("Valve is not initialized.".to_string())?;
-        for table in get_tables(&valve)? {
+        for table in get_tables(&valve) {
             if table == "history" {
                 continue;
             }
@@ -643,7 +646,7 @@ async fn tree2(
             .valve
             .as_ref()
             .ok_or("Valve is not initialized.".to_string())?;
-        for table in get_tables(&valve)? {
+        for table in get_tables(&valve) {
             if table == "history" {
                 continue;
             }
@@ -747,7 +750,7 @@ async fn table(
     };
 
     // TODO: properly detect LDTab tables
-    if !get_tables(valve)?.contains(&table) {
+    if !get_tables(valve).contains(&table) {
         let url = format!("{table}/owl:Class");
         return Ok(Redirect::permanent(&url).into_response());
     }
@@ -922,7 +925,7 @@ async fn table(
         // Used to display a drop-down or menu of some kind containing all the available tables:
         let table_map = {
             let mut table_map = SerdeMap::new();
-            for table in get_tables(valve)? {
+            for table in get_tables(valve) {
                 if table == "history" {
                     continue;
                 }
@@ -1247,7 +1250,7 @@ fn render_row_from_database(
     // Used to display a drop-down or menu containing all of the tables:
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(valve)? {
+        for table in get_tables(valve) {
             if table == "history" {
                 continue;
             }
@@ -1285,17 +1288,14 @@ fn render_row_from_database(
 
 fn matches_nulltype(table: &str, column: &str, value: &str, valve: &Valve) -> Result<bool, String> {
     let column_config = get_column_config(table, column, valve)?;
-    let nulltype = match column_config.get("nulltype") {
-        Some(dt) => match dt.as_str() {
-            Some(s) => s,
-            None => return Err(format!("Nulltype in '{}' is not a string", dt)),
-        },
+    if column_config.nulltype == "" {
         // If there is no nulltype for this column, check that the value is not an empty string.
-        None => return Ok(value != ""),
-    };
+        return Ok(value != "");
+    }
+    let nulltype = column_config.nulltype;
 
-    let datatype_conditions = &valve.compiled_datatype_conditions;
-    match datatype_conditions.get(nulltype) {
+    let datatype_conditions = &valve.datatype_conditions;
+    match datatype_conditions.get(&nulltype) {
         Some(datatype_condition) => {
             let compiled_cond = &datatype_condition.compiled;
             return Ok(compiled_cond(value));
@@ -1366,30 +1366,16 @@ fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> 
     Ok(messages)
 }
 
-fn get_tables(valve: &Valve) -> Result<Vec<String>, String> {
-    match valve
-        .config
-        .get("table")
-        .and_then(|t| t.as_object())
-        .and_then(|t| Some(t.keys().cloned().collect::<Vec<_>>()))
-    {
-        Some(tables) => Ok(tables),
-        None => Err(format!("No object named 'table' in valve config")),
-    }
+fn get_tables(valve: &Valve) -> Vec<String> {
+    valve.config.table.keys().cloned().collect::<Vec<_>>()
 }
 
 fn get_columns(table: &str, valve: &Valve) -> Result<Vec<String>, String> {
     match valve
         .config
-        .get("table")
-        .and_then(|t| t.as_object())
-        .and_then(|t| t.get(table))
-        .and_then(|t| t.as_object())
-        .and_then(|t| t.get("column"))
-        .and_then(|c| c.as_object())
-        .and_then(|c| Some(c.iter()))
-        .and_then(|c| Some(c.map(|(k, _)| k.clone())))
-        .and_then(|c| Some(c.collect::<Vec<_>>()))
+        .table
+        .get(table)
+        .and_then(|t| Some(t.column_order.to_vec()))
     {
         None => Err(format!(
             "Unable to retrieve columns of '{}' from valve configuration.",
@@ -1399,17 +1385,16 @@ fn get_columns(table: &str, valve: &Valve) -> Result<Vec<String>, String> {
     }
 }
 
-fn get_column_config(table: &str, column: &str, valve: &Valve) -> Result<SerdeMap, String> {
+fn get_column_config(
+    table: &str,
+    column: &str,
+    valve: &Valve,
+) -> Result<ValveColumnConfig, String> {
     match valve
         .config
-        .get("table")
-        .and_then(|t| t.as_object())
-        .and_then(|t| t.get(table))
-        .and_then(|t| t.as_object())
-        .and_then(|t| t.get("column"))
-        .and_then(|c| c.as_object())
-        .and_then(|c| c.get(column))
-        .and_then(|c| c.as_object())
+        .table
+        .get(table)
+        .and_then(|t| t.column.get(column))
     {
         Some(c) => Ok(c.clone()),
         None => Err(format!(
@@ -1424,13 +1409,7 @@ fn get_html_type_and_values(
     datatype: &str,
     values: &Option<Vec<String>>,
 ) -> Result<(Option<String>, Option<Vec<String>>), String> {
-    let dt_config = match valve
-        .config
-        .get("datatype")
-        .and_then(|d| d.as_object())
-        .and_then(|d| d.get(datatype))
-        .and_then(|d| d.as_object())
-    {
+    let dt_config = match valve.config.datatype.get(datatype) {
         Some(o) => o,
         None => {
             return Err(format!(
@@ -1442,7 +1421,7 @@ fn get_html_type_and_values(
 
     let mut new_values = vec![];
     match values {
-        None => match valve.compiled_datatype_conditions.get(datatype) {
+        None => match valve.datatype_conditions.get(datatype) {
             Some(compiled_condition) => match &compiled_condition.parsed {
                 Expression::Function(name, args) if name == "in" => {
                     for arg in args {
@@ -1473,16 +1452,12 @@ fn get_html_type_and_values(
         }
     };
 
-    if let Some(html_type) = dt_config.get("HTML type").and_then(|t| t.as_str()) {
-        if !html_type.is_empty() {
-            return Ok((Some(html_type.to_string()), new_values));
-        }
+    if dt_config.html_type != "" {
+        return Ok((Some(dt_config.html_type.to_string()), new_values));
     }
 
-    if let Some(parent) = dt_config.get("parent").and_then(|t| t.as_str()) {
-        if !parent.is_empty() {
-            return get_html_type_and_values(valve, parent, &new_values);
-        }
+    if dt_config.parent != "" {
+        return get_html_type_and_values(valve, &dt_config.parent, &new_values);
     }
 
     Ok((None, None))
@@ -1570,7 +1545,9 @@ fn validate_table_row(
             Err(e) => return Err(format!("{:?}", e)),
         }
     };
-    Ok(validated_row)
+    Ok(validated_row
+        .to_rich_json(false)
+        .map_err(|e| format!("{:?}", e))?)
 }
 
 fn stringify_messages(messages: &Vec<SerdeValue>) -> Result<String, String> {
@@ -1692,40 +1669,18 @@ fn get_row_as_form_map(
 
         let message = stringify_messages(&messages)?;
         let column_config = get_column_config(table_name, cell_header, valve)?;
-        let description = match column_config.get("description") {
-            Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
-                None => return Err(format!("Could not convert '{}' to string", d)),
-                Some(d) => d,
-            },
-            None => cell_header.to_string(),
+        let description = if column_config.description == "" {
+            cell_header.to_string()
+        } else {
+            column_config.description.to_string()
         };
-        let label = match column_config.get("label") {
-            Some(l) => match l.as_str().and_then(|l| Some(l.to_string())) {
-                None => cell_header.to_string(),
-                Some(l) => {
-                    if l.trim().is_empty() {
-                        cell_header.to_string()
-                    } else {
-                        l
-                    }
-                }
-            },
-            None => cell_header.to_string(),
+        let label = if column_config.label.trim() == "" {
+            cell_header.to_string()
+        } else {
+            column_config.label.to_string()
         };
-        let datatype = match column_config.get("datatype") {
-            Some(d) => match d.as_str().and_then(|d| Some(d.to_string())) {
-                None => return Err(format!("Could not convert '{}' to string", d)),
-                Some(d) => d,
-            },
-            None => return Err("No 'datatype' in column config".to_string()),
-        };
-        let structure = match column_config.get("structure") {
-            Some(d) => match d.as_str() {
-                None => return Err(format!("{} is not a str", d)),
-                Some(d) => d.split('(').collect::<Vec<_>>()[0],
-            },
-            None => "",
-        };
+        let datatype = column_config.datatype;
+        let structure = column_config.structure.split('(').collect::<Vec<_>>()[0];
 
         let mut html_type;
         let mut allowed_values = None;
