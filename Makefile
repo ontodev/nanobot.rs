@@ -14,7 +14,7 @@ deps:
 	sudo apt-get install -y rustc cargo
 	sudo apt-get install -y python3-pip
 	sudo pip install tesh
-	npm install -g tree-sitter-cl@v0.20.9
+	npm install -g tree-sitter-cli@0.20
 	cd .. && git clone https://github.com/ontodev/tree-sitter-sqlrest.git
 	cd ../tree-sitter-sqlrest && tree-sitter generate
 
