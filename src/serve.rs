@@ -839,12 +839,12 @@ async fn table(
             None => return Err(format!("No 'action' in {:?}", form_params).into()),
             Some(v) => v,
         };
-        let validated_row = match validate_table_row(&table, &new_row, &None, state) {
-            Ok(v) => v,
-            Err(e) => return Err(e.into()),
-        };
 
         if action == "validate" {
+            let validated_row = match validate_table_row(&table, &new_row, &None, state) {
+                Ok(v) => v,
+                Err(e) => return Err(e.into()),
+            };
             // If this is a validate action, fill in form_map which will then be handled below.
             match get_row_as_form_map(valve, &table, &validated_row) {
                 Ok(f) => form_map = Some(f),
@@ -858,7 +858,7 @@ async fn table(
             // containing a javascript redirect as a response which points back to the last
             // page of the table:
             let offset = {
-                let row_number = match insert_table_row(&table, &validated_row, state) {
+                let row_number = match insert_table_row(&table, &new_row, state) {
                     Ok(n) => n,
                     Err(e) => return Err(e.to_string().into()),
                 };
@@ -1170,16 +1170,11 @@ fn render_row_from_database(
                 }
             };
         } else if action == "submit" {
-            let validated_row = match validate_table_row(table, &new_row, &Some(row_number), state)
-            {
-                Ok(v) => v,
-                Err(e) => return Err(e.into()),
-            };
-            if let Err(e) = update_table_row(table, &validated_row, &row_number, state) {
+            if let Err(e) = update_table_row(table, &new_row, &row_number, state) {
                 return Err(e.to_string().into());
             }
 
-            messages = get_messages(&validated_row)?;
+            messages = get_messages(&new_row)?;
             if let Some(error_messages) = messages.get_mut("error") {
                 let extra_message = format!("Row updated with {} errors", error_messages.len());
                 match messages.get_mut("debug") {
@@ -1524,14 +1519,7 @@ fn validate_table_row(
     let validated_row = {
         let mut result_row = SerdeMap::new();
         for (column, value) in row_data.iter() {
-            result_row.insert(
-                column.to_string(),
-                json!({
-                    "value": value.clone(),
-                    "valid": true,
-                    "messages": Vec::<SerdeMap>::new(),
-                }),
-            );
+            result_row.insert(column.to_string(), value.clone());
         }
         match block_on(
             state
@@ -1546,7 +1534,7 @@ fn validate_table_row(
         }
     };
     Ok(validated_row
-        .to_rich_json(false)
+        .contents_to_rich_json()
         .map_err(|e| format!("{:?}", e))?)
 }
 

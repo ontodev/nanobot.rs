@@ -65,27 +65,28 @@ pub async fn get_rows(
     }
 
     // Get the columns for the selected table
-    let column_config = match valve
-        .config
-        .table
-        .get(&unquoted_table)
-        .and_then(|t| Some(t.column.clone()))
-    {
-        None => {
-            return Err(GetError::new(format!(
-                "Unable to retrieve columns of '{}' from valve configuration.",
+    let (columns_config, unquoted_columns) = {
+        let this_table_config = table_config
+            .get(&unquoted_table)
+            .ok_or(GetError::new(format!(
+                "Undefined table '{}'",
                 unquoted_table
-            )))
-        }
-        Some(v) => v,
+            )))?;
+        let columns_config = &this_table_config.column;
+        let column_order = &this_table_config.column_order;
+        (columns_config, column_order.to_vec())
     };
 
-    let mut columns: Vec<String> = vec![];
+    let mut columns = vec![];
     let mut column_configs = vec![];
-    for (column, col_config) in column_config {
+    for column in unquoted_columns {
+        let column_config = columns_config.get(&column).ok_or(GetError::new(format!(
+            "No column {} in column configuration for {}",
+            column, unquoted_table
+        )))?;
+        column_configs.push(column_config.clone());
         let unquoted_column = unquote(&column).unwrap_or(column.to_string());
         columns.push(format!("\"{}\"", unquoted_column));
-        column_configs.push(col_config.clone());
     }
 
     let mut select = Select::clone(&base_select);
@@ -173,9 +174,8 @@ async fn get_page(
     // Annotate columns with filters and sorting
     let mut column_map = Map::new();
     for col_config in column_configs.iter() {
-        let mut r = Map::new();
         let key = col_config.column.to_string();
-        r.insert("column".to_string(), json!(key));
+        let mut cmap_entry = json!(col_config).as_object_mut().unwrap().clone();
         let sql_type = toolkit::get_sql_type_from_global_config(
             &config
                 .valve
@@ -186,20 +186,20 @@ async fn get_page(
             &key,
             &pool,
         );
-        r.insert("sql_type".into(), json!(sql_type));
+        cmap_entry.insert("sql_type".into(), json!(sql_type));
         let numeric_types = ["integer", "numeric", "real", "decimal"];
-        r.insert(
+        cmap_entry.insert(
             "numeric".into(),
             json!(numeric_types.contains(&sql_type.to_lowercase().as_str())),
         );
         let mut filter_others = vec![];
         for filter in &select.filter {
             if filter.lhs.replace("\"", "") == key {
-                r.insert(
+                cmap_entry.insert(
                     "filtered_operator".into(),
                     json!(filter.operator.to_string()),
                 );
-                r.insert(
+                cmap_entry.insert(
                     "filtered_constraint".into(),
                     match filter.rhs.clone() {
                         serde_json::Value::String(s) => json!(s
@@ -216,7 +216,7 @@ async fn get_page(
         }
         for order_by in &select.order_by {
             if order_by.column.replace("\"", "") == key {
-                r.insert("sorted".to_string(), json!(order_by.direction.to_url()));
+                cmap_entry.insert("sorted".to_string(), json!(order_by.direction.to_url()));
                 break;
             }
         }
@@ -234,7 +234,7 @@ async fn get_page(
             Ok(href) => href,
             Err(e) => return Err(GetError::new(e.to_string())),
         };
-        r.insert("sort_ascending".into(), json!(href));
+        cmap_entry.insert("sort_ascending".into(), json!(href));
 
         sorted.explicit_order_by(vec![&OrderByColumn::new(&key, &Direction::Descending)]);
         let href = match sorted.to_url() {
@@ -245,7 +245,7 @@ async fn get_page(
             Ok(href) => href,
             Err(e) => return Err(GetError::new(e.to_string())),
         };
-        r.insert("sort_descending".into(), json!(href));
+        cmap_entry.insert("sort_descending".into(), json!(href));
 
         let empty: Vec<String> = Vec::new();
         sorted.order_by(empty);
@@ -257,13 +257,13 @@ async fn get_page(
             Ok(href) => href,
             Err(e) => return Err(GetError::new(e.to_string())),
         };
-        r.insert("sort_none".into(), json!(href));
+        cmap_entry.insert("sort_none".into(), json!(href));
 
         let mut sorted = select.clone();
         let empty: Vec<String> = Vec::new();
         sorted.select(empty);
 
-        if r.contains_key(&"sorted".to_string()) {
+        if cmap_entry.contains_key(&"sorted".to_string()) {
             let empty: Vec<String> = Vec::new();
             sorted.order_by(empty);
         }
@@ -276,11 +276,11 @@ async fn get_page(
             Ok(href) => href,
             Err(e) => return Err(GetError::new(e.to_string())),
         };
-        r.insert("reset".into(), json!(href));
+        cmap_entry.insert("reset".into(), json!(href));
 
         // TODO: Hide
 
-        column_map.insert(key.to_string(), Value::Object(r));
+        column_map.insert(key.to_string(), Value::Object(cmap_entry));
     }
 
     // We will need the table name without quotes for lookup purposes:
