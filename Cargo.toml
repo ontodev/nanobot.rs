@@ -27,6 +27,7 @@ tokio-test = "0.4.2"
 toml = "0.7.5"
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+tree-sitter-cli = "0.20.7"
 urlencoding = "2.1.2"
 url = "2.4.0"
 wiring_rs = { git = "https://github.com/ontodev/wiring.rs" } 
