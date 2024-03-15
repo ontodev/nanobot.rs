@@ -294,7 +294,7 @@
       </td>
       {% else %}
       <td class="{{ cell.classes|join(" , ") }}">
-        {% if cell.nulltype %}
+        {% if cell.nulltype or cell.value == None %}
         {% elif cell.href %}
         <a href="{{ cell.href }}">{{ cell.value }}</a>
         {% else %}

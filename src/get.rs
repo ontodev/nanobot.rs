@@ -611,7 +611,7 @@ fn decorate_cell(
     // Handle null and nulltype
     if value.is_null() {
         if let Some(nulltype) = column.get("nulltype") {
-            if nulltype.is_string() {
+            if nulltype.is_string() || nulltype == "" {
                 cell.insert("nulltype".to_string(), nulltype.clone());
             }
         }
