@@ -182,8 +182,6 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
         Ok(_x) => {}
     }
 
-    tracing::debug!("VALVE create_only {}", config.create_only);
-
     (config.valve, config.pool) = {
         let valve = Valve::build(&valve_path, &config.connection)
             .await
@@ -194,7 +192,6 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
         let pool = valve.pool.clone();
         (Some(valve), Some(pool))
     };
-    tracing::debug!("VALVE {:?}", config.valve);
 
     // Create and/or load tables into database
     match &config.valve {
