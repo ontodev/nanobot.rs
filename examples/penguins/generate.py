@@ -2,6 +2,7 @@
 import csv
 import math
 import random
+import sys
 
 random.seed(0)
 
@@ -46,7 +47,15 @@ def randdate():
 
 
 def main():
-    count = int(1e3)
+    if len(sys.argv) < 2:
+        count = int(1e3)
+    else:
+        try:
+            count = int(sys.argv[1])
+        except ValueError as e:
+            print(f"Could not parse argument as integer: '{e}'")
+            sys.exit(1)
+
     error_rate = 0.1
     error_count = math.floor(count * error_rate)
     error_rows = []

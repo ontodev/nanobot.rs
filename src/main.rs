@@ -36,7 +36,7 @@ async fn main() -> Result<(), NanobotError> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     if let Some(vars) = cgi_vars() {
-        build_valve(&mut config, false).await?;
+        build_valve(&mut config).await?;
         return match handle_cgi(&vars, &mut config) {
             Err(x) => {
                 tracing::error!("{}", x);
@@ -105,11 +105,11 @@ async fn main() -> Result<(), NanobotError> {
             init::init(&mut config).await
         }
         Some(("config", _sub_matches)) => {
-            build_valve(&mut config, false).await?;
+            build_valve(&mut config).await?;
             Ok(config.to_string())
         }
         Some(("get", sub_matches)) => {
-            build_valve(&mut config, false).await?;
+            build_valve(&mut config).await?;
             let table = match sub_matches.get_one::<String>("TABLE") {
                 Some(x) => x,
                 _ => panic!("No table given"),
@@ -129,7 +129,7 @@ async fn main() -> Result<(), NanobotError> {
             Ok(result)
         }
         Some(("serve", _sub_matches)) => {
-            build_valve(&mut config, false).await?;
+            build_valve(&mut config).await?;
             serve::app(&config)
         }
         _ => Err(String::from(
@@ -154,10 +154,9 @@ async fn main() -> Result<(), NanobotError> {
 
 /// Builds and assigns a Valve struct to the field `config.valve` and a copy of valve's
 /// connection pool to the field `config.pool`.
-async fn build_valve(config: &mut Config, initial_load: bool) -> Result<(), NanobotError> {
+async fn build_valve(config: &mut Config) -> Result<(), NanobotError> {
     (config.valve, config.pool) = {
-        let valve =
-            Valve::build(&config.valve_path, &config.connection, false, initial_load).await?;
+        let valve = Valve::build(&config.valve_path, &config.connection).await?;
         let pool = valve.pool.clone();
         (Some(valve), Some(pool))
     };

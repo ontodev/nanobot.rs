@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0"
 async-std = { version = "1", features = [ "attributes" ] }
 axum = "0.6.18"
 axum-test-helper = { version = "0.3.0", default-features = false, features = ["withouttrace"] }
@@ -47,7 +48,7 @@ rev = "f46fbd5450505644ed9970cef1ae14164699981f"
 [dependencies.ontodev_valve]
 # path = "../ontodev_demo/valve.rs"
 git = "https://github.com/ontodev/valve.rs"
-rev = "669d4db21bfcbe92d9b31378259594aa09fe6b0c"
+rev = "99c56d1657f587facb0b44800b1b77999921d0f2"
 
 [dependencies.ontodev_sqlrest]
 git = "https://github.com/ontodev/sqlrest.rs"

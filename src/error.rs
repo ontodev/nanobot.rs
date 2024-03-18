@@ -8,6 +8,7 @@ pub enum NanobotError {
     ValveError(ValveError),
     TomlError(toml::de::Error),
     GetError(GetError),
+    AnyhowError(anyhow::Error),
 }
 
 impl From<ValveError> for NanobotError {
@@ -25,6 +26,12 @@ impl From<toml::de::Error> for NanobotError {
 impl From<GetError> for NanobotError {
     fn from(e: GetError) -> Self {
         Self::GetError(e)
+    }
+}
+
+impl From<anyhow::Error> for NanobotError {
+    fn from(e: anyhow::Error) -> Self {
+        Self::AnyhowError(e)
     }
 }
 
@@ -65,6 +72,12 @@ impl From<std::io::Error> for GetError {
 
 impl From<csv::Error> for GetError {
     fn from(error: csv::Error) -> GetError {
+        GetError::new(format!("{:?}", error))
+    }
+}
+
+impl From<serde_json::Error> for GetError {
+    fn from(error: serde_json::Error) -> GetError {
         GetError::new(format!("{:?}", error))
     }
 }
