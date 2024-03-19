@@ -257,7 +257,7 @@
     </span>
 
     {% if table.table != "message" %}
-    <a class="btn btn-outline-success" href="{{ table.table }}?view=form">Add row</a>
+    <a class="btn btn-outline-success" href="{{ table.table }}?view={{ table.edit_view or 'form' }}">Add row</a>
     {% endif %}
 
   </div>
