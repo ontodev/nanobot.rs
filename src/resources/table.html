@@ -294,6 +294,7 @@
         <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view={{ table.edit_view or 'form' }}"><i
             class="bi-pencil" style="color: #adb5bd;"></i></a>
       </td>
+      {% elif col == "message_id" %}
       {% else %}
       <td class="nanobot-cell dropdown {{ cell.classes|join(" , ") }}" data-column="{{ col }}">
         <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">

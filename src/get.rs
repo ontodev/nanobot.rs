@@ -704,16 +704,19 @@ fn decorate_row(
     row: &Map<String, Value>,
 ) -> Map<String, Value> {
     // tracing::debug!("Decorate Row: table {table}");
-    let messages: Vec<ValveMessage> = match row.get("message") {
-        Some(serde_json::Value::Null) => vec![],
-        Some(json_value) => match serde_json::from_value(json_value.clone()) {
-            Ok(ms) => ms,
-            Err(x) => {
-                tracing::warn!("Could not parse message '{json_value:?}': {x:?}");
-                vec![]
-            }
+    let messages: Vec<ValveMessage> = match table {
+        "message" => vec![],
+        _ => match row.get("message") {
+            Some(serde_json::Value::Null) => vec![],
+            Some(json_value) => match serde_json::from_value(json_value.clone()) {
+                Ok(ms) => ms,
+                Err(x) => {
+                    tracing::warn!("Could not parse message '{json_value:?}': {x:?}");
+                    vec![]
+                }
+            },
+            None => vec![],
         },
-        None => vec![],
     };
     let history: Vec<Vec<ValveChange>> = match row.get("history") {
         Some(serde_json::Value::Null) => vec![],
