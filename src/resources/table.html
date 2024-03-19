@@ -266,7 +266,9 @@
 <table class="table table-sm">
   <thead>
     <tr>
+      {% if "row_number" in row[0] %}
       <th />
+      {% endif %}
       {% for name, value in column|items -%}
       <th>
         <a class="" data-bs-toggle="modal" href="#{{ name|id }}Modal" role="button">
@@ -286,68 +288,118 @@
   <tbody>
     {% for r in row -%}
     <tr>
-      {% for column, cell in r|items -%}
-      {% if column == "row_number" %}
+      {% for col, cell in r|items -%}
+      {% if col == "row_number" %}
       <td>
         <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view={{ table.edit_view or 'form' }}"><i
             class="bi-pencil" style="color: #adb5bd;"></i></a>
       </td>
       {% else %}
-      <td class="{{ cell.classes|join(" , ") }}">
-        {% if cell.nulltype or cell.value == None %}
-        {% elif cell.href %}
-        <a href="{{ cell.href }}">{{ cell.value }}</a>
+      <td class="nanobot-cell dropdown {{ cell.classes|join(" , ") }}" data-column="{{ col }}">
+        {% if cell.nulltype or not cell.value %}
         {% else %}
-        {{ cell.value }}
-        {% endif %}
-        {% if cell.messages or cell.history %}
-        <div class="dropdown float-end">
-          <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
-            {% if cell.messages and cell.messages|length > 1 %}
-            <strong>{{ cell.messages|length }}</strong>
-            {% endif %}
-            {% if cell.message_level == "error" %}
-            <i class="bi bi-exclamation-octagon-fill text-danger"></i>
-            {% elif cell.message_level == "warn" %}
-            <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-            {% elif cell.message_level == "info" %}
-            <i class="bi bi-info-circle-fill text-info"></i>
-            {% endif %}
-            {% if cell.history %}
-            <i class="bi bi-clock-history text-secondary"></i>
-            {% endif %}
+        <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
+          {{ cell.value }}
+          {% if cell.value is string and cell.value[0:4] == "http" %}
+          <a href="{{ cell.value }}">
+            <i class="bi bi-box-arrow-up-right"></i>
           </a>
-          <ul class="dropdown-menu">
-            {% for message in cell.messages %}
-            <li>
-              <a class="dropdown-item" href="#">
-                {% if message.level == "error" %}
-                <i class="bi bi-exclamation-octagon-fill text-danger"></i>
-                {% elif message.level == "warn" %}
-                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
-                {% elif message.level == "info" %}
-                <i class="bi bi-info-circle-fill text-info"></i>
-                {% elif message.level == "update" %}
-                <i class="bi bi-clock-history text-secondary"></i>
-                {% else %}
-                <i class="bi bi-question-circle-fill"></i>
-                {% endif %}
-                {{ message.message }}
-              </a>
-            </li>
-            {% endfor %}
-            {% for history in cell.history %}
-            <li>
-              <a class="dropdown-item" href="#">
-                <i class="bi bi-clock-history text-secondary"></i>
-                {{ history.message }}
-              </a>
-            </li>
-            {% endfor %}
-          </ul>
-        </div>
-      </td>
-      {% endif %}
+          {% endif %}
+          {% if cell.messages %}
+          {% if cell.messages|length > 1 %}
+          <strong>{{ cell.messages|length }}</strong>
+          {% endif %}
+          {% if cell.message_level == "error" %}
+          <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+          {% elif cell.message_level == "warn" %}
+          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+          {% elif cell.message_level == "info" %}
+          <i class="bi bi-info-circle-fill text-info"></i>
+          {% elif cell.message_level == "update" %}
+          <i class="bi bi-clock-history text-secondary"></i>
+          {% else %}
+          <i class="bi bi-question-circle-fill"></i>
+          {% endif %}
+          {% endif %}
+        </a>
+        {% endif %}
+
+        <ul class="dropdown-menu">
+          <li>
+            <a class="dropdown-item replace-link" href="javascript:navigator.clipboard.writeText('{{ cell.value }}')">
+              <i class="bi bi-copy"></i>
+              Copy this value
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item replace-link" href="{{ table.table }}?{{ col }}=eq.&quot;{{ cell.value }}&quot;">
+              <i class="bi bi-funnel-fill"></i>
+              Filter for this value
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item replace-link"
+              href="{{ table.table }}?{{ col }}=not_eq.&quot;{{ cell.value }}&quot;">
+              <i class="bi bi-funnel"></i>
+              Exclude this value
+            </a>
+          </li>
+          {% if table.table in ["table", "column"] and col == "table" %}
+          <li>
+            <a class="dropdown-item replace-link" href="{{ cell.value }}">
+              <i class="bi bi-arrow-right"></i>
+              Jump to {{ cell.value }}
+            </a>
+          </li>
+          {% endif %}
+          {% if column[col].from %}
+          <li>
+            <a class="dropdown-item replace-link"
+              href="{{ column[col].from.table }}?{{ column[col].from.column }}=eq.&quot;{{ cell.value }}&quot;">
+              <i class="bi bi-arrow-left"></i>
+              Jump to {{ column[col].from.table }}.{{ column[col].from.column }}
+            </a>
+          </li>
+          {% endif %}
+          {% for link in column[col].links %}
+          <li>
+            <a class="dropdown-item replace-link"
+              href="{{ link.table }}?{{ link.column }}=eq.&quot;{{ cell.value }}&quot;">
+              <i class="bi bi-arrow-right"></i>
+              Jump to {{ link.table }}.{{ link.column }}
+            </a>
+          </li>
+          {% endfor %}
+          {% if col in ['subject', 'predicate'] or (col == 'object' and r['datatype'].value == '_IRI') %}
+          <li>
+            <a class="dropdown-item replace-link" href="{{ table.table }}/{{ cell.value }}">
+              <i class="bi bi-arrow-right"></i>
+              View in tree
+            </a>
+          </li>
+          {% endif %}
+          {% if cell.messages %}
+          {% for message in cell.messages %}
+          <li>
+            <a class="dropdown-item"
+              href="column?table=eq.&quot;{{ table.table }}&quot;&column=eq.&quot;{{ col }}&quot;">
+              {% if message.level == "error" %}
+              <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+              {% elif message.level == "warn" %}
+              <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+              {% elif message.level == "info" %}
+              <i class="bi bi-info-circle-fill text-info"></i>
+              {% elif message.level == "update" %}
+              <i class="bi bi-clock-history text-secondary"></i>
+              {% else %}
+              <i class="bi bi-question-circle-fill"></i>
+              {% endif %}
+              {{ message.message }}
+            </a>
+          </li>
+          {% endfor %}
+          {% endif %}
+        </ul>
       </td>
       {% endif %}
       {% endfor %}
