@@ -296,10 +296,8 @@
       </td>
       {% else %}
       <td class="nanobot-cell dropdown {{ cell.classes|join(" , ") }}" data-column="{{ col }}">
-        {% if cell.nulltype or not cell.value %}
-        {% else %}
         <a class="text-body" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="true">
-          {{ cell.value }}
+          {{ "null" if cell.value is none else cell.value }}
           {% if cell.value is string and cell.value[0:4] == "http" %}
           <a href="{{ cell.value }}">
             <i class="bi bi-box-arrow-up-right"></i>
@@ -322,9 +320,9 @@
           {% endif %}
           {% endif %}
         </a>
-        {% endif %}
 
         <ul class="dropdown-menu">
+          {% if cell.value %}
           <li>
             <a class="dropdown-item replace-link" href="javascript:navigator.clipboard.writeText('{{ cell.value }}')">
               <i class="bi bi-copy"></i>
@@ -344,6 +342,20 @@
               Exclude this value
             </a>
           </li>
+          {% else %}
+          <li>
+            <a class="dropdown-item replace-link" href="{{ table.table }}?{{ col }}=is.NULL">
+              <i class="bi bi-funnel-fill"></i>
+              Filter for NULL
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item replace-link" href="{{ table.table }}?{{ col }}=not_is.NULL">
+              <i class="bi bi-funnel"></i>
+              Exclude NULL
+            </a>
+          </li>
+          {% endif %}
           {% if table.table in ["table", "column"] and col == "table" %}
           <li>
             <a class="dropdown-item replace-link" href="{{ cell.value }}">
