@@ -155,6 +155,7 @@ async fn get_page(
     table_map: &HashMap<String, ValveTableConfig>,
     column_configs: &Vec<ValveColumnConfig>,
 ) -> Result<Value, GetError> {
+    let table = &unquote(&select.table).unwrap();
     let pool = &config
         .pool
         .as_ref()
@@ -172,20 +173,41 @@ async fn get_page(
     };
 
     // Annotate columns with filters and sorting
+    let valve = &config
+        .valve
+        .as_ref()
+        .ok_or("Valve is not initialized.".to_string())?;
     let mut column_map = Map::new();
     for col_config in column_configs.iter() {
         let key = col_config.column.to_string();
         let mut cmap_entry = json!(col_config).as_object_mut().unwrap().clone();
-        let sql_type = toolkit::get_sql_type_from_global_config(
-            &config
-                .valve
-                .as_ref()
-                .ok_or("Valve is not initialized.".to_string())?
-                .config,
-            &unquote(&select.table).unwrap(),
-            &key,
-            &pool,
-        );
+        let sql_type = toolkit::get_sql_type_from_global_config(&valve.config, table, &key, &pool);
+
+        // Get table.column that use this column as a foreign key constraint
+        // and insert as "links".
+        let mut links = vec![];
+        for constraints in valve.config.constraint.foreign.values() {
+            for constraint in constraints.iter() {
+                if &constraint.table == table && constraint.column == key {
+                    cmap_entry.insert(
+                        "from".into(),
+                        json!({
+                            "table": constraint.ftable.clone(),
+                            "column": constraint.fcolumn.clone()
+                        }),
+                    );
+                } else if &constraint.ftable == table && constraint.fcolumn == key {
+                    links.push(json!({
+                        "table": constraint.table.clone(),
+                        "column": constraint.column.clone()
+                    }));
+                }
+            }
+        }
+        if links.len() > 0 {
+            cmap_entry.insert("links".into(), json!(links));
+        }
+
         cmap_entry.insert("sql_type".into(), json!(sql_type));
         let numeric_types = ["integer", "numeric", "real", "decimal"];
         cmap_entry.insert(
