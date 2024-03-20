@@ -277,7 +277,7 @@ fn action(
         .ok_or("Valve is not initialized.".to_string())?;
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(valve) {
+        for table in &valve.config.table_order {
             if table == "history" {
                 continue;
             }
@@ -503,7 +503,7 @@ async fn tree(
             .valve
             .as_ref()
             .ok_or("Valve is not initialized.".to_string())?;
-        for table in get_tables(&valve) {
+        for table in &valve.config.table_order {
             if table == "history" {
                 continue;
             }
@@ -646,7 +646,7 @@ async fn tree2(
             .valve
             .as_ref()
             .ok_or("Valve is not initialized.".to_string())?;
-        for table in get_tables(&valve) {
+        for table in &valve.config.table_order {
             if table == "history" {
                 continue;
             }
@@ -750,7 +750,7 @@ async fn table(
     };
 
     // TODO: properly detect LDTab tables
-    if !get_tables(valve).contains(&table) {
+    if !valve.config.table_order.contains(&table) {
         let url = format!("{table}/owl:Class");
         return Ok(Redirect::permanent(&url).into_response());
     }
@@ -925,7 +925,7 @@ async fn table(
         // Used to display a drop-down or menu of some kind containing all the available tables:
         let table_map = {
             let mut table_map = SerdeMap::new();
-            for table in get_tables(valve) {
+            for table in &valve.config.table_order {
                 if table == "history" {
                     continue;
                 }
@@ -1245,7 +1245,7 @@ fn render_row_from_database(
     // Used to display a drop-down or menu containing all of the tables:
     let table_map = {
         let mut table_map = SerdeMap::new();
-        for table in get_tables(valve) {
+        for table in &valve.config.table_order {
             if table == "history" {
                 continue;
             }
@@ -1359,10 +1359,6 @@ fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> 
         }
     }
     Ok(messages)
-}
-
-fn get_tables(valve: &Valve) -> Vec<String> {
-    valve.config.table.keys().cloned().collect::<Vec<_>>()
 }
 
 fn get_columns(table: &str, valve: &Valve) -> Result<Vec<String>, String> {
