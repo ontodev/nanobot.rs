@@ -1,7 +1,6 @@
 {% extends "page.html" %}
 {% block content %}
-
-<h2>Custom Page: Field Order Reversed</h2>
+<h2>Custom Form: Field Order Reversed</h2>
 
 {% if messages %}
 {% if "success" in messages %}
@@ -57,6 +56,9 @@
 {% endif %}
 {% endif %}
 
+<h3>Return to <a href="{{ page.root }}{{ table_name }}{% if row_number %}?offset={{ row_number - 1 }}{% endif %}">{{
+    table_name }}</a> table.</h3>
+
 <div class="row" style="padding-bottom:5px; padding-top:20px;">
   <form method="post">
     {% for column, form_row in form_map|items|reverse %}
@@ -64,14 +66,13 @@
     {% endfor %}
     <div class="row pt-4">
       <div class="col-auto">
-        <button class="btn btn-large btn-outline-primary" type="submit" name="action" value="validate">Validate</button>
-      </div>
-      <div class="col-auto">
-        <button class="btn btn-large btn-outline-{{ 'success' if validated else 'danger' }}" type="submit" name="action"
-          value="submit">Submit</button>
+        <button class="btn btn-primary" type="submit" name="action" value="validate">Validate</button>
+        <button class="btn btn-success" type="submit" name="action" value="submit">Submit</button>
+        <button class="btn btn-danger" type="submit" name="action" value="delete"
+          onclick="return confirm('Permanently delete this row?')">Delete</button>
+        <a class="btn btn-secondary" href="{{ page.root }}{{ table_name }}?offset={{ offset }}">Cancel</a>
       </div>
   </form>
 </div>
-
 
 {% endblock %}
