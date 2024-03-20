@@ -64,9 +64,7 @@ build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/peng
 	rm -rf $|
 	mkdir -p $|
 	cp -r examples/penguins/* $|
-	mkdir -p $|/src/data/
 	cd $| \
-	&& python3 generate.py \
 	&& ../../$< init
 
 .PHONY: penguins
