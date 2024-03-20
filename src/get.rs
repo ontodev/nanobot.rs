@@ -581,7 +581,7 @@ async fn get_page(
     }
 
     let mut tables = Map::new();
-    for key in table_map.keys() {
+    for key in &valve.config.table_order {
         if key == "history" {
             continue;
         }
