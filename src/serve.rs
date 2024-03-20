@@ -816,8 +816,9 @@ async fn table(
     let mut form_map = None;
     let columns = get_columns(&table, valve)?;
     if request_type == RequestType::POST {
-        // Override view, which isn't passed in POST. This value will then be picked up below.
-        view = String::from("form");
+        if view == "" {
+            view = String::from("form");
+        }
         let mut new_row = SerdeMap::new();
         for column in &columns {
             if column != "row_number" {
