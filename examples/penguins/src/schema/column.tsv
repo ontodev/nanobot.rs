@@ -1,20 +1,18 @@
 table	column	label	nulltype	datatype	structure	description
-table	table	table		label	unique	name of this table
-table	path	path		line		path to the TSV file for this table, relative to the table.tsv file
-table	type	type	empty	table_type		type of this table, used for tables with special meanings
+table	table	table		label	unique	the name of this table
+table	path	path		line		the path to the TSV file for this table, relative to the table.tsv file
+table	type	type	empty	table_type		the type of this table, used for tables with special meanings
 table	description	description	empty	text		a description of this table
 column	table	table		label	from(table.table)	the table that this column belongs to
 column	column	column		label		the name of this column
-column	label	label		label		the label of this column
+column	label	label	empty	label		the label of this column
 column	nulltype	nulltype	empty	word	from(datatype.datatype)	the datatype for NULL values in this column
 column	datatype	datatype		word	from(datatype.datatype)	the datatype for this column
 column	structure	structure	empty	label		schema information for this column
 column	description	description	empty	text		a description of this column
 datatype	datatype	datatype		label	primary	the name of this datatype
 datatype	parent	parent	empty	label	tree(datatype)	the parent datatype
-datatype	transform		empty	word		
 datatype	condition	condition	empty	line		the method for testing the datatype
-datatype	structure		empty	trimmed_line		
 datatype	description	description	empty	text		a description of this datatype
 datatype	SQL type	SQL type	empty	sql_type		the SQLite type for representing this data
 datatype	HTML type	HTML type	empty	html_type		the HTML type for viewing and editing this data
