@@ -59,7 +59,7 @@ async fn main() -> Result<(), NanobotError> {
                 .about("Initialises things")
                 .arg(
                     arg!(
-                        -d --database <FILE> "Specifies a custom database name"
+                        -c --connection <URL> "Specifies a database connection URL or file"
                     )
                     .required(false)
                     .value_parser(value_parser!(String)),
@@ -87,13 +87,21 @@ async fn main() -> Result<(), NanobotError> {
                         .value_parser(value_parser!(String)),
                 ),
         )
-        .subcommand(Command::new("serve").about("Run HTTP server"))
+        .subcommand(
+            Command::new("serve").about("Run HTTP server").arg(
+                arg!(
+                    -c --connection <URL> "Specifies a database connection URL or file"
+                )
+                .required(false)
+                .value_parser(value_parser!(String)),
+            ),
+        )
         .get_matches();
 
     let exit_result = match matches.subcommand() {
         Some(("init", sub_matches)) => {
-            if let Some(d) = sub_matches.get_one::<String>("database") {
-                config.connection(d);
+            if let Some(c) = sub_matches.get_one::<String>("connection") {
+                config.connection(c);
             }
             if sub_matches.get_flag("create_only") {
                 config.create_only(true);
@@ -129,13 +137,29 @@ async fn main() -> Result<(), NanobotError> {
             };
             Ok(result)
         }
-        Some(("serve", _sub_matches)) => {
-            build_valve(&mut config).await?;
+        Some(("serve", sub_matches)) => {
+            if let Some(c) = sub_matches.get_one::<String>("connection") {
+                config.connection(c);
+            }
+            if config.connection == ":memory:" {
+                (config.valve, config.pool) = {
+                    let valve = Valve::build(&config.valve_path, &config.connection).await?;
+                    let pool = valve.pool.clone();
+                    let _ = valve.load_all_tables(true).await;
+                    let table_select = Select::new("\"table\"");
+                    config.table = get_table_from_pool(&pool, &table_select)
+                        .await
+                        .unwrap()
+                        .clone();
+                    (Some(valve), Some(pool))
+                };
+            } else {
+                build_valve(&mut config).await?;
+            }
             serve::app(&config)
         }
         _ => Err(String::from(
-            "Unrecognised or missing subcommand, but CGI environment vars are \
-                             undefined",
+            "Unrecognised or missing subcommand, but CGI environment vars are undefined",
         )),
     };
 
