@@ -1,8 +1,0 @@
-[nanobot]
-config_version = 0
-
-[logging]
-level = "DEBUG"
-
-[templates]
-path = "src/resources/"
