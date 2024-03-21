@@ -63,7 +63,7 @@ dev-serve:
 build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
 	rm -rf $|
 	mkdir -p $|
-	cp -r examples/penguins/* $|
+	cp -r examples/penguins/table/* $|
 	cd $| \
 	&& ../../$< init
 
