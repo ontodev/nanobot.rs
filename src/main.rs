@@ -1,6 +1,7 @@
-use crate::{config::Config, error::NanobotError, serve::build_app};
+use crate::{config::Config, error::NanobotError, serve::build_app, sql::get_table_from_pool};
 use axum_test_helper::{TestClient, TestResponse};
 use clap::{arg, command, value_parser, Command};
+use ontodev_sqlrest::Select;
 use ontodev_valve::valve::Valve;
 use std::path::Path;
 use std::sync::Arc;
@@ -158,6 +159,11 @@ async fn build_valve(config: &mut Config) -> Result<(), NanobotError> {
     (config.valve, config.pool) = {
         let valve = Valve::build(&config.valve_path, &config.connection).await?;
         let pool = valve.pool.clone();
+        let table_select = Select::new("\"table\"");
+        config.table = get_table_from_pool(&pool, &table_select)
+            .await
+            .unwrap()
+            .clone();
         (Some(valve), Some(pool))
     };
     Ok(())

@@ -2,7 +2,7 @@
 // we can use the valve config (which is now available) instead of running db requests. But do
 // this later.
 
-use crate::config::Config;
+use crate::config::{Config, SerdeMap};
 use crate::error::GetError;
 use crate::sql::{
     get_count_from_pool, get_message_counts_from_pool, get_table_from_pool, get_total_from_pool,
@@ -17,18 +17,15 @@ use minijinja::{Environment, Source};
 use ontodev_sqlrest::{Direction, OrderByColumn, Select};
 use ontodev_valve::{
     toolkit,
-    valve::{ValveChange, ValveColumnConfig, ValveMessage, ValveTableConfig},
+    valve::{ValveChange, ValveColumnConfig, ValveMessage},
 };
 use regex::Regex;
 use serde_json::{json, to_string_pretty, Map, Value};
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use tabwriter::TabWriter;
 use urlencoding::decode;
-
-pub type SerdeMap = serde_json::Map<String, serde_json::Value>;
 
 pub async fn get_table(
     config: &Config,
@@ -128,7 +125,7 @@ pub async fn get_rows(
             }
         }
         "page" => {
-            let page = match get_page(&config, &select, &table_config, &column_configs).await {
+            let page = match get_page(&config, &select, &column_configs).await {
                 Ok(page) => page,
                 Err(e) => return Err(GetError::new(e.to_string())),
             };
@@ -152,7 +149,6 @@ pub async fn get_rows(
 async fn get_page(
     config: &Config,
     select: &Select,
-    table_map: &HashMap<String, ValveTableConfig>,
     column_configs: &Vec<ValveColumnConfig>,
 ) -> Result<Value, GetError> {
     let table = &unquote(&select.table).unwrap();
@@ -403,16 +399,13 @@ async fn get_page(
     }
 
     let end = select.offset.unwrap_or(0) + cell_rows.len();
-
-    let mut this_table = json!(table_map.get(&unquoted_table).ok_or(GetError::new(format!(
-        "No '{}' in {:?}",
-        unquoted_table, table_map
-    )))?);
-    let this_table = this_table.as_object_mut().ok_or(GetError::new(format!(
-        "Could not parse table config for {} as a JSON object",
-        unquoted_table
-    )))?;
-
+    let mut this_table = config
+        .table
+        .iter()
+        .filter(|x| x.get("table").unwrap() == &json!(unquoted_table))
+        .next()
+        .unwrap()
+        .clone();
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
     this_table.insert("href".to_string(), json!(unquoted_table.clone()));
     this_table.insert("start".to_string(), json!(select.offset.unwrap_or(0) + 1));
