@@ -22,6 +22,7 @@ use serde_json::{json, Value as SerdeValue};
 use std::{
     collections::HashMap, collections::HashSet, net::SocketAddr, process::Command, sync::Arc,
 };
+use tokio::signal;
 use tower_http::services::ServeDir;
 use wiring_rs::util::signature;
 
@@ -75,16 +76,41 @@ pub async fn app(config: &Config) -> Result<String, String> {
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([0, 0, 0, 0], config.port));
-    tracing::info!("listening on {}", addr);
+    println!("Running Nanobot server at http://{addr}");
+    println!("Press Control-C to quit.");
     if let Err(e) = axum::Server::bind(&addr)
         .serve(app.into_make_service())
+        .with_graceful_shutdown(shutdown_signal())
         .await
     {
         return Err(e.to_string());
     }
 
-    let hello = String::from("Hello, world!");
-    Ok(hello)
+    Ok("Stopping Nanobot server...".into())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 async fn root() -> impl IntoResponse {
