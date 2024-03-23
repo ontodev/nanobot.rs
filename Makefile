@@ -63,10 +63,8 @@ dev-serve:
 build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
 	rm -rf $|
 	mkdir -p $|
-	cp -r examples/penguins/* $|
-	mkdir -p $|/src/data/
+	cp -r examples/penguins/table/* $|
 	cd $| \
-	&& python3 generate.py \
 	&& ../../$< init
 
 .PHONY: penguins
