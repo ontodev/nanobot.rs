@@ -399,12 +399,20 @@ async fn get_page(
     }
 
     let end = select.offset.unwrap_or(0) + cell_rows.len();
+
+    // Start with the VALVE table config, minus 'column' and 'column_order'.
+    let this_table_config = valve.config.table.get(&unquoted_table).unwrap();
+    let this_table_config = json!(this_table_config);
+    let mut this_table_config = this_table_config.as_object().unwrap().clone();
+    this_table_config.remove("column");
+    this_table_config.remove("column_order");
+    // Try to get Nanobot table config: will fail for "message" and "history" tables.
     let mut this_table = config
         .table
         .iter()
         .filter(|x| x.get("table").unwrap() == &json!(unquoted_table))
         .next()
-        .unwrap()
+        .unwrap_or(&this_table_config)
         .clone();
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
     this_table.insert("href".to_string(), json!(unquoted_table.clone()));
