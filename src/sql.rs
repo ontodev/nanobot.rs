@@ -79,7 +79,11 @@ pub async fn get_table_from_pool(
     select.fetch_rows_as_json(pool, &HashMap::new())
 }
 
-pub async fn get_count_from_pool(pool: &AnyPool, select: &Select) -> Result<usize, sqlx::Error> {
+pub async fn get_count_from_pool(
+    pool: &AnyPool,
+    select: &Select,
+    conflict: bool,
+) -> Result<usize, sqlx::Error> {
     let db_type = match get_db_type(pool) {
         Ok(db_type) => db_type,
         Err(e) => return Err(sqlx::Error::Configuration(e.into())),
@@ -99,7 +103,7 @@ pub async fn get_count_from_pool(pool: &AnyPool, select: &Select) -> Result<usiz
 
     let unquoted_table = unquote(&select.table).unwrap_or(select.table.to_string());
     let conflict_count = {
-        if unquoted_table != "message" {
+        if conflict {
             let conflict_select = Select {
                 table: format!("\"{}_conflict\"", unquoted_table),
                 ..select.clone()
@@ -124,10 +128,14 @@ pub async fn get_count_from_pool(pool: &AnyPool, select: &Select) -> Result<usiz
     Ok(value_count + conflict_count)
 }
 
-pub async fn get_total_from_pool(pool: &AnyPool, table: &String) -> Result<usize, sqlx::Error> {
+pub async fn get_total_from_pool(
+    pool: &AnyPool,
+    table: &String,
+    conflict: bool,
+) -> Result<usize, sqlx::Error> {
     let unquoted_table = unquote(&table).unwrap_or(table.to_string());
     let select = Select::new(format!("\"{}\"", unquoted_table));
-    get_count_from_pool(pool, &select).await
+    get_count_from_pool(pool, &select, conflict).await
 }
 
 pub async fn get_message_counts_from_pool(

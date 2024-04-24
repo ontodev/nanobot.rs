@@ -138,14 +138,6 @@ async fn post_table(
         .ok_or("Valve is not initialized.".to_string())?;
     if form_params.contains_key("save") {
         tracing::info!("SAVE");
-        let vconfig = &valve.config;
-
-        // Write VALVE config to file
-        std::fs::write(
-            "config.json",
-            serde_json::to_string_pretty(&vconfig).unwrap(),
-        )
-        .expect("Could not write VALVE config to config.json");
         valve
             .save_all_tables(&None)
             .map_err(|e| format!("{:?}", e))?;
@@ -765,8 +757,8 @@ async fn table(
         format = "html";
         shape = "page";
     }
-    let valve = &state
-        .config
+    let config = &state.config;
+    let valve = config
         .valve
         .as_ref()
         .ok_or("Valve is not initialized.".to_string())?;
@@ -873,7 +865,7 @@ async fn table(
                 Err(e) => return Err(e.into()),
             };
             // If this is a validate action, fill in form_map which will then be handled below.
-            match get_row_as_form_map(valve, &table, &validated_row) {
+            match get_row_as_form_map(config, &table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 1 {}", e);
@@ -940,7 +932,7 @@ async fn table(
                     );
                 }
             }
-            match get_row_as_form_map(valve, &table, &new_row) {
+            match get_row_as_form_map(config, &table, &new_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 2 {}", e);
@@ -1104,8 +1096,8 @@ fn render_row_from_database(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let valve = &state
-        .config
+    let config = &state.config;
+    let valve = config
         .valve
         .as_ref()
         .ok_or("Valve is not initialized.".to_string())?;
@@ -1189,7 +1181,7 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            match get_row_as_form_map(valve, table, &validated_row) {
+            match get_row_as_form_map(config, table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 3 {}", e);
@@ -1249,7 +1241,7 @@ fn render_row_from_database(
             }
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
-            match get_row_as_form_map(valve, table, &metafied_row) {
+            match get_row_as_form_map(config, table, &metafied_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 4 {}", e);
@@ -1423,10 +1415,11 @@ fn get_column_config(
 }
 
 fn get_html_type_and_values(
-    valve: &Valve,
+    config: &Config,
     datatype: &str,
     values: &Option<Vec<String>>,
 ) -> Result<(Option<String>, Option<Vec<String>>), String> {
+    let valve = config.valve.as_ref().unwrap();
     let dt_config = match valve.config.datatype.get(datatype) {
         Some(o) => o,
         None => {
@@ -1470,12 +1463,21 @@ fn get_html_type_and_values(
         }
     };
 
-    if dt_config.html_type != "" {
-        return Ok((Some(dt_config.html_type.to_string()), new_values));
+    let rows = &config.datatype;
+    for row in rows.iter() {
+        let name = row.get("datatype").unwrap();
+        if name == datatype {
+            if let Some(html_type) = row.get("html_type") {
+                if let Some(html_type) = html_type.as_str() {
+                    return Ok((Some(html_type.into()), new_values));
+                }
+            }
+            break;
+        }
     }
 
     if dt_config.parent != "" {
-        return get_html_type_and_values(valve, &dt_config.parent, &new_values);
+        return get_html_type_and_values(config, &dt_config.parent, &new_values);
     }
 
     Ok((None, None))
@@ -1638,10 +1640,11 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
 }
 
 fn get_row_as_form_map(
-    valve: &Valve,
+    config: &Config,
     table_name: &str,
     row_data: &SerdeMap,
 ) -> Result<SerdeMap, String> {
+    let valve = config.valve.as_ref().unwrap();
     let mut result = SerdeMap::new();
     let mut row_valid = None;
     let mut form_row_id = 0;
@@ -1698,7 +1701,7 @@ fn get_row_as_form_map(
         if vec!["from", "in", "tree", "under"].contains(&structure) {
             html_type = Some("search".into());
         } else {
-            (html_type, allowed_values) = get_html_type_and_values(valve, &datatype, &None)?;
+            (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
 
         if allowed_values != None && html_type == None {

@@ -1539,6 +1539,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "is_executable"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa9acdc6d67b75e626ad644734e8bc6df893d9cd2a834129065d3dd6158ea9c8"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "itertools"
 version = "0.10.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1972,7 +1981,7 @@ dependencies = [
 [[package]]
 name = "ontodev_valve"
 version = "0.2.2"
-source = "git+https://github.com/ontodev/valve.rs?rev=d97a34848bf9cc541d6b86564a2f019b1fe3d724#d97a34848bf9cc541d6b86564a2f019b1fe3d724"
+source = "git+https://github.com/ontodev/valve.rs?rev=b1a0b282bbccf8817901bf45494f25316afb9ac2#b1a0b282bbccf8817901bf45494f25316afb9ac2"
 dependencies = [
  "anyhow",
  "argparse",
@@ -1986,6 +1995,7 @@ dependencies = [
  "futures",
  "indexmap 1.9.3",
  "indoc",
+ "is_executable",
  "itertools 0.10.5",
  "lalrpop",
  "lalrpop-util",
@@ -1998,6 +2008,8 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sprintf",
+ "sql_split",
  "sqlx",
 ]
 
@@ -2762,6 +2774,21 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "sprintf"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2819cb5194dfe9e6d102f4519a9fb9dc7106d2879b71b4fd4d4677f1175bd39"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "sql_split"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4455debf3b2a88ea42fa7712dc1b4894aaef1fead535b2e18018626257c87595"
 
 [[package]]
 name = "sqlformat"

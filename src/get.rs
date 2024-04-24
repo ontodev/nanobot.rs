@@ -62,15 +62,15 @@ pub async fn get_rows(
     }
 
     // Get the columns for the selected table
+    let table_config = table_config
+        .get(&unquoted_table)
+        .ok_or(GetError::new(format!(
+            "Undefined table '{}'",
+            unquoted_table
+        )))?;
     let (columns_config, unquoted_columns) = {
-        let this_table_config = table_config
-            .get(&unquoted_table)
-            .ok_or(GetError::new(format!(
-                "Undefined table '{}'",
-                unquoted_table
-            )))?;
-        let columns_config = &this_table_config.column;
-        let column_order = &this_table_config.column_order;
+        let columns_config = &table_config.column;
+        let column_order = &table_config.column_order;
         (columns_config, column_order.to_vec())
     };
 
@@ -96,7 +96,7 @@ pub async fn get_rows(
 
     match shape {
         "value_rows" => {
-            if unquoted_table != "message" {
+            if table_config.options.contains("edit") {
                 // use the *_view table
                 select.table(format!("\"{unquoted_table}_view\""));
             }
@@ -309,10 +309,18 @@ async fn get_page(
     // If the table is anything other than the message table, query its corresponding view instead
     // of the table itself. The view includes conflict rows and the message column:
     let db_object;
-    if unquoted_table == "message" {
-        db_object = unquoted_table.to_string();
-    } else {
+    let table_config = &valve
+        .config
+        .table
+        .get(&unquoted_table)
+        .ok_or(GetError::new(format!(
+            "Undefined table '{}'",
+            unquoted_table
+        )))?;
+    if table_config.options.contains("edit") {
         db_object = format!("{}_view", unquoted_table);
+    } else {
+        db_object = unquoted_table.to_string();
     }
     let mut view_select = Select {
         table: db_object,
@@ -329,7 +337,7 @@ async fn get_page(
         view_select.add_explicit_select(col);
     }
     // If this isn't the message table, explicitly include the message and history columns from the table's view:
-    if unquoted_table != "message" {
+    if table_config.options.contains("edit") {
         view_select.add_select("message");
         view_select.add_select("history");
     }
@@ -369,6 +377,7 @@ async fn get_page(
         .collect();
 
     let mut counts = Map::new();
+    let conflict = table_config.options.contains("edit");
     let count = {
         if unquoted_table != "message" && filter_messages {
             match message_counts.get("message_row").and_then(|m| m.as_u64()) {
@@ -381,7 +390,7 @@ async fn get_page(
                 }
             }
         } else {
-            match get_count_from_pool(&pool, &select).await {
+            match get_count_from_pool(&pool, &select, conflict).await {
                 Ok(count) => count,
                 Err(e) => return Err(GetError::new(e.to_string())),
             }
@@ -389,7 +398,7 @@ async fn get_page(
     };
     counts.insert("count".to_string(), json!(count));
 
-    let total = match get_total_from_pool(&pool, &unquoted_table).await {
+    let total = match get_total_from_pool(&pool, &unquoted_table, conflict).await {
         Ok(total) => total,
         Err(e) => return Err(GetError::new(e.to_string())),
     };

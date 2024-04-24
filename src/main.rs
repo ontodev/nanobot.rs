@@ -151,6 +151,11 @@ async fn main() -> Result<(), NanobotError> {
                         .await
                         .unwrap()
                         .clone();
+                    let datatype_select = Select::new("\"datatype\"");
+                    config.datatype = get_table_from_pool(&pool, &datatype_select)
+                        .await
+                        .unwrap()
+                        .clone();
                     (Some(valve), Some(pool))
                 };
             } else {
@@ -188,6 +193,13 @@ async fn build_valve(config: &mut Config) -> Result<(), NanobotError> {
             .await
             .unwrap()
             .clone();
+        let datatype_select = Select::new("\"datatype\"");
+        config.datatype = get_table_from_pool(&pool, &datatype_select)
+            .await
+            .unwrap()
+            .clone();
+        tracing::info!("TABLE ORDER {:?}", valve.config.table_order);
+        tracing::info!("SORTED TABLES {:?}", valve.sorted_table_list);
         (Some(valve), Some(pool))
     };
     Ok(())
