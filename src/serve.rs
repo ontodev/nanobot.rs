@@ -1683,11 +1683,7 @@ fn get_row_as_form_map(
 
         let message = stringify_messages(&messages)?;
         let column_config = get_column_config(table_name, cell_header, valve)?;
-        let description = if column_config.description == "" {
-            cell_header.to_string()
-        } else {
-            column_config.description.to_string()
-        };
+        let description = column_config.description;
         let label = if column_config.label.trim() == "" {
             cell_header.to_string()
         } else {
@@ -1784,31 +1780,26 @@ fn get_hiccup_form_row(
     // Create the header level for this form row:
     let mut header_col = vec![
         json!("div"),
-        json!({"class": "col-md-3", "id": form_row_id}),
+        json!({"class": "col-md-4 form-label", "id": form_row_id}),
     ];
     if allow_delete {
         header_col.push(json!([
-            json!("a"),
-            json!({ "href": format!("javascript:del({})", form_row_id) }),
-            json!(["i", {"class": "bi-x-circle", "style": "font-size: 16px; color: #dc3545;"}]),
-            json!("&nbsp"),
+            "a",
+            { "href": format!("javascript:del({})", form_row_id) },
+            ["i", {"class": "bi-x-circle", "style": "font-size: 16px; color: #dc3545;"}],
+            "&nbsp",
         ]));
     }
 
     match display_header {
-        Some(d) => header_col.push(json!([json!("b"), json!(d)])),
-        None => header_col.push(json!([json!("b"), json!(header)])),
+        Some(d) => header_col.push(json!(["p", {"class": "header"}, d])),
+        None => header_col.push(json!(["p", {"class": "header"}, header])),
     };
 
     if let Some(description) = description {
-        // Tooltip:
-        header_col.push(json!([
-            json!("span"),
-            json!({
-                "title": description,
-            }),
-            json!(["i", {"class": "bi-question-circle"}]),
-        ]));
+        if description != "" {
+            header_col.push(json!(["p", {"class": "description"}, description]));
+        }
     }
 
     // Create the value input for this form row:
@@ -1825,7 +1816,7 @@ fn get_hiccup_form_row(
         input_attrs.insert("name".to_string(), json!(header));
     }
 
-    let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
+    let mut value_col = vec![json!("div"), json!({"class": "col-md-8 form-group"})];
 
     if html_type == "input" {
         classes.insert(0, "form-control");
@@ -1878,16 +1869,16 @@ fn get_hiccup_form_row(
                     Some(value) if value == av => {
                         has_selected = true;
                         select_element.push(json!([
-                            json!("option"),
-                            json!({"value": av_safe, "selected": true}),
-                            json!(av_safe),
+                            "option",
+                            {"value": av_safe, "selected": true},
+                            av_safe,
                         ]));
                     }
                     _ => {
                         select_element.push(json!([
-                            json!("option"),
-                            json!({ "value": av_safe }),
-                            json!(av_safe),
+                            "option",
+                            { "value": av_safe },
+                            av_safe,
                         ]));
                     }
                 };
@@ -1929,7 +1920,7 @@ fn get_hiccup_form_row(
             }
             _ => (),
         };
-        value_col.push(json!([json!("input"), json!(input_attrs)]));
+        value_col.push(json!(["input", input_attrs]));
     } else if html_type == "radio" {
         // TODO: This html type will need to be re-implemented (later).
         classes.insert(0, "form-check-input");
@@ -1948,13 +1939,9 @@ fn get_hiccup_form_row(
                     }
                 }
                 value_col.push(json!([
-                    json!("div"),
-                    json!([json!("input"), json!(attrs_copy)]),
-                    json!([
-                        json!("label"),
-                        json!({"class": "form-check-label", "for": av_safe}),
-                        json!(av_safe),
-                    ]),
+                    "div",
+                    ["input", attrs_copy],
+                    ["label", {"class": "form-check-label", "for": av_safe}, av_safe,],
                 ]));
             }
         }
