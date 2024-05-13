@@ -23,6 +23,7 @@ pub struct Config {
     pub template_path: Option<String>,
     pub actions: IndexMap<String, ActionConfig>,
     pub table: Vec<SerdeMap>,
+    pub datatype: Vec<SerdeMap>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -355,6 +356,7 @@ impl Config {
             },
             actions: user.actions.unwrap_or_default(),
             table: vec![],
+            datatype: vec![],
         };
 
         Ok(config)

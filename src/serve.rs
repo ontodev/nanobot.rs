@@ -138,14 +138,6 @@ async fn post_table(
         .ok_or("Valve is not initialized.".to_string())?;
     if form_params.contains_key("save") {
         tracing::info!("SAVE");
-        let vconfig = &valve.config;
-
-        // Write VALVE config to file
-        std::fs::write(
-            "config.json",
-            serde_json::to_string_pretty(&vconfig).unwrap(),
-        )
-        .expect("Could not write VALVE config to config.json");
         valve
             .save_all_tables(&None)
             .map_err(|e| format!("{:?}", e))?;
@@ -765,8 +757,8 @@ async fn table(
         format = "html";
         shape = "page";
     }
-    let valve = &state
-        .config
+    let config = &state.config;
+    let valve = config
         .valve
         .as_ref()
         .ok_or("Valve is not initialized.".to_string())?;
@@ -873,7 +865,7 @@ async fn table(
                 Err(e) => return Err(e.into()),
             };
             // If this is a validate action, fill in form_map which will then be handled below.
-            match get_row_as_form_map(valve, &table, &validated_row) {
+            match get_row_as_form_map(config, &table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 1 {}", e);
@@ -940,7 +932,7 @@ async fn table(
                     );
                 }
             }
-            match get_row_as_form_map(valve, &table, &new_row) {
+            match get_row_as_form_map(config, &table, &new_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 2 {}", e);
@@ -1104,8 +1096,8 @@ fn render_row_from_database(
     form_params: &RequestParams,
     request_type: RequestType,
 ) -> axum::response::Result<impl IntoResponse> {
-    let valve = &state
-        .config
+    let config = &state.config;
+    let valve = config
         .valve
         .as_ref()
         .ok_or("Valve is not initialized.".to_string())?;
@@ -1189,7 +1181,7 @@ fn render_row_from_database(
                 }
                 Err(e) => return Err(e.into()),
             };
-            match get_row_as_form_map(valve, table, &validated_row) {
+            match get_row_as_form_map(config, table, &validated_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 3 {}", e);
@@ -1249,7 +1241,7 @@ fn render_row_from_database(
             }
             let mut row = &mut rows[0];
             let metafied_row = metafy_row(&mut row)?;
-            match get_row_as_form_map(valve, table, &metafied_row) {
+            match get_row_as_form_map(config, table, &metafied_row) {
                 Ok(f) => form_map = Some(f),
                 Err(e) => {
                     tracing::debug!("Rendering error 4 {}", e);
@@ -1423,10 +1415,11 @@ fn get_column_config(
 }
 
 fn get_html_type_and_values(
-    valve: &Valve,
+    config: &Config,
     datatype: &str,
     values: &Option<Vec<String>>,
 ) -> Result<(Option<String>, Option<Vec<String>>), String> {
+    let valve = config.valve.as_ref().unwrap();
     let dt_config = match valve.config.datatype.get(datatype) {
         Some(o) => o,
         None => {
@@ -1470,12 +1463,21 @@ fn get_html_type_and_values(
         }
     };
 
-    if dt_config.html_type != "" {
-        return Ok((Some(dt_config.html_type.to_string()), new_values));
+    let rows = &config.datatype;
+    for row in rows.iter() {
+        let name = row.get("datatype").unwrap();
+        if name == datatype {
+            if let Some(html_type) = row.get("html_type") {
+                if let Some(html_type) = html_type.as_str() {
+                    return Ok((Some(html_type.into()), new_values));
+                }
+            }
+            break;
+        }
     }
 
     if dt_config.parent != "" {
-        return get_html_type_and_values(valve, &dt_config.parent, &new_values);
+        return get_html_type_and_values(config, &dt_config.parent, &new_values);
     }
 
     Ok((None, None))
@@ -1638,10 +1640,11 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
 }
 
 fn get_row_as_form_map(
-    valve: &Valve,
+    config: &Config,
     table_name: &str,
     row_data: &SerdeMap,
 ) -> Result<SerdeMap, String> {
+    let valve = config.valve.as_ref().unwrap();
     let mut result = SerdeMap::new();
     let mut row_valid = None;
     let mut form_row_id = 0;
@@ -1680,11 +1683,7 @@ fn get_row_as_form_map(
 
         let message = stringify_messages(&messages)?;
         let column_config = get_column_config(table_name, cell_header, valve)?;
-        let description = if column_config.description == "" {
-            cell_header.to_string()
-        } else {
-            column_config.description.to_string()
-        };
+        let description = column_config.description;
         let label = if column_config.label.trim() == "" {
             cell_header.to_string()
         } else {
@@ -1698,7 +1697,7 @@ fn get_row_as_form_map(
         if vec!["from", "in", "tree", "under"].contains(&structure) {
             html_type = Some("search".into());
         } else {
-            (html_type, allowed_values) = get_html_type_and_values(valve, &datatype, &None)?;
+            (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
         }
 
         if allowed_values != None && html_type == None {
@@ -1781,31 +1780,26 @@ fn get_hiccup_form_row(
     // Create the header level for this form row:
     let mut header_col = vec![
         json!("div"),
-        json!({"class": "col-md-3", "id": form_row_id}),
+        json!({"class": "col-md-4 form-label", "id": form_row_id}),
     ];
     if allow_delete {
         header_col.push(json!([
-            json!("a"),
-            json!({ "href": format!("javascript:del({})", form_row_id) }),
-            json!(["i", {"class": "bi-x-circle", "style": "font-size: 16px; color: #dc3545;"}]),
-            json!("&nbsp"),
+            "a",
+            { "href": format!("javascript:del({})", form_row_id) },
+            ["i", {"class": "bi-x-circle", "style": "font-size: 16px; color: #dc3545;"}],
+            "&nbsp",
         ]));
     }
 
     match display_header {
-        Some(d) => header_col.push(json!([json!("b"), json!(d)])),
-        None => header_col.push(json!([json!("b"), json!(header)])),
+        Some(d) => header_col.push(json!(["p", {"class": "header"}, d])),
+        None => header_col.push(json!(["p", {"class": "header"}, header])),
     };
 
     if let Some(description) = description {
-        // Tooltip:
-        header_col.push(json!([
-            json!("span"),
-            json!({
-                "title": description,
-            }),
-            json!(["i", {"class": "bi-question-circle"}]),
-        ]));
+        if description != "" {
+            header_col.push(json!(["p", {"class": "description"}, description]));
+        }
     }
 
     // Create the value input for this form row:
@@ -1822,7 +1816,7 @@ fn get_hiccup_form_row(
         input_attrs.insert("name".to_string(), json!(header));
     }
 
-    let mut value_col = vec![json!("div"), json!({"class": "col-md-9 form-group"})];
+    let mut value_col = vec![json!("div"), json!({"class": "col-md-8 form-group"})];
 
     if html_type == "input" {
         classes.insert(0, "form-control");
@@ -1875,16 +1869,16 @@ fn get_hiccup_form_row(
                     Some(value) if value == av => {
                         has_selected = true;
                         select_element.push(json!([
-                            json!("option"),
-                            json!({"value": av_safe, "selected": true}),
-                            json!(av_safe),
+                            "option",
+                            {"value": av_safe, "selected": true},
+                            av_safe,
                         ]));
                     }
                     _ => {
                         select_element.push(json!([
-                            json!("option"),
-                            json!({ "value": av_safe }),
-                            json!(av_safe),
+                            "option",
+                            { "value": av_safe },
+                            av_safe,
                         ]));
                     }
                 };
@@ -1926,7 +1920,7 @@ fn get_hiccup_form_row(
             }
             _ => (),
         };
-        value_col.push(json!([json!("input"), json!(input_attrs)]));
+        value_col.push(json!(["input", input_attrs]));
     } else if html_type == "radio" {
         // TODO: This html type will need to be re-implemented (later).
         classes.insert(0, "form-check-input");
@@ -1945,13 +1939,9 @@ fn get_hiccup_form_row(
                     }
                 }
                 value_col.push(json!([
-                    json!("div"),
-                    json!([json!("input"), json!(attrs_copy)]),
-                    json!([
-                        json!("label"),
-                        json!({"class": "form-check-label", "for": av_safe}),
-                        json!(av_safe),
-                    ]),
+                    "div",
+                    ["input", attrs_copy],
+                    ["label", {"class": "form-check-label", "for": av_safe}, av_safe,],
                 ]));
             }
         }
