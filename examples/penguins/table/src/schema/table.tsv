@@ -1,0 +1,5 @@
+table	path	type	options	description
+table	src/schema/table.tsv	table		the tables in this project
+column	src/schema/column.tsv	column		the columns for all of the tables
+datatype	src/schema/datatype.tsv	datatype		the datatypes for all of the columns
+penguin	src/data/penguin.tsv			penguin measurement data
