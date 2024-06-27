@@ -3,6 +3,7 @@ usage:
 	@echo "make [TASK]"
 	@echo "  format     reformat code"
 	@echo "  build      build release"
+	@echo "  clean      remove build files"
 	@echo "  test       run all tests"
 	@echo "  dev-check  watch for changes and run cargo check"
 	@echo "  dev-test   watch for changes and run tests"
@@ -26,13 +27,19 @@ format:
 build:
 	cargo build --release
 
+clean:
+	rm -rf build/
+
 build/ build/penguins/:
 	mkdir -p $@
 
-target/debug/nanobot: src/
+build/penguins/%/:
+	mkdir -p $@
+
+target/debug/nanobot: Cargo.* src/**
 	cargo build
 
-target/release/nanobot: src/
+target/release/nanobot: Cargo.* src/**
 	cargo build --release
 
 TEST_TABLES = ldtab prefix statement
@@ -43,7 +50,7 @@ src/resources/test_data/zfa_excerpt.db: ${TEST_TSVS}
 	$(foreach T,${TEST_TABLES},".import src/resources/test_data/${T}.tsv ${T}")
 
 .PHONY: test
-test: target/debug/nanobot build/penguins/.nanobot.db
+test: build/penguins/table/.nanobot.db
 	cargo fmt --check
 	cargo test
 	PATH="$${PATH}:$$(pwd)/target/debug"; tesh --debug false ./doc
@@ -60,16 +67,17 @@ dev-test:
 dev-serve:
 	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
 
-build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
+build/penguins/%/.nanobot.db: target/debug/nanobot examples/penguins/% | build/penguins/%/
 	rm -rf $|
 	mkdir -p $|
-	cp -r examples/penguins/table/* $|
+	cp -r $(word 2,$^) build/penguins/
 	cd $| \
-	&& ../../$< init
+	&& python3 ../../../examples/penguins/generate.py src/data/penguin.tsv \
+	&& ../../../$< init
 
 .PHONY: penguins
-penguins: target/debug/nanobot build/penguins/.nanobot.db
-	cd build/penguins && ../../$< serve
+penguins: build/penguins/table/.nanobot.db
+	cd build/penguins/table/ && ../../$< serve
 
 build/synthea.zip: | build
 	curl -L -o build/synthea.zip "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip"

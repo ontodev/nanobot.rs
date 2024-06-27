@@ -2,6 +2,7 @@ table	column	label	nulltype	datatype	structure	description
 table	table	table		word	unique	the name of this table
 table	path	path		trimmed_line		the path to the TSV file for this table, relative to the table.tsv file
 table	type	type	empty	table_type		the type of this table, used for tables with special meanings
+table	options	options	empty	trimmed_line		the type of this table, used for tables with special meanings
 table	description	description	empty	trimmed_text		a description of this table
 column	table	table		word	from(table.table)	the table that this column belongs to
 column	column	column		trimmed_line		the name of this column
@@ -14,8 +15,8 @@ datatype	datatype	datatype		word	primary	the name of this datatype
 datatype	parent	parent	empty	word	tree(datatype)	the parent datatype
 datatype	condition	condition	empty	trimmed_line		the method for testing the datatype
 datatype	description	description	empty	trimmed_text		a description of this datatype
-datatype	SQL type	SQL type	empty	sql_type		the SQLite type for representing this data
-datatype	HTML type	HTML type	empty	html_type		the HTML type for viewing and editing this data
+datatype	sql_type	SQL type	empty	sql_type		the SQLite type for representing this data
+datatype	html_type	HTML type	empty	html_type		the HTML type for viewing and editing this data
 penguin	study_name	studyName		word		the name of the study
 penguin	sample_number	Sample Number		natural_number	primary	the sample identifier
 penguin	species	Species		trimmed_line		the species of the measured individual

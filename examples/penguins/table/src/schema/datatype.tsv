@@ -1,4 +1,4 @@
-datatype	parent	condition	description	SQL type	HTML type
+datatype	parent	condition	description	sql_type	html_type
 text			any text	TEXT	textarea
 empty	text	equals('')	the empty string	NULL	
 nonempty	text	match(/.+/)	non-empty		
