@@ -10,7 +10,8 @@ and the
 a member of the
 [Long Term Ecological Research Network](https://lternet.edu/).
 
-See the [README](../README.md) in the parent directory for more information.
+See the [README](../README.md) in the parent directory for more information
+about how to install and run Nanobot for these examples.
 
 ## Examples
 

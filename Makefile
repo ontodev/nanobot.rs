@@ -72,12 +72,14 @@ build/penguins/%/.nanobot.db: target/debug/nanobot examples/penguins/% | build/p
 	mkdir -p $|
 	cp -r $(word 2,$^) build/penguins/
 	cd $| \
+	&& rm -f .nanobot.db \
 	&& python3 ../../../examples/penguins/generate.py src/data/penguin.tsv \
 	&& ../../../$< init
 
 .PHONY: penguins
-penguins: build/penguins/table/.nanobot.db
-	cd build/penguins/table/ && ../../$< serve
+penguins: target/debug/nanobot build/penguins/table/.nanobot.db
+	cd $(dir $(word 2,$^)) && ../../../$< serve
+
 
 build/synthea.zip: | build
 	curl -L -o build/synthea.zip "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip"
