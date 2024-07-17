@@ -50,7 +50,7 @@ src/resources/test_data/zfa_excerpt.db: ${TEST_TSVS}
 	$(foreach T,${TEST_TABLES},".import src/resources/test_data/${T}.tsv ${T}")
 
 .PHONY: test
-test: build/penguins/table/.nanobot.db
+test: build/penguins/tables/.nanobot.db
 	cargo fmt --check
 	cargo test
 	PATH="$${PATH}:$$(pwd)/target/debug"; tesh --debug false ./doc
@@ -77,9 +77,8 @@ build/penguins/%/.nanobot.db: target/debug/nanobot examples/penguins/% | build/p
 	&& ../../../$< init
 
 .PHONY: penguins
-penguins: target/debug/nanobot build/penguins/table/.nanobot.db
+penguins: target/debug/nanobot build/penguins/tables/.nanobot.db
 	cd $(dir $(word 2,$^)) && ../../../$< serve
-
 
 build/synthea.zip: | build
 	curl -L -o build/synthea.zip "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip"
