@@ -205,12 +205,14 @@
 
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/react-bootstrap-typeahead/dist/react-bootstrap-typeahead.js"></script>
   <!-- Don't use this in production: -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="text/babel">
     function App(props){
       return <h1>{`Hello, world! ${props.name}`}</h1>;
     }
+    var Typeahead = ReactBootstrapTypeahead;
     const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(
       <React.StrictMode>
