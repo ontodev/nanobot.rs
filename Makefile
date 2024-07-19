@@ -84,7 +84,7 @@ react:
 	&& echo 'path = "assets/"' >> nanobot.toml \
 	&& ../../target/debug/nanobot serve
 
-build/penguins/%/.nanobot.db: target/debug/nanobot examples/penguins/% | build/penguins/%/
+build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
 	rm -rf $|
 	mkdir -p $|
 	cp -r examples/penguins/* $|
