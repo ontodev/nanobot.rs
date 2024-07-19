@@ -1652,6 +1652,9 @@ fn get_row_as_form_map(
         if cell_header == "row_number" {
             continue;
         }
+        if cell_header == "row_order" {
+            continue;
+        }
         if cell_header == "history" {
             continue;
         }

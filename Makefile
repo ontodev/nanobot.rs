@@ -64,7 +64,27 @@ serve:
 dev-serve:
 	find src/ | entr -rs 'cargo build && target/debug/nanobot serve'
 
-build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
+# First `cd src/javascript/` and `npm install`.
+.PHONY: react
+react:
+	cargo build
+	rm -rf build/react/
+	mkdir -p build/react/assets/
+	cd src/javascript/ \
+	&& npm run build
+	cp src/javascript/build/static/js/main.*.js build/react/assets/main.js
+	cp src/javascript/build/static/css/main.*.css build/react/assets/main.css
+	cd build/react/ \
+	&& ../../target/debug/nanobot init \
+	&& echo '' >> nanobot.toml \
+	&& echo '[logging]' >> nanobot.toml \
+	&& echo 'level = "DEBUG"' >> nanobot.toml \
+	&& echo '' >> nanobot.toml \
+	&& echo '[assets]' >> nanobot.toml \
+	&& echo 'path = "assets/"' >> nanobot.toml \
+	&& ../../target/debug/nanobot serve
+
+build/penguins/%/.nanobot.db: target/debug/nanobot examples/penguins/% | build/penguins/%/
 	rm -rf $|
 	mkdir -p $|
 	cp -r examples/penguins/* $|
