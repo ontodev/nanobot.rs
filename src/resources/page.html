@@ -203,17 +203,19 @@
     src="https://cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.11.1/typeahead.bundle.min.js">
     </script>
 
-  <script src="https://unpkg.com/react@16/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@16/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <!-- Don't use this in production: -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="text/babel">
     function App(props){
       return <h1>{`Hello, world! ${props.name}`}</h1>;
     }
-    ReactDOM.render(
-        <App name="Nanobot"/>,
-      document.getElementById('root')
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(
+      <React.StrictMode>
+        <App name="Nanobotty"/>
+      </React.StrictMode>
     );
   </script>
   <script>
