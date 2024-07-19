@@ -56,9 +56,13 @@ dev-check:
 dev-test:
 	find src/ tests/ | entr make test
 
+.PHONY: serve
+serve:
+	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
+
 .PHONY: dev-serve
 dev-serve:
-	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
+	find src/ | entr -rs 'cargo build && target/debug/nanobot serve'
 
 build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
 	rm -rf $|
