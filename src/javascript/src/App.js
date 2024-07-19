@@ -5,12 +5,14 @@ import 'bootstrap/dist/css/bootstrap.css';
 import 'react-bootstrap-typeahead/css/Typeahead.css';
 
 function App() {
+  const table = document.getElementById("root").getAttribute("data-table");
+  const column = document.getElementById("root").getAttribute("data-column");
   const [isLoading, setIsLoading] = useState(false);
   const [options, setOptions] = useState([]);
   const handleSearch = (query: string) => {
     setIsLoading(true);
-    // console.log("FETCH", `/table?text=${query}&column=type&format=json`);
-    fetch(`/table?text=${query}&column=type&format=json`)
+    console.log("FETCH", `/table?text=${query}&column=type&format=json`);
+    fetch(`/${table}?text=${query}&column=${column}&format=json`)
       .then((resp) => resp.json())
       .then((items) => {
         // console.log("ITEMS", items);
