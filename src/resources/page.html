@@ -168,7 +168,11 @@
     </div>
   </nav>
 
-  <div id="root"></div>
+  <form method="GET">
+    <div id="root"></div>
+    <input id="root-value" name="root-value" type="hidden" value="def"/>
+    <input type="submit"/>
+  </form>
 
   <div id="content" class="container-fluid">
     {% if page.elapsed %}<p class="float-end">{{ page.elapsed }}ms</p>{% endif %}

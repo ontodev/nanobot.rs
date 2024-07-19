@@ -9,11 +9,11 @@ function App() {
   const [options, setOptions] = useState([]);
   const handleSearch = (query: string) => {
     setIsLoading(true);
-    console.log("FETCH", `/table?text=${query}&column=type&format=json`);
+    // console.log("FETCH", `/table?text=${query}&column=type&format=json`);
     fetch(`/table?text=${query}&column=type&format=json`)
       .then((resp) => resp.json())
       .then((items) => {
-        console.log("ITEMS", items);
+        // console.log("ITEMS", items);
         setOptions(items);
         setIsLoading(false);
       });
@@ -22,6 +22,14 @@ function App() {
     <div className="App">
       <AsyncTypeahead
         isLoading={isLoading}
+        onChange={(selected) => {
+          // console.log("SELECTED", selected);
+          var values = selected.map((item) => item.id);
+          // console.log("VALUES", values);
+          var value = values.join(" ");
+          // console.log("VALUE", value);
+          document.getElementById("root-value").value = value;
+        }}
         onSearch={handleSearch}
         options={options}
         multiple="true"
