@@ -13,6 +13,7 @@ usage:
 deps:
 	sudo apt-get update
 	sudo apt-get install -y rustc cargo
+	sudo apt-get install -y nodejs npm
 	sudo apt-get install -y python3-pip
 	sudo pip install tesh
 	npm install -g tree-sitter-cli@0.21
@@ -24,11 +25,11 @@ format:
 	cargo fmt
 
 .PHONY: build
-build:
+build: src/javascript/build/main.js
 	cargo build --release
 
 clean:
-	rm -rf build/
+	rm -rf build/ src/javascript/build/
 
 build/ build/penguins/:
 	mkdir -p $@
@@ -36,11 +37,18 @@ build/ build/penguins/:
 build/penguins/%/:
 	mkdir -p $@
 
-target/debug/nanobot: Cargo.* src/**
+target/debug/nanobot: Cargo.* src/** src/javascript/build/main.js
 	cargo build
 
-target/release/nanobot: Cargo.* src/**
+target/release/nanobot: Cargo.* src/** src/javascript/build/main.js
 	cargo build --release
+
+src/javascript/build/main.js: src/javascript/package.* src/javascript/src/* src/javascript/public/*
+	cd src/javascript/ \
+	&& npm install \
+	&& npm run build \
+	&& cp build/static/js/main.*.js build/main.js \
+	&& cp build/static/css/main.*.css build/main.css
 
 TEST_TABLES = ldtab prefix statement
 TEST_TSVS = $(foreach T,$(TEST_TABLES),src/resources/test_data/$(T).tsv)

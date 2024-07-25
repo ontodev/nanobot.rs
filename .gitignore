@@ -12,6 +12,8 @@
 /shell.nix
 /temp/
 /.venv/
+/src/javascript/node_modules/
+/src/javascript/build/
 
 /examples/penguins/table/nanobot.toml
 

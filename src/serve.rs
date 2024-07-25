@@ -2,7 +2,7 @@ use crate::{config::Config, get, ldtab, tree_view};
 use ansi_to_html;
 use axum::{
     extract::{Form, Path, Query, State},
-    http::StatusCode,
+    http::{header, HeaderMap, StatusCode},
     response::{Html, IntoResponse, Json, Redirect},
     routing::get,
     Router,
@@ -49,6 +49,8 @@ pub fn build_app(shared_state: Arc<AppState>) -> Router {
     // build our application with a route
     let router = Router::new()
         .route("/", get(root))
+        .route("/_/main.js", get(main_js))
+        .route("/_/main.css", get(main_css))
         .route("/:table", get(get_table).post(post_table))
         .route("/:table/:subject", get(get_tree))
         .route("/:table/row/:row_number", get(get_row).post(post_row))
@@ -116,6 +118,18 @@ async fn shutdown_signal() {
 async fn root() -> impl IntoResponse {
     tracing::info!("request root");
     Redirect::permanent("table")
+}
+
+async fn main_js() -> impl IntoResponse {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "text/javascript".parse().unwrap());
+    (headers, include_str!("javascript/build/main.js"))
+}
+
+async fn main_css() -> impl IntoResponse {
+    let mut headers = HeaderMap::new();
+    headers.insert(header::CONTENT_TYPE, "text/css".parse().unwrap());
+    (headers, include_str!("javascript/build/main.css"))
 }
 
 async fn post_table(
