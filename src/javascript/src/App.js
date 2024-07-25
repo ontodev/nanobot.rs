@@ -1,4 +1,4 @@
-import { AsyncTypeahead, Token } from 'react-bootstrap-typeahead';
+import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 import { useState } from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.css';
