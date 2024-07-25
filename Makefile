@@ -64,7 +64,7 @@ EXAMPLE_DBS := $(foreach EXAMPLE,$(EXAMPLES),build/penguins/$(EXAMPLE)/.nanobot.
 test-examples: $(EXAMPLE_DBS)
 
 .PHONY: test-code
-test-code:
+test-code: src/javascript/build/main.js
 	cargo fmt --check
 	cargo test
 
