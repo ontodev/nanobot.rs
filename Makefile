@@ -3,6 +3,7 @@ usage:
 	@echo "make [TASK]"
 	@echo "  format     reformat code"
 	@echo "  build      build release"
+	@echo "  clean      remove build files"
 	@echo "  test       run all tests"
 	@echo "  dev-check  watch for changes and run cargo check"
 	@echo "  dev-test   watch for changes and run tests"
@@ -26,27 +27,45 @@ format:
 build:
 	cargo build --release
 
+clean:
+	rm -rf build/
+
 build/ build/penguins/:
 	mkdir -p $@
 
-target/debug/nanobot: src/
+build/penguins/%/:
+	mkdir -p $@
+
+target/debug/nanobot: Cargo.* src/**
 	cargo build
 
-target/release/nanobot: src/
+target/release/nanobot: Cargo.* src/**
 	cargo build --release
 
 TEST_TABLES = ldtab prefix statement
-TEST_TSVS = $(foreach T,${TEST_TABLES},src/resources/test_data/${T}.tsv)
-src/resources/test_data/zfa_excerpt.db: ${TEST_TSVS}
+TEST_TSVS = $(foreach T,$(TEST_TABLES),src/resources/test_data/$(T).tsv)
+src/resources/test_data/zfa_excerpt.db: $(TEST_TSVS)
 	rm -f $@
 	sqlite3 $@ ".mode tabs" \
-	$(foreach T,${TEST_TABLES},".import src/resources/test_data/${T}.tsv ${T}")
+	$(foreach T,$(TEST_TABLES),".import src/resources/test_data/$(T).tsv $(T)")
 
-.PHONY: test
-test: target/debug/nanobot build/penguins/.nanobot.db
+EXAMPLES := table tables
+EXAMPLE_DBS := $(foreach EXAMPLE,$(EXAMPLES),build/penguins/$(EXAMPLE)/.nanobot.db)
+
+.PHONY: test-examples
+test-examples: $(EXAMPLE_DBS)
+
+.PHONY: test-code
+test-code:
 	cargo fmt --check
 	cargo test
+
+.PHONY: test-docs
+test-docs:
 	PATH="$${PATH}:$$(pwd)/target/debug"; tesh --debug false ./doc
+
+.PHONY: test
+test: test-code test-examples test-docs
 
 .PHONY: dev-check
 dev-check:
@@ -60,18 +79,18 @@ dev-test:
 dev-serve:
 	find src/ | entr -rs 'cargo build --release && target/release/nanobot serve'
 
-build/penguins/.nanobot.db: target/debug/nanobot examples/penguins/ | build/penguins/
+build/penguins/%/.nanobot.db: target/debug/nanobot examples/penguins/% | build/penguins/%/
 	rm -rf $|
 	mkdir -p $|
-	cp -r examples/penguins/* $|
-	mkdir -p $|/src/data/
+	cp -r $(word 2,$^) build/penguins/
 	cd $| \
-	&& python3 generate.py \
-	&& ../../$< init
+	&& rm -f .nanobot.db \
+	&& python3 ../../../examples/penguins/generate.py src/data/penguin.tsv \
+	&& ../../../$< init
 
 .PHONY: penguins
-penguins: target/debug/nanobot build/penguins/.nanobot.db
-	cd build/penguins && ../../$< serve
+penguins: target/debug/nanobot build/penguins/tables/.nanobot.db
+	cd $(dir $(word 2,$^)) && ../../../$< serve
 
 build/synthea.zip: | build
 	curl -L -o build/synthea.zip "https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip"

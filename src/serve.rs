@@ -839,7 +839,7 @@ async fn table(
         }
         let mut new_row = SerdeMap::new();
         for column in &columns {
-            if column != "row_number" {
+            if !vec!["row_number", "row_order"].contains(&column.as_str()) {
                 let value = match form_params.get(column) {
                     Some(v) => v.to_string(),
                     None => {
@@ -913,7 +913,7 @@ async fn table(
         if let None = form_map {
             let mut new_row = SerdeMap::new();
             for column in &columns {
-                if column != "row_number" {
+                if !vec!["row_number", "row_order"].contains(&column.as_str()) {
                     let value = query_params
                         .get(column)
                         .unwrap_or(&String::from(""))
@@ -1151,7 +1151,7 @@ fn render_row_from_database(
         let mut new_row = SerdeMap::new();
         // Use the list of columns for the table from the db to look up their values in the form:
         for column in &get_columns(table, valve)? {
-            if column != "row_number" {
+            if !vec!["row_number", "row_order"].contains(&column.as_str()) {
                 let value = match form_params.get(column) {
                     Some(v) => v.to_string(),
                     None => {
@@ -1323,7 +1323,7 @@ fn matches_nulltype(table: &str, column: &str, value: &str, valve: &Valve) -> Re
 fn get_messages(row: &SerdeMap) -> Result<HashMap<String, Vec<String>>, String> {
     let mut messages = HashMap::new();
     for (header, details) in row {
-        if header == "row_number" {
+        if vec!["row_number", "row_order"].contains(&header.as_str()) {
             continue;
         }
         if let Some(SerdeValue::Array(row_messages)) = details.get("messages") {
@@ -1596,7 +1596,7 @@ fn metafy_row(row: &mut SerdeMap) -> Result<SerdeMap, String> {
         _ => return Err(format!("No array called 'messages' in row: {:?}", row).into()),
     };
     for (column, value) in row {
-        if column == "message" || column == "row_number" {
+        if vec!["row_number", "row_order", "message"].contains(&column.as_str()) {
             continue;
         }
         let mut metafied_cell = SerdeMap::new();
@@ -1649,10 +1649,7 @@ fn get_row_as_form_map(
     let mut row_valid = None;
     let mut form_row_id = 0;
     for (cell_header, cell_value) in row_data.iter() {
-        if cell_header == "row_number" {
-            continue;
-        }
-        if cell_header == "history" {
+        if vec!["row_number", "row_order", "history"].contains(&cell_header.as_str()) {
             continue;
         }
         let (valid, value, messages);

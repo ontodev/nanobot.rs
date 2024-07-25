@@ -1,0 +1,10 @@
+table	path	type	description
+table	src/schema/table.tsv	table	the tables in this project
+column	src/schema/column.tsv	column	the columns for all of the tables
+datatype	src/schema/datatype.tsv	datatype	the datatypes for all of the columns
+penguin	src/data/penguin.tsv		penguin measurement data
+species	src/schema/species.tsv		the species in the study
+region	src/schema/region.tsv		the geographical regions in the study
+island	src/schema/island.tsv		the islands in the study
+stage	src/schema/stage.tsv		the developmental stages in the study
+sex	src/schema/sex.tsv		the biological sexes in the study

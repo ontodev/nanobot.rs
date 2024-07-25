@@ -1,0 +1,7 @@
+[nanobot]
+config_version = 1
+port = 3000
+results_per_page = 20
+
+[logging]
+level = "DEBUG"

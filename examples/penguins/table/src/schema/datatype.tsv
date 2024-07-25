@@ -1,0 +1,19 @@
+datatype	parent	condition	description	sql_type	html_type
+text			any text	TEXT	textarea
+empty	text	equals('')	the empty string	NULL	
+nonempty	text	match(/.+/)	non-empty		
+left_trimmed_text	nonempty	match(/\S.*/)	text that does not begin with whitespace		
+trimmed_text	left_trimmed_text	match(/(\S|\S.*\S)/)	text that does not begin or end with whitespace		
+line	nonempty	match(/[^\n]+/)	one line of text		input
+left_trimmed_line	line	match(/\S[^\n]*/)	a line that does not begin with whitespace		
+trimmed_line	left_trimmed_line	match(/(\S|\S[^\n]*\S)/)	a line that does not begin or end with whitespace		
+nonspace	trimmed_line	match(/\S+/)	non-space characters		
+word	trimmed_line	match(/\w+/)	a single word: letters, numbers, underscore		
+natural_number	nonspace	match(/\d+/)	an integer greater than zero	INTEGER	
+positive_decimal	nonspace	match(/\d+.\d+/)	a number with decimal places, greater than zero	NUMERIC	
+negative_decimal	nonspace	match(/-\d+.\d+/)	a number with decimal places, less than than zero	NUMERIC	
+date	nonspace	match(/\d\d\d\d-\d\d-\d\d/)	a date in YYYY-MM-DD format		
+individual_id	word	match(/N\d+A\d/)	an ID for an individual penguin: Nest number + Adult number		
+table_type	word	in('table', 'column', 'datatype')	a VALVE table type		search
+sql_type	word	in('NULL', 'TEXT', 'INTEGER', 'REAL', 'NUMERIC')	a SQL type		search
+html_type	word	in('input', 'textarea', 'search', 'radio', 'number', 'select')	an HTML form type		search

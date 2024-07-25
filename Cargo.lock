@@ -299,18 +299,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-scoped"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e7a6a57c8aeb40da1ec037f5d455836852f7a57e69e1b1ad3d8f38ac1d6cadf"
-dependencies = [
- "async-std",
- "futures",
- "pin-project",
- "slab",
-]
-
-[[package]]
 name = "async-signal"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -631,6 +619,7 @@ dependencies = [
  "anstyle",
  "clap_lex",
  "strsim",
+ "terminal_size",
 ]
 
 [[package]]
@@ -1017,6 +1006,12 @@ name = "finl_unicode"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fcfdc7a0362c9f4444381a9e697c79d435fe65b52a37466fc2c1184cee9edc6"
+
+[[package]]
+name = "fix_fn"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "380f193e13417258cee0f6f750a1be449bfaa476874985fd6690be580086f7f1"
 
 [[package]]
 name = "fixedbitset"
@@ -1636,6 +1631,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
+name = "lfu_cache"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18333c3c9ae8f731098d650474d07785570bf5ab1e1f33750731b7c9ef562009"
+
+[[package]]
 name = "libc"
 version = "0.2.153"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1981,17 +1982,17 @@ dependencies = [
 [[package]]
 name = "ontodev_valve"
 version = "0.2.2"
-source = "git+https://github.com/ontodev/valve.rs?rev=b1a0b282bbccf8817901bf45494f25316afb9ac2#b1a0b282bbccf8817901bf45494f25316afb9ac2"
+source = "git+https://github.com/ontodev/valve.rs?rev=1858972dec231f874c87f3fd930cbeef47a444d3#1858972dec231f874c87f3fd930cbeef47a444d3"
 dependencies = [
  "anyhow",
- "argparse",
  "async-recursion",
- "async-scoped",
  "async-std",
+ "clap",
  "crossbeam",
  "csv",
  "enquote",
  "env_logger",
+ "fix_fn",
  "futures",
  "indexmap 1.9.3",
  "indoc",
@@ -2000,12 +2001,16 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
+ "lfu_cache",
  "log",
  "num_cpus",
+ "pad",
  "petgraph",
  "proceed",
  "rand",
+ "rand_regex",
  "regex",
+ "regex-syntax 0.8.3",
  "serde",
  "serde_json",
  "sprintf",
@@ -2062,6 +2067,15 @@ name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
+name = "pad"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2ad9b889f1b12e0b9ee24db044b5129150d5eada288edc800f789928dc8c0e3"
+dependencies = [
+ "unicode-width",
+]
 
 [[package]]
 name = "parking"
@@ -2302,6 +2316,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "rand_regex"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bfbd599a8c757f89100e3ae559fb1ef9efa1cfd9276136862e3089dec627b31"
+dependencies = [
+ "rand",
+ "regex-syntax 0.8.3",
 ]
 
 [[package]]
@@ -3019,6 +3043,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "terminal_size"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "21bebf2b7c9e0a515f6e0f8c51dc0f8e4696391e6f1ff30379559f8365fb0df7"
+dependencies = [
+ "rustix 0.38.34",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

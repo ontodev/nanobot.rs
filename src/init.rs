@@ -1,4 +1,4 @@
-use crate::config::{to_toml, Config};
+use crate::config::{to_toml, Config, LoggingLevel};
 use ontodev_valve::valve::Valve;
 use std::error;
 use std::fs;
@@ -183,12 +183,15 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
     }
 
     (config.valve, config.pool) = {
-        let valve = Valve::build(&valve_path, &config.connection)
+        let mut valve = Valve::build(&valve_path, &config.connection)
             .await
             .expect(&format!(
                 "VALVE failed to load configuration for '{}'",
                 valve_path
             ));
+        if config.logging_level == LoggingLevel::DEBUG {
+            valve.set_verbose(true);
+        }
         let pool = valve.pool.clone();
         (Some(valve), Some(pool))
     };

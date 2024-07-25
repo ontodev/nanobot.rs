@@ -1,4 +1,4 @@
-datatype	parent	condition	structure	transform	description	SQL type	HTML type
+datatype	parent	condition	structure	transform	description	sql_type	html_type
 text					any text	TEXT	textarea
 empty	text	equals('')			the empty string	NULL	
 line	text	exclude(/\\\\\\\n/)			one line of text		text
