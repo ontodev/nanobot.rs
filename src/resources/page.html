@@ -168,12 +168,6 @@
     </div>
   </nav>
 
-  <form method="GET">
-    <div id="root" data-table="table" data-column="type"></div>
-    <input id="root-value" name="root-value" type="hidden" value="def"/>
-    <input type="submit"/>
-  </form>
-
   <div id="content" class="container-fluid">
     {% if page.elapsed %}<p class="float-end">{{ page.elapsed }}ms</p>{% endif %}
     {% if page.repo %}
@@ -224,49 +218,6 @@
       });
     }
     friendlifyMoments();
-
-    function configure_typeahead_form(node, table) {
-      if (!node.id || !node.id.endsWith("-typeahead-form")) {
-        return;
-      }
-      var col = node.id.split("-")[0];
-      var bloodhound = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.nonword('label'),
-        queryTokenizer: Bloodhound.tokenizers.nonword,
-        sorter: function (a, b) {
-          return a.order - b.order;
-        },
-        remote: {
-          url: `../../${table}?text=%QUERY&column=${col}&format=json`,
-          wildcard: '%QUERY',
-          transform: function (response) {
-            return bloodhound.sorter(response);
-          }
-        }
-      });
-      $(node).typeahead({
-        minLength: 0,
-        hint: false,
-        highlight: true
-      }, {
-        name: `${table}`,
-        source: bloodhound,
-        display: function (item) {
-          return item.label;
-        },
-        limit: 40
-      });
-      $(node).bind('click', function (e) {
-        $(node).select();
-      });
-      var cls = node.className;
-      if (cls.includes("is-invalid")) {
-        var parent = node.parentElement;
-        var parentCls = parent.className;
-        parent.className = parentCls + " is-invalid";
-      }
-    }
-    <!-- $('.typeahead').each(function () {configure_typeahead_form(this, "{{ table_name }}");}); -->
   </script>
   {% block body_end %}{% endblock %}
 </body>

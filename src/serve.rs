@@ -1703,16 +1703,14 @@ fn get_row_as_form_map(
         let datatype = column_config.datatype;
         let structure = column_config.structure.split('(').collect::<Vec<_>>()[0];
 
-        let mut html_type;
-        let mut allowed_values = None;
-        if vec!["from", "in", "tree", "under"].contains(&structure) {
-            html_type = Some("search".into());
-        } else {
-            (html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
-        }
-
-        if allowed_values != None && html_type == None {
-            html_type = Some("search".into());
+        let (mut html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
+        if html_type == None {
+            if allowed_values != None {
+                html_type = Some("search".into());
+            }
+            if vec!["from", "in", "tree", "under"].contains(&structure) {
+                html_type = Some("search".into());
+            }
         }
 
         let readonly;
@@ -1725,6 +1723,7 @@ fn get_row_as_form_map(
         };
 
         let hiccup_form_row = get_hiccup_form_row(
+            table_name,
             cell_header,
             &None,
             &allowed_values,
@@ -1757,6 +1756,7 @@ fn get_row_as_form_map(
 }
 
 fn get_hiccup_form_row(
+    table_name: &str,
     header: &str,
     allow_delete: &Option<bool>,
     allowed_values: &Option<Vec<String>>,
@@ -1904,17 +1904,22 @@ fn get_hiccup_form_row(
             select_element.insert(2, json!(["option", {"value": "", "selected": true}]));
         }
         value_col.push(json!(select_element));
-    } else if vec!["text", "number", "search"].contains(&html_type) {
+    } else if vec!["text", "number", "search", "multisearch"].contains(&html_type) {
         // TODO: This html type will need to be re-implemented (later).
         // TODO: Support a range restriction for 'number'
         classes.insert(0, "form-control");
         input_attrs.insert("type".to_string(), json!(html_type));
-        if html_type == "search" {
+        if ["search", "multisearch"].contains(&html_type) {
             classes.append(&mut vec!["search", "typeahead"]);
+            if html_type == "multisearch" {
+                classes.push("multiple");
+            }
             input_attrs.insert(
                 "id".to_string(),
                 json!(format!("{}-typeahead-form", header)),
             );
+            input_attrs.insert("data-table".to_string(), json!(table_name));
+            input_attrs.insert("data-column".to_string(), json!(header));
         }
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         match value {
