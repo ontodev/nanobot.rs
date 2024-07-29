@@ -9,7 +9,7 @@ function App(args) {
   const [isLoading, setIsLoading] = useState(false);
   const [options, setOptions] = useState([]);
 
-  const handleSearch = (query: string) => {
+  const handleSearch = (query) => {
     // console.log("Starting search for", query);
     setIsLoading(true);
     const url = `../../${args.table}?text=${query}&column=${args.column}&format=json`;
@@ -27,7 +27,7 @@ function App(args) {
   var selected = [{"id": args.value, "label": args.value, "order": 1}];
   if (args.multiple) {
     value = "";
-    selected = args.value.trim().split(" ").filter((item) => {
+    selected = args.value.trim().split(args.separator).filter((item) => {
         return item.trim() !== "";
       }).map((item, order) => {
         return {"id": item, "label": item, "order": order}
@@ -46,7 +46,11 @@ function App(args) {
         onChange={(selected) => {
           // Set value of original input element to selected value.
           var values = selected.map((item) => item.id);
-          document.getElementById(args.id).value = values.join(" ");
+          var value = values.join(args.separator).trim();
+          document.getElementById(args.id).value = value;
+          if (value === "") {
+            handleSearch("");
+          }
         }}
         onFocus={(event) => {
           // Search for current values.

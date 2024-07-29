@@ -1701,18 +1701,35 @@ fn get_row_as_form_map(
             column_config.label.to_string()
         };
         let datatype = column_config.datatype;
-        let structure = column_config.structure.split('(').collect::<Vec<_>>()[0];
 
         let (mut html_type, allowed_values) = get_html_type_and_values(config, &datatype, &None)?;
-        if html_type == None {
-            if allowed_values != None {
-                html_type = Some("search".into());
-            }
-            if vec!["from", "in", "tree", "under"].contains(&structure) {
-                html_type = Some("search".into());
+
+        let datatype_condition = valve
+            .datatype_conditions
+            .get(&datatype)
+            .and_then(|d| Some(d.parsed.clone()));
+        let mut separator = None;
+        if let Some(Expression::Function(name, args)) = datatype_condition.clone() {
+            if name == "list" {
+                for arg in args {
+                    if let Expression::Label(arg) = *arg {
+                        separator = Some(unquote(&arg).unwrap_or_else(|_| arg));
+                    }
+                }
             }
         }
 
+        let structure = column_config.structure.split('(').collect::<Vec<_>>()[0];
+        if html_type.is_none() || html_type.clone().is_some_and(|h| h == "text") {
+            if vec!["from", "tree"].contains(&structure) {
+                html_type = Some("search".into());
+            } else if allowed_values != None {
+                html_type = Some("search".into());
+            }
+        }
+        if separator.is_some() && html_type.clone().is_some_and(|h| h == "search") {
+            html_type = Some("multisearch".into());
+        }
         let readonly;
         match html_type {
             Some(s) if s == "readonly" => {
@@ -1730,6 +1747,7 @@ fn get_row_as_form_map(
             &Some(description),
             &Some(label),
             &html_type,
+            &separator,
             &Some(message),
             &Some(readonly),
             &Some(valid),
@@ -1763,6 +1781,7 @@ fn get_hiccup_form_row(
     description: &Option<String>,
     display_header: &Option<String>,
     html_type: &Option<String>,
+    separator: &Option<String>,
     message: &Option<String>,
     readonly: &Option<bool>,
     valid: &Option<bool>,
@@ -1920,6 +1939,9 @@ fn get_hiccup_form_row(
             );
             input_attrs.insert("data-table".to_string(), json!(table_name));
             input_attrs.insert("data-column".to_string(), json!(header));
+            if let Some(separator) = separator {
+                input_attrs.insert("data-separator".to_string(), json!(separator));
+            }
         }
         input_attrs.insert("class".to_string(), json!(classes.join(" ")));
         match value {

@@ -22,6 +22,7 @@ for (var i=0; i < typeaheads.length; i++) {
         value={typeahead.getAttribute("value")}
         table={typeahead.getAttribute("data-table")}
         column={typeahead.getAttribute("data-column")}
+        separator={typeahead.getAttribute("data-separator")}
         multiple={typeahead.classList.contains("multiple")}
         isValid={typeahead.classList.contains("is-valid")}/>
     </React.StrictMode>
