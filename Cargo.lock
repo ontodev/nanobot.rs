@@ -1982,7 +1982,7 @@ dependencies = [
 [[package]]
 name = "ontodev_valve"
 version = "0.2.2"
-source = "git+https://github.com/ontodev/valve.rs?rev=6025da044de289861973a62f83484d9cca03c78f#6025da044de289861973a62f83484d9cca03c78f"
+source = "git+https://github.com/ontodev/valve.rs?rev=ece707684f7a836837ce7d079c103a27df6a85d7#ece707684f7a836837ce7d079c103a27df6a85d7"
 dependencies = [
  "anyhow",
  "async-recursion",
