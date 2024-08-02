@@ -14,6 +14,11 @@ positive_decimal	nonspace	match(/\d+.\d+/)	a number with decimal places, greater
 negative_decimal	nonspace	match(/-\d+.\d+/)	a number with decimal places, less than than zero	NUMERIC	
 date	nonspace	match(/\d\d\d\d-\d\d-\d\d/)	a date in YYYY-MM-DD format		
 individual_id	word	match(/N\d+A\d/)	an ID for an individual penguin: Nest number + Adult number		
+species	trimmed_line	in('Adelie Penguin (Pygoscelis adeliae)')			search
+regions	word	in('Anvers')			search
+islands	word	in('Biscoe', 'Dream', 'Torgersen')			search
+stages	trimmed_line	in('Adult, 1 Egg Stage')			search
+sexes	word	in('FEMALE', 'MALE')			search
 table_type	word	in('table', 'column', 'datatype')	a VALVE table type		search
 sql_type	word	in('NULL', 'TEXT', 'INTEGER', 'REAL', 'NUMERIC')	a SQL type		search
 html_type	word	in('input', 'textarea', 'search', 'radio', 'number', 'select')	an HTML form type		search

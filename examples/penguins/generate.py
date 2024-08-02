@@ -216,7 +216,7 @@ def main():
     parser.add_argument("path", type=str, help="The output file path")
     parser.add_argument("count", type=int, default=1000,
                         nargs="?", help="The number of rows [1000]")
-    parser.add_argument("rate", type=int, default=10, nargs="?",
+    parser.add_argument("rate", type=float, default=10, nargs="?",
                         help="The percentage of rows with errors [10]")
     parser.add_argument("seed", type=int, nargs="?",
                         default=0, help="The random seed [0]")
