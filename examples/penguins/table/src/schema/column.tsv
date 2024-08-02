@@ -19,10 +19,10 @@ datatype	sql_type	SQL type	empty	sql_type		the SQLite type for representing this
 datatype	html_type	HTML type	empty	html_type		the HTML type for viewing and editing this data
 penguin	study_name	studyName		word		the name of the study
 penguin	sample_number	Sample Number		natural_number	primary	the sample identifier
-penguin	species	Species		trimmed_line		the species of the measured individual
-penguin	region	Region		trimmed_line		the region where the measurement took place
-penguin	island	Island		trimmed_line		the island where the measurement took place
-penguin	stage	Stage		trimmed_line		the growth stage of the individual
+penguin	species	Species		species		the species of the measured individual
+penguin	region	Region		regions		the region where the measurement took place
+penguin	island	Island		islands		the island where the measurement took place
+penguin	stage	Stage		stages		the growth stage of the individual
 penguin	individual_id	Individual ID		individual_id	unique	the ID of the measured individual
 penguin	clutch_completion	Clutch Completion		word		whether the measured individual's clutch of eggs was complete
 penguin	date_egg	Date Egg		date		the date that an egg in the clutch was observed
@@ -30,7 +30,7 @@ penguin	culmen_length	Culmen Length (mm)		positive_decimal		the length of the cu
 penguin	culmen_depth	Culmen Depth (mm)		positive_decimal		the depth of the culmen of the individual, in millimetres
 penguin	flipper_length	Flipper Length (mm)		natural_number		the length of the individual's flipper, in millimetres
 penguin	body_mass	Body Mass (g)		natural_number		the body mass of the individual, in grams
-penguin	sex	Sex		word		the sex of the individual
+penguin	sex	Sex		sexes		the sex of the individual
 penguin	delta_15_n	Delta 15 N (o/oo)		positive_decimal		the Delta 15 N measurement
 penguin	delta_13_c	Delta 13 C (o/oo)		negative_decimal		the Delta 13 C measurement
 penguin	comments	Comments	empty	trimmed_text		comments on the measurement or the individual
