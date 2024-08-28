@@ -1,10 +1,11 @@
-datatype	parent	condition	structure	transform	description	sql_type	html_type
-text					any text	TEXT	textarea
-empty	text	equals('')			the empty string	NULL	
-line	text	exclude(/\\\\\\\n/)			one line of text		text
-label	line	match(/[^\s]+.+[^\s]/)			text that does not begin or end with whitespace		
-word	label	exclude(/\W/)			a single word: letters, numbers, underscore		
-table_type	word	in('table', 'column', 'datatype')			a VALVE table type		search
-sql_type	word	in('NULL', 'TEXT', 'INT')			a SQL type		search
-html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')			an HTML form type		search
-trimmed_line	line		match(/\S([^\n]*\S)*/)		a line of text that does not begin or end with whitespace		
+datatype	parent	condition	sql_type	html_type	description
+text			TEXT	textarea	any text
+empty	text	equals('')	NULL		the empty string
+line	text	exclude(/\\\\\\\n/)		text	one line of text
+trimmed_line	line	match(/\S([^\n]*\S)*/)			a line of text that does not begin or end with whitespace
+label	trimmed_line	match(/\S.+\S/)			text that does not begin or end with whitespace
+nonspace	label	match(/\S+/)			non-space characters
+word	nonspace	match(/\w+/)			a single word: letters, numbers, underscore
+table_type	word	in('table', 'column', 'datatype')		search	a VALVE table type
+sql_type	word	in('NULL', 'TEXT', 'INT')		search	a SQL type
+html_type	word	in('text', 'textarea', 'search', 'radio', 'number', 'select')		search	an HTML form type
