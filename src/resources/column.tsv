@@ -13,8 +13,6 @@ column	description		empty	text		a description of this column
 datatype	datatype			word	primary	the name of this datatype
 datatype	parent		empty	word	tree(datatype)	the parent datatype
 datatype	condition		empty	line		the method for testing the datatype
-datatype	description		empty	text		a description of this datatype
-datatype	transform		empty	word		
-datatype	structure		empty	trimmed_line		
 datatype	sql_type		empty	sql_type		the SQLite type for representing this data
 datatype	html_type		empty	html_type		the HTML type for viewing and editing this data
+datatype	description		empty	text		a description of this datatype

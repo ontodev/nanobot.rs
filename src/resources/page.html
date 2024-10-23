@@ -8,6 +8,7 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet"
     integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link href="/_/main.css" rel="stylesheet">
   <!-- TODO: Verify that all of these style elements are really needed -->
   <style>
     a:link,
@@ -166,6 +167,7 @@
       </div>
     </div>
   </nav>
+
   <div id="content" class="container-fluid">
     {% if page.elapsed %}<p class="float-end">{{ page.elapsed }}ms</p>{% endif %}
     {% if page.repo %}
@@ -199,6 +201,9 @@
   <script type="text/javascript"
     src="https://cdnjs.cloudflare.com/ajax/libs/typeahead.js/0.11.1/typeahead.bundle.min.js">
     </script>
+
+  <script defer="defer" src="/_/main.js"></script>
+
   <script>
 
     // Replace GMT dates with local dates, and replace GMT dates with friendly time
@@ -213,49 +218,6 @@
       });
     }
     friendlifyMoments();
-
-    function configure_typeahead_form(node, table) {
-      if (!node.id || !node.id.endsWith("-typeahead-form")) {
-        return;
-      }
-      var col = node.id.split("-")[0];
-      var bloodhound = new Bloodhound({
-        datumTokenizer: Bloodhound.tokenizers.obj.nonword('label'),
-        queryTokenizer: Bloodhound.tokenizers.nonword,
-        sorter: function (a, b) {
-          return a.order - b.order;
-        },
-        remote: {
-          url: `../../${table}?text=%QUERY&column=${col}&format=json`,
-          wildcard: '%QUERY',
-          transform: function (response) {
-            return bloodhound.sorter(response);
-          }
-        }
-      });
-      $(node).typeahead({
-        minLength: 0,
-        hint: false,
-        highlight: true
-      }, {
-        name: `${table}`,
-        source: bloodhound,
-        display: function (item) {
-          return item.label;
-        },
-        limit: 40
-      });
-      $(node).bind('click', function (e) {
-        $(node).select();
-      });
-      var cls = node.className;
-      if (cls.includes("is-invalid")) {
-        var parent = node.parentElement;
-        var parentCls = parent.className;
-        parent.className = parentCls + " is-invalid";
-      }
-    }
-    $('.typeahead').each(function () {configure_typeahead_form(this, "{{ table_name }}");});
   </script>
   {% block body_end %}{% endblock %}
 </body>
