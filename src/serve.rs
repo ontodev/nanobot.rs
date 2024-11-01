@@ -154,6 +154,7 @@ async fn post_table(
         tracing::info!("SAVE");
         valve
             .save_all_tables(&None)
+            .await
             .map_err(|e| format!("{:?}", e))?;
         request_type = RequestType::GET;
     } else if form_params.contains_key("undo") {

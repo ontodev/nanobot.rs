@@ -177,7 +177,8 @@ async fn get_page(
     for col_config in column_configs.iter() {
         let key = col_config.column.to_string();
         let mut cmap_entry = json!(col_config).as_object_mut().unwrap().clone();
-        let sql_type = toolkit::get_sql_type_from_global_config(&valve.config, table, &key, &pool);
+        let sql_type =
+            toolkit::get_sql_type_from_global_config(&valve.config, table, &key, &valve.db_kind);
 
         // Get table.column that use this column as a foreign key constraint
         // and insert as "links".
@@ -766,7 +767,8 @@ pub fn get_undo_message(config: &Config) -> Option<String> {
         }
         Some(valve) => valve,
     };
-    let change = block_on(valve.get_change_to_undo()).ok()??;
+    let changes = block_on(valve.get_changes_to_undo(1)).ok()?;
+    let change = changes.into_iter().nth(1)?;
     Some(String::from(format!("Undo '{}'", change.message)))
 }
 
@@ -779,7 +781,8 @@ pub fn get_redo_message(config: &Config) -> Option<String> {
         }
         Some(valve) => valve,
     };
-    let change = block_on(valve.get_change_to_redo()).ok()??;
+    let changes = block_on(valve.get_changes_to_redo(1)).ok()?;
+    let change = changes.into_iter().nth(1)?;
     Some(String::from(format!("Redo '{}'", change.message)))
 }
 
