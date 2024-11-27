@@ -1991,7 +1991,7 @@ dependencies = [
 [[package]]
 name = "ontodev_valve"
 version = "0.2.2"
-source = "git+https://github.com/ontodev/valve.rs?rev=92ed973db0cf94ba849256fd62ffd29a77f0e948#92ed973db0cf94ba849256fd62ffd29a77f0e948"
+source = "git+https://github.com/ontodev/valve.rs?rev=94504e2604c3266d5e6a2abed18348b4e6a2ce4d#94504e2604c3266d5e6a2abed18348b4e6a2ce4d"
 dependencies = [
  "ansi_term",
  "anyhow",

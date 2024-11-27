@@ -143,7 +143,7 @@ async fn main() -> Result<(), NanobotError> {
             }
             if config.connection == ":memory:" {
                 (config.valve, config.pool) = {
-                    let valve = Valve::build(&config.valve_path, &config.connection).await?;
+                    let mut valve = Valve::build(&config.valve_path, &config.connection).await?;
                     let pool = valve.pool.clone();
                     let _ = valve.load_all_tables(true).await;
                     let table_select = Select::new("\"table\"");
