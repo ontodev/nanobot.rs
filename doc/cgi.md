@@ -20,6 +20,10 @@ The CGI environment variables are:
 - `PATH_INFO` with the path part of the URL, defaults to `/table`
 - `QUERY_STRING` with the query string part of the URL, which is optional
 
+Nanobot also checks these environment variables:
+
+- `NANOBOT_READONLY`: when `TRUE` no editing is supporting; defaults to `FALSE`
+
 Nanobot will return an
 [HTTP response](https://en.wikipedia.org/wiki/HTTP#HTTP/1.1_response_messages),
 with a status line,
@@ -28,7 +32,15 @@ and blank line,
 and an optional message body
 which will usually contain the HTML or JSON response content.
 
-You can test this from the command-line like so:
+Nanobot's CGI mode works by
+starting the same HTTP server used for `nanobot serve` on a random port,
+executing the request,
+and printing the response to `STDOUT`.
+This is much less efficient than a long-running server,
+but it's very simple
+and works well enough for low volumes of traffic.
+
+You can test Nanobot CGI from the command-line like so:
 
 ```console tesh-session="cgi"
 $ nanobot init
@@ -45,14 +57,39 @@ column    src/schema/column.tsv    column    Columns for all of the tables.
 datatype  src/schema/datatype.tsv  datatype  Datatypes for all of the columns
 ```
 
-Nanobot's CGI mode works by
-starting the same HTTP server used for `nanobot serve` on a random port,
-executing the request,
-and printing the response to `STDOUT`.
-This is much less efficient than a long-running server,
-but it's very simple
-and works well enough for low volumes of traffic.
+We can POST a new row using CGI and form contents as `STDIN`:
 
+```console tesh-session="cgi"
+$ export GATEWAY_INTERFACE=CGI/1.1
+$ REQUEST_METHOD=POST PATH_INFO=/table nanobot <<< 'action=submit&table=foo'
+...
+$ PATH_INFO=/table.txt nanobot
+status: 200 OK
+content-type: text/plain
+content-length: 337
+date: ...
+
+table     path                     type      description
+table     src/schema/table.tsv     table     All of the tables in this project.
+column    src/schema/column.tsv    column    Columns for all of the tables.
+datatype  src/schema/datatype.tsv  datatype  Datatypes for all of the columns
+foo
+```
+
+When `NANOBOT_READONLY` is `TRUE`,
+POSTing will not work,
+and the WebUI will not include buttons for editing actions.
+
+```console tesh-session="cgi"
+$ export NANOBOT_READONLY=TRUE
+$ REQUEST_METHOD=POST PATH_INFO=/table nanobot <<< 'action=submit&table=bar'
+status: 403 Forbidden
+content-type: text/html; charset=utf-8
+content-length: 13
+date: ...
+
+403 Forbidden
+```
 
 ## Python
 
@@ -122,4 +159,3 @@ def run_cgi(path):
     # The `response` is set, so just return the body.
     return '\n'.join(body)
 ```
-

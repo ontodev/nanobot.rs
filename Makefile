@@ -69,7 +69,7 @@ test-code: src/javascript/build/main.js
 	cargo test
 
 .PHONY: test-docs
-test-docs:
+test-docs: target/debug/nanobot
 	PATH="$${PATH}:$$(pwd)/target/debug"; tesh --debug false ./doc
 
 .PHONY: test

@@ -18,6 +18,7 @@ pub struct Config {
     pub pool: Option<AnyPool>,
     pub valve: Option<Valve>,
     pub valve_path: String,
+    pub editable: bool,
     pub create_only: bool,
     pub asset_path: Option<String>,
     pub template_path: Option<String>,
@@ -319,6 +320,7 @@ impl Config {
                 .unwrap_or_default()
                 .path
                 .unwrap_or("src/schema/table.tsv".into()),
+            editable: true,
             create_only: false,
             asset_path: {
                 match user.assets.unwrap_or_default().path {
@@ -373,6 +375,11 @@ impl Config {
             );
         }
         self.connection = connection;
+        self
+    }
+
+    pub fn editable(&mut self, value: bool) -> &mut Config {
+        self.editable = value;
         self
     }
 

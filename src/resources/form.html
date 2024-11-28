@@ -59,6 +59,7 @@
     table_name }}</a> table.</h3>
 
 <div class="row" style="padding-bottom:5px; padding-top:20px;">
+  {% if page.editable and table.editable %}
   <form method="post">
     {% for column, form_row in form_map|items %}
     {{ form_row|safe }}
@@ -72,6 +73,11 @@
         <a class="btn btn-secondary" href="{{ page.root }}{{ table_name }}?offset={{ offset }}">Cancel</a>
       </div>
   </form>
+  {% else %}
+    {% for column, form_row in form_map|items %}
+    {{ form_row|safe }}
+    {% endfor %}
+  {% endif %}
 </div>
 
 {% endblock %}
