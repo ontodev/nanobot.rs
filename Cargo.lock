@@ -3833,7 +3833,7 @@ dependencies = [
 [[package]]
 name = "wiring_rs"
 version = "0.1.1"
-source = "git+https://github.com/ontodev/wiring.rs#b0d72ef78056316153312e1d68799bdabd6c467b"
+source = "git+https://github.com/ontodev/wiring.rs?rev=caf6d2be9c0468e451f1b547a79c90442d5a0bb7#caf6d2be9c0468e451f1b547a79c90442d5a0bb7"
 dependencies = [
  "rand",
  "regex",
