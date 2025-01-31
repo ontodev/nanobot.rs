@@ -69,7 +69,7 @@ test-code: src/javascript/build/main.js
 	cargo test
 
 .PHONY: test-docs
-test-docs:
+test-docs: target/debug/nanobot
 	PATH="$${PATH}:$$(pwd)/target/debug"; tesh --debug false ./doc
 
 .PHONY: test
@@ -136,11 +136,12 @@ endif
 BINARY_PATH := build/$(BINARY)
 
 # Build a Linux binary using Musl instead of GCC.
-target/x86_64-unknown-linux-musl/release/nanobot: src/*.rs
+target/x86_64-unknown-linux-musl/release/nanobot: Cargo.* src/*.rs
 	docker pull clux/muslrust:stable
 	docker run \
 		-v cargo-cache:/root/.cargo/registry \
 		-v $$PWD:/volume \
+		-v /home/knocean/valve.rs:/valve.rs \
 		--rm -t clux/muslrust:stable \
 		cargo build --release
 

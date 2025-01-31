@@ -1,6 +1,6 @@
 use crate::{config::Config, error::NanobotError, serve::build_app, sql::get_table_from_pool};
 use axum_test_helper::{TestClient, TestResponse};
-use clap::{arg, command, value_parser, Command};
+use clap::{arg, command, value_parser, Arg, Command};
 use ontodev_sqlrest::Select;
 use ontodev_valve::valve::Valve;
 use std::path::Path;
@@ -88,13 +88,22 @@ async fn main() -> Result<(), NanobotError> {
                 ),
         )
         .subcommand(
-            Command::new("serve").about("Run HTTP server").arg(
-                arg!(
-                    -c --connection <URL> "Specifies a database connection URL or file"
+            Command::new("serve")
+                .about("Run HTTP server")
+                .arg(
+                    arg!(
+                        -c --connection <URL> "Specifies a database connection URL or file"
+                    )
+                    .required(false)
+                    .value_parser(value_parser!(String)),
                 )
-                .required(false)
-                .value_parser(value_parser!(String)),
-            ),
+                .arg(
+                    Arg::new("read-only")
+                        .help("Run the server in read-only mode")
+                        .long("read-only")
+                        .required(false)
+                        .num_args(0),
+                ),
         )
         .get_matches();
 
@@ -141,9 +150,12 @@ async fn main() -> Result<(), NanobotError> {
             if let Some(c) = sub_matches.get_one::<String>("connection") {
                 config.connection(c);
             }
+            if let Some(r) = sub_matches.get_one::<bool>("read-only") {
+                config.editable = !*r;
+            }
             if config.connection == ":memory:" {
                 (config.valve, config.pool) = {
-                    let valve = Valve::build(&config.valve_path, &config.connection).await?;
+                    let mut valve = Valve::build(&config.valve_path, &config.connection).await?;
                     let pool = valve.pool.clone();
                     let _ = valve.load_all_tables(true).await;
                     let table_select = Select::new("\"table\"");
@@ -209,12 +221,6 @@ async fn build_valve(config: &mut Config) -> Result<(), NanobotError> {
 async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Result<String, String> {
     tracing::debug!("Processing CGI request with vars: {:?}", vars);
 
-    let shared_state = Arc::new(serve::AppState {
-        config: config.clone(),
-    });
-    let app = build_app(shared_state);
-    let client = TestClient::new(app);
-
     let request_method = vars
         .get("REQUEST_METHOD")
         .ok_or("No 'REQUEST_METHOD' in CGI vars".to_string())?;
@@ -224,6 +230,20 @@ async fn handle_cgi(vars: &HashMap<String, String>, config: &mut Config) -> Resu
     let query_string = vars
         .get("QUERY_STRING")
         .ok_or("No 'QUERY_STRING' in CGI vars".to_string())?;
+    let read_only = vars
+        .get("NANOBOT_READONLY")
+        .ok_or("No 'NANOBOT_READONLY' in CGI vars".to_string())?;
+
+    if read_only.to_lowercase() == "true" {
+        config.editable = false;
+    }
+
+    let shared_state = Arc::new(serve::AppState {
+        config: config.clone(),
+    });
+    let app = build_app(shared_state);
+    let client = TestClient::new(app);
+
     let mut url = path_info.clone();
     if !url.starts_with("/") {
         url = format!("/{}", path_info);
@@ -283,13 +303,19 @@ fn cgi_vars() -> Option<HashMap<String, String>> {
         _ => return None,
     };
 
-    for var in vec!["REQUEST_METHOD", "PATH_INFO", "QUERY_STRING"] {
+    for var in vec![
+        "REQUEST_METHOD",
+        "PATH_INFO",
+        "QUERY_STRING",
+        "NANOBOT_READONLY",
+    ] {
         match env::var_os(var).and_then(|p| Some(p.into_string())) {
             Some(Ok(s)) => vars.insert(var.to_string(), s),
             _ => match var {
                 "REQUEST_METHOD" => vars.insert(var.to_string(), "GET".to_string()),
                 "PATH_INFO" => vars.insert(var.to_string(), "/table".to_string()),
                 "QUERY_STRING" => vars.insert(var.to_string(), String::new()),
+                "NANOBOT_READONLY" => vars.insert(var.to_string(), String::from("FALSE")),
                 _ => {
                     // This should never happen since all possible cases should be handled above:
                     unreachable!(

@@ -177,7 +177,8 @@ async fn get_page(
     for col_config in column_configs.iter() {
         let key = col_config.column.to_string();
         let mut cmap_entry = json!(col_config).as_object_mut().unwrap().clone();
-        let sql_type = toolkit::get_sql_type_from_global_config(&valve.config, table, &key, &pool);
+        let sql_type =
+            toolkit::get_sql_type_from_global_config(&valve.config, table, &key, &valve.db_kind);
 
         // Get table.column that use this column as a foreign key constraint
         // and insert as "links".
@@ -410,19 +411,14 @@ async fn get_page(
     let end = select.offset.unwrap_or(0) + cell_rows.len();
 
     // Start with the VALVE table config, minus 'column' and 'column_order'.
-    let this_table_config = valve.config.table.get(&unquoted_table).unwrap();
-    let this_table_config = json!(this_table_config);
-    let mut this_table_config = this_table_config.as_object().unwrap().clone();
-    this_table_config.remove("column");
-    this_table_config.remove("column_order");
-    // Try to get Nanobot table config: will fail for "message" and "history" tables.
-    let mut this_table = config
-        .table
-        .iter()
-        .filter(|x| x.get("table").unwrap() == &json!(unquoted_table))
-        .next()
-        .unwrap_or(&this_table_config)
-        .clone();
+    let this_table = json!(table_config);
+    let mut this_table = this_table.as_object().unwrap().clone();
+    this_table.remove("column");
+    this_table.remove("column_order");
+    this_table.insert(
+        "editable".to_string(),
+        json!(table_config.options.contains("edit")),
+    );
     this_table.insert("table".to_string(), json!(unquoted_table.clone()));
     this_table.insert("href".to_string(), json!(unquoted_table.clone()));
     this_table.insert("start".to_string(), json!(select.offset.unwrap_or(0) + 1));
@@ -606,6 +602,7 @@ async fn get_page(
     let result: Value = json!({
         "page": {
             "project_name": "Nanobot",
+            "editable": config.editable,
             "tables": tables,
             "title": unquoted_table,
             "url": select2.to_url().unwrap_or_default(),
@@ -766,7 +763,8 @@ pub fn get_undo_message(config: &Config) -> Option<String> {
         }
         Some(valve) => valve,
     };
-    let change = block_on(valve.get_change_to_undo()).ok()??;
+    let changes = block_on(valve.get_changes_to_undo(1)).ok()?;
+    let change = changes.into_iter().nth(1)?;
     Some(String::from(format!("Undo '{}'", change.message)))
 }
 
@@ -779,7 +777,8 @@ pub fn get_redo_message(config: &Config) -> Option<String> {
         }
         Some(valve) => valve,
     };
-    let change = block_on(valve.get_change_to_redo()).ok()??;
+    let changes = block_on(valve.get_changes_to_redo(1)).ok()?;
+    let change = changes.into_iter().nth(1)?;
     Some(String::from(format!("Redo '{}'", change.message)))
 }
 

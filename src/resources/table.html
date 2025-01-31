@@ -256,7 +256,7 @@
       </ul>
     </span>
 
-    {% if table.table != "message" %}
+    {% if page.editable and table.editable %}
     <a class="btn btn-outline-success" href="{{ table.table }}?view={{ table.edit_view or 'form' }}">Add row</a>
     {% endif %}
 
@@ -291,8 +291,10 @@
       {% for col, cell in r|items -%}
       {% if col == "row_number" %}
       <td>
+        {% if page.editable and table.editable %}
         <a class="btn btn-sm" href="{{ table.href }}/row/{{ cell.value }}?view={{ table.edit_view or 'form' }}"><i
             class="bi-pencil" style="color: #adb5bd;"></i></a>
+        {% endif %}
       </td>
       {% elif col == "message_id" %}
       {% else %}

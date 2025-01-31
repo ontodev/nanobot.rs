@@ -197,11 +197,11 @@ pub async fn init(config: &mut Config) -> Result<String, String> {
     };
 
     // Create and/or load tables into database
-    match &config.valve {
+    match &mut config.valve {
         None => unreachable!("Valve is not initialized."),
         Some(valve) => {
             if config.create_only {
-                if let Err(e) = valve.create_all_tables().await {
+                if let Err(e) = valve.ensure_all_tables_created(&vec![]).await {
                     return Err(format!(
                         "VALVE error while creating from {}: {:?}",
                         valve_path, e

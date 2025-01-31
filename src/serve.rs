@@ -69,7 +69,6 @@ pub fn build_app(shared_state: Arc<AppState>) -> Router {
 #[tokio::main]
 pub async fn app(config: &Config) -> Result<String, String> {
     let shared_state = Arc::new(AppState {
-        //TODO: use &config instead of config.clone()?
         config: config.clone(),
     });
 
@@ -144,6 +143,11 @@ async fn post_table(
         query_params,
         form_params
     );
+    if !&state.config.editable {
+        return Err((StatusCode::FORBIDDEN, Html("403 Forbidden".to_string()))
+            .into_response()
+            .into());
+    }
     let mut request_type = RequestType::POST;
     let valve = state
         .config
@@ -154,6 +158,7 @@ async fn post_table(
         tracing::info!("SAVE");
         valve
             .save_all_tables(&None)
+            .await
             .map_err(|e| format!("{:?}", e))?;
         request_type = RequestType::GET;
     } else if form_params.contains_key("undo") {
@@ -321,6 +326,7 @@ fn action(
         "page": {
             "root": root,
             "project_name": "Nanobot",
+            "editable": &state.config.editable,
             "tables": table_map,
             "undo": get::get_undo_message(&state.config),
             "redo": get::get_redo_message(&state.config),
@@ -548,6 +554,7 @@ async fn tree(
         "page": {
             "root": "../",
             "project_name": "Nanobot",
+            "editable": &state.config.editable,
             "tables": table_map,
             "undo": get::get_undo_message(&state.config),
             "redo": get::get_redo_message(&state.config),
@@ -691,6 +698,7 @@ async fn tree2(
         "page": {
             "root": "../",
             "project_name": "Nanobot",
+            "editable": &state.config.editable,
             "tables": table_map,
             "undo": get::get_undo_message(&state.config),
             "redo": get::get_redo_message(&state.config),
@@ -848,6 +856,12 @@ async fn table(
     let mut form_map = None;
     let columns = get_columns(&table, valve)?;
     if request_type == RequestType::POST {
+        println!("config.editable = {}", config.editable);
+        if !config.editable {
+            return Err((StatusCode::FORBIDDEN, Html("403 Forbidden".to_string()))
+                .into_response()
+                .into());
+        }
         if view == "" {
             view = String::from("form");
         }
@@ -967,17 +981,29 @@ async fn table(
             json!(table_map)
         };
 
+        let editable = valve
+            .config
+            .table
+            .get(&table)
+            .ok_or(format!("Undefined table '{table}'"))?
+            .options
+            .contains("edit");
+
         // Fill in the page JSON containing all of the configuration parameters that we will be
         // passing (through page_to_html()) to the minijinja template:
         let page = json!({
             "page": {
                 "root": "",
                 "project_name": "Nanobot",
+                "editable": &state.config.editable,
                 "tables": table_map,
                 "undo": get::get_undo_message(&state.config),
                 "redo": get::get_redo_message(&state.config),
                 "actions": get::get_action_map(&state.config).unwrap_or_default(),
                 "repo": get::get_repo_details().unwrap_or_default(),
+            },
+            "table": {
+                "editable": editable,
             },
             "title": "table",
             "table_name": table,
@@ -1162,6 +1188,9 @@ fn render_row_from_database(
     let mut messages = HashMap::new();
     let mut form_map = None;
     if request_type == RequestType::POST {
+        if !config.editable {
+            return Ok((StatusCode::FORBIDDEN, Html("403 Forbidden".to_string())).into_response());
+        }
         let mut new_row = SerdeMap::new();
         // Use the list of columns for the table from the db to look up their values in the form:
         for column in &get_columns(table, valve)? {
@@ -1287,17 +1316,29 @@ fn render_row_from_database(
         json!(table_map)
     };
 
+    let editable = valve
+        .config
+        .table
+        .get(table)
+        .ok_or(format!("Undefined table '{table}'"))?
+        .options
+        .contains("edit");
+
     // Fill in the page JSON which contains all of the parameters that we will be passing to our
     // minijinja template (through page_to_html()):
     let page = json!({
         "page": {
             "root": "../../",
             "project_name": "Nanobot",
+            "editable": &state.config.editable,
             "tables": table_map,
             "undo": get::get_undo_message(&state.config),
             "redo": get::get_redo_message(&state.config),
             "actions": get::get_action_map(&state.config).unwrap_or_default(),
             "repo": get::get_repo_details().unwrap_or_default(),
+        },
+        "table": {
+            "editable": editable,
         },
         "title": "table",
         "table_name": table,
@@ -1730,7 +1771,7 @@ fn get_row_as_form_map(
         if separator.is_some() && html_type.clone().is_some_and(|h| h == "search") {
             html_type = Some("multisearch".into());
         }
-        let readonly;
+        let mut readonly;
         match html_type {
             Some(s) if s == "readonly" => {
                 readonly = true;
@@ -1738,6 +1779,18 @@ fn get_row_as_form_map(
             }
             _ => readonly = false,
         };
+        if !config.editable {
+            readonly = true;
+        }
+
+        let table_config = valve
+            .config
+            .table
+            .get(table_name)
+            .ok_or(format!("Undefined table '{table_name}'"))?;
+        if !table_config.options.contains("edit") {
+            readonly = true;
+        }
 
         let hiccup_form_row = get_hiccup_form_row(
             table_name,
