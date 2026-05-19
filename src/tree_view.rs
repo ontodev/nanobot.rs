@@ -1269,6 +1269,7 @@ pub fn sort_array(array: &Vec<Value>) -> Result<Value, TreeViewError> {
     }
 
     labels.sort();
+    labels.dedup();
 
     let mut res = Vec::new();
     for label in labels {
@@ -2716,7 +2717,11 @@ pub async fn get_hiccup_term_tree(
         OWLEntityType::Class => {
             //TODO: use a config struct?
             //use part-of by default
-            let relations = vec!["obo:BFO_0000050"];
+            let relations = vec![
+                "obo:BFO_0000050", // part of
+                "BFO:0000050",     // part of
+                "RO:0002202",      // develops from
+            ];
             //don't use preferred root nodes by default
             let term_tree = get_hiccup_class_tree(entity, &relations, false, table, pool).await?;
             list_view[2] = term_tree;

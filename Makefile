@@ -136,9 +136,10 @@ endif
 BINARY_PATH := build/$(BINARY)
 
 # Build a Linux binary using Musl instead of GCC.
-target/x86_64-unknown-linux-musl/release/nanobot: src/*.rs
+target/x86_64-unknown-linux-musl/release/nanobot: Cargo.* src/*.rs src/javascript/build/main.js
 	docker pull clux/muslrust:stable
 	docker run \
+		--platform linux/amd64 \
 		-v cargo-cache:/root/.cargo/registry \
 		-v $$PWD:/volume \
 		--rm -t clux/muslrust:stable \
@@ -161,3 +162,6 @@ release: $(TARGET) | build/
 		v$(TODAY) $(BINARY_PATH)
 	@echo "Please publish GitHub release v$(TODAY)"
 
+.PHONY: cebs
+cebs: target/x86_64-unknown-linux-musl/release/nanobot
+	scp $< dev:/home/knocean/cebs-ddd-dev/bin/nanobot

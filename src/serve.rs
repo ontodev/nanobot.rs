@@ -387,9 +387,10 @@ async fn tree(
             .trim_end_matches(".json")
             .trim_end_matches(".pretty");
 
-        let content = ldtab::get_property_map(&term_id, "ontology", &pool)
+        let empty = json!({});
+        let content = ldtab::get_property_map(&term_id, table, &pool)
             .await
-            .unwrap_or_default();
+            .unwrap_or(empty);
         let mut iris = HashSet::from([term_id.into()]);
         signature::get_iris(&content, &mut iris);
         let prefixes = ldtab::get_prefix_hash_map(&iris, &pool).await.unwrap();
